@@ -1,6 +1,6 @@
 # Referência do diagnóstico
 
-Out 14, 2026 · programador-gameplay · bloco A, passo 0 (atualizada no passo 2)
+Out 14, 2026 · programador-gameplay · bloco A, passo 0 (atualizada nos passos 2 e 6)
 
 ## Comando
 
@@ -8,18 +8,20 @@ Out 14, 2026 · programador-gameplay · bloco A, passo 0 (atualizada no passo 2)
 .godot-bin/godot --headless --path . res://tests/diagnostico.tscn -- --segundos=120
 ```
 
-Godot 4.3.stable.official.77dcf97d8, Linux x86_64, `data/` do commit b3fa693, sem mudança de balanceamento. Não há semente: nenhuma regra sorteia nada. Os únicos sorteios do jogo são cosméticos (posição do texto flutuante em `Fx` e escolha da fala do ajudante) e não mexem no combate.
+Godot 4.3.stable.official.77dcf97d8, Linux x86_64, números de `data/` do commit b3fa693, sem mudança de balanceamento (o passo 7 só acrescentou `offline_salvamento_intervalo` em `data/regras.json`, que o diagnóstico não usa). Não há semente: nenhuma regra sorteia nada. Os únicos sorteios do jogo são cosméticos (posição do texto flutuante em `Fx` e escolha da fala do ajudante) e não mexem no combate.
 
 ## Números de referência
 
-Valem a partir do passo 2 (bot gera `InputFrame`):
+Valem a partir do passo 6 (RD-002: corpos móveis colidem só com o mundo):
 
 | Classe | Nível | Abates | Mortes | Dano causado | Dano recebido | TTK médio | Andando | Atacando | Morto |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Guerreiro | 5 | 35 | 0 | 2910 | 699 | 3,1 s | 33% | 66% | 0% |
-| Caçador | 5 | 31 | 0 | 2490 | 468 | 3,1 s | 27% | 72% | 0% |
+| Guerreiro | 5 | 35 | 0 | 2910 | 769 | 2,9 s | 34% | 65% | 0% |
+| Caçador | 5 | 32 | 0 | 2654 | 463 | 2,8 s | 28% | 71% | 0% |
 
-Determinismo conferido. A versão do passo 0 deu a mesma saída em 3 rodadas simultâneas, disputando CPU, e em rodadas com `--max-fps 20` e `--max-fps 45`. A versão do passo 2 deu a saída acima em 4 rodadas: uma sozinha, duas simultâneas e uma com `--max-fps 20`. O FPS impresso (cerca de 144 sem tela) não faz parte da referência.
+A referência anterior (passos 2 a 5) está no histórico, no passo 6.
+
+Determinismo conferido. A versão do passo 0 deu a mesma saída em 3 rodadas simultâneas, disputando CPU, e em rodadas com `--max-fps 20` e `--max-fps 45`. A versão do passo 2 deu a sua saída em 4 rodadas: uma sozinha, duas simultâneas e uma com `--max-fps 20`. A versão do passo 6 deu a saída acima em 4 rodadas: duas sozinhas, e duas simultâneas, uma delas com `--max-fps 20`; a do fim do passo 7 também. O FPS impresso (cerca de 144 sem tela) não faz parte da referência.
 
 ## Tolerância
 
@@ -72,3 +74,32 @@ A ordem dentro do tick foi mantida de propósito: a `WorldSim` avança os inimig
 Renascimento em ticks: o inimigo renasce `round(respawn × 60)` ticks depois da morte, contando o tick da morte (720 e 900 ticks, os mesmos que o `create_timer` de física dava). O jogador renasce em `round(3 × 60) = 180` ticks; o `create_timer` dava 181, porque 3,0 menos 180 × (1/60) em ponto flutuante sobra um resto positivo. A diferença é de um tick (17 ms) e não aparece no diagnóstico, em que ninguém morre.
 
 Uma rodada curta com tela virtual (`xvfb-run`, `--segundos=40`, cerca de 5 FPS) deu os mesmos números no commit anterior e depois do passo 5: Guerreiro 3, 10, 0, 780, 203, 3,2 s; Caçador 2, 9, 0, 709, 176, 3,0 s.
+
+### Passo 6 (RD-002: camadas de colisão)
+
+**Mudança.** Camadas 1 = mundo, 2 = jogadores, 3 = inimigos (`scripts/sim/physics_layers.gd`, nomes em `project.godot`). Jogador e inimigo continuam `CharacterBody3D`, mas a máscara de todos é só a camada 1: jogador atravessa inimigo e outro jogador, e inimigos não se empurram. Chão e obstáculos continuam sólidos. Decisão aprovada pelo dono do projeto (RD-002, `docs/arquitetura-fase-1.md`); é mudança de física, por isso gera referência nova.
+
+| | Guerreiro (nível, abates, mortes, causado, recebido, TTK, andando, atacando, morto) | Caçador (mesmas colunas) |
+| --- | --- | --- |
+| Antes (passo 5) | 5, 35, 0, 2910, 699, 3,1 s, 33%, 66%, 0% | 5, 31, 0, 2490, 468, 3,1 s, 27%, 72%, 0% |
+| Depois (passo 6) | 5, 35, 0, 2910, 769, 2,9 s, 34%, 65%, 0% | 5, 32, 0, 2654, 463, 2,8 s, 28%, 71%, 0% |
+| Diferença | dano recebido +70 (+10%), TTK −0,2 s | abates +1, dano causado +164 (+7%), TTK −0,3 s |
+
+**Leitura.** Antes, os inimigos que perseguiam o mesmo alvo se esbarravam entre si e no jogador e chegavam aos poucos. Agora todos vão direto até o alcance de ataque e podem se empilhar quase no mesmo ponto (visto nas capturas com tela virtual: dois Lobos Sombrios no mesmo lugar, com os rótulos sobrepostos). Para separar as causas, contei os alvos atingidos por uso de habilidade numa cópia do projeto (contador temporário, fora do repositório), com as camadas antigas e com as novas:
+
+| Habilidade | Usos antes / depois | Alvos por uso antes / depois |
+| --- | --- | --- |
+| Guerreiro, ataque | 124 / 124 | 1,56 / 1,56 |
+| Guerreiro, Golpe Giratório | 18 / 18 | 1,39 / 1,39 |
+| Caçador, ataque | 169 / 168 | 1,00 / 1,00 |
+| Caçador, Rajada | 23 / 24 | 1,17 / 1,38 |
+
+- **Caçador:** a Rajada pega 18% mais alvos por uso, porque os inimigos chegam juntos e empilhados. Isso explica o dano causado +164 e o abate a mais.
+- **Guerreiro:** os golpes acertam o mesmo de antes, e o dano causado é idêntico. O que muda é que mais inimigos chegam ao alcance de ataque ao mesmo tempo, sem ficar presos atrás uns dos outros, e por isso o dano recebido sobe 10%. A queda do TTK médio (3,1 s para 2,9 s) não vem de mais dano: o diagnóstico mede o TTK a partir de quando o bot entra no alcance de cada alvo, e com o bando chegando junto esse começo muda. A causa exata não foi isolada.
+- Os inimigos param no alcance de ataque (1,8 m o lobo, 2,1 m o Carniçal), mais longe que a soma dos raios das cápsulas. Só ficam dentro do jogador se ele andar para dentro deles.
+
+**Meta de balanceamento** (25 a 35 abates por classe, 0 ou 1 morte, menos de 50% do tempo andando): as duas classes continuam dentro. O Guerreiro segue no limite de cima (35 abates), como antes. Nenhum número de `data/` foi mudado.
+
+### Passo 7 (save offline)
+
+Igual ao passo 6, campo por campo. O diagnóstico roda `main.tscn` dentro da própria cena de teste, e nesse caso o save offline fica desligado: não lê nem grava personagem, então não muda o resultado nem toca nos saves do jogador.

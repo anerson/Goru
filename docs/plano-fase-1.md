@@ -43,14 +43,14 @@ P1 tem de fechar antes do passo 0: se o balanceamento mudar depois, a referênci
 
 | Id | Tarefa | Responsável | Depende de | Critério de pronto | Dias-pessoa |
 | --- | --- | --- | --- | --- | --- |
-| 0 | Guardar números de referência do `diagnostico` | `qa` | P3 | Arquivo de referência no repositório, com comando e semente usados | 0,5 |
-| 1 | `rules/progression`, `combat`, `cooldowns`; constantes em `data/regras.json` | `programador-gameplay` | 0 | `player.gd` usa as regras puras; testes das funções puras no smoke; `diagnostico` = referência | 2,5 |
-| 2 | `InputFrame`, `PlayerBody.apply_input`, `offline/local_input.gd`; bot gera quadros | `programador-gameplay` | 1 | Nenhum `Input.` fora de `local_input.gd`; bot do `diagnostico` roda sem `Input` global; `diagnostico` = referência | 2 |
-| 3 | Separar view (`player_view`, `enemy_view`, `camera_rig`); HUD só ouve sinais | `programador-gameplay` | 2 | Teste: a sim roda sem nenhuma view; `take_damage` não chama `Fx` | 3 |
-| 4 | `EnemyBrain` com N alvos | `programador-gameplay` | 2 | Teste offline com 2 `PlayerBody` na mesma sim: inimigo troca de alvo e respeita a coleira | 2 |
-| 5 | `WorldSim` e `zone_builder`; timers em ticks; eventos; XP de grupo provisória | `programador-gameplay` | 3, 4 | Nenhum `await` de timer em regra; `main.gd` virou `offline/offline_game.gd`; `diagnostico` = referência | 4 |
-| 6 | RD-002: camadas de colisão | `programador-gameplay` (aval `game-designer`) | 5, decisão D2 | Antes e depois do `diagnostico` anexados; aval escrito do `game-designer` | 1,5 |
-| 7 | `offline_save.gd` (atômico, `.bak`, `formato`) | `programador-gameplay` | 5 | Teste de salvar e carregar; teste de arquivo corrompido recupera o `.bak` | 1,5 |
+| 0 | **Feito.** Guardar números de referência do `diagnostico` | `qa` | P3 | Arquivo de referência no repositório, com comando e semente usados | 0,5 |
+| 1 | **Feito.** `rules/progression`, `combat`, `cooldowns`; constantes em `data/regras.json` | `programador-gameplay` | 0 | `player.gd` usa as regras puras; testes das funções puras no smoke; `diagnostico` = referência | 2,5 |
+| 2 | **Feito.** `InputFrame`, `PlayerBody.apply_input`, `offline/local_input.gd`; bot gera quadros | `programador-gameplay` | 1 | Nenhum `Input.` fora de `local_input.gd`; bot do `diagnostico` roda sem `Input` global; `diagnostico` = referência | 2 |
+| 3 | **Feito.** Separar view (`player_view`, `enemy_view`, `camera_rig`); HUD só ouve sinais | `programador-gameplay` | 2 | Teste: a sim roda sem nenhuma view; `take_damage` não chama `Fx` | 3 |
+| 4 | **Feito.** `EnemyBrain` com N alvos | `programador-gameplay` | 2 | Teste offline com 2 `PlayerBody` na mesma sim: inimigo troca de alvo e respeita a coleira | 2 |
+| 5 | **Feito.** `WorldSim` e `zone_builder`; timers em ticks; eventos; XP de grupo provisória | `programador-gameplay` | 3, 4 | Nenhum `await` de timer em regra; `main.gd` virou `offline/offline_game.gd`; `diagnostico` = referência | 4 |
+| 6 | **Feito.** RD-002: camadas de colisão | `programador-gameplay` (aval `game-designer`) | 5, decisão D2 | Antes e depois do `diagnostico` anexados; aval escrito do `game-designer` | 1,5 |
+| 7 | **Feito.** `offline_save.gd` (atômico, `.bak`, `formato`) | `programador-gameplay` | 5 | Teste de salvar e carregar; teste de arquivo corrompido recupera o `.bak` | 1,5 |
 
 ### Bloco B: rede (passos 8 a 16 da arquitetura)
 

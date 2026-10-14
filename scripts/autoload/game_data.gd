@@ -15,20 +15,23 @@ const KEY_ACTIONS := {
 
 var classes: Dictionary
 var enemies: Dictionary
+## Id da zona carregada (nome do arquivo em data/), gravado no save do personagem.
+var zone_id := "zona_1"
 var zone: Dictionary
 var companions: Dictionary
-## Constantes de regra (XP e dano por nível, renascimento, coleira do inimigo). Usadas por scripts/rules/ e scripts/sim/.
+## Constantes de regra (XP e dano por nível, renascimento, coleira do inimigo, intervalo do save offline). Usadas por scripts/rules/ e scripts/sim/.
 var rules: Dictionary
 
 
 func _ready() -> void:
 	classes = _load_table("res://data/classes.json")
 	enemies = _load_table("res://data/enemies.json")
-	zone = _load_table("res://data/zona_1.json")
+	zone = _load_table("res://data/%s.json" % zone_id)
 	companions = _load_table("res://data/ajudantes.json")
 	rules = _load_table("res://data/regras.json")
 	for key in ["xp_por_nivel", "dano_por_nivel", "jogador_renascimento", "inimigo_coleira",
-			"inimigo_tempo_max_volta", "inimigo_folga_ataque", "inimigo_velocidade_volta", "inimigo_raio_chegada"]:
+			"inimigo_tempo_max_volta", "inimigo_folga_ataque", "inimigo_velocidade_volta", "inimigo_raio_chegada",
+			"offline_salvamento_intervalo"]:
 		if not rules.has(key):
 			push_error("data/regras.json sem o campo %s" % key)
 	_register_inputs()

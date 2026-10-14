@@ -49,6 +49,16 @@ func emit_state() -> void:
 	xp_changed.emit(xp, xp_to_next_level(), level)
 
 
+## Restaura nível e XP de um personagem salvo, com a vida cheia do nível. Só para montar o
+## personagem ao entrar; em jogo, a progressão passa por add_xp().
+func set_progress(new_level: int, new_xp: int) -> void:
+	level = maxi(new_level, 1)
+	xp = maxi(new_xp, 0)
+	max_health = Progression.max_health_for(stats, level)
+	health = max_health
+	emit_state()
+
+
 ## O quadro de entrada deste tick (vazio se não houver fonte).
 func next_input() -> InputFrame:
 	return input_source.call() if input_source.is_valid() else InputFrame.new()

@@ -49,6 +49,9 @@ static func player_spawn(zone: Dictionary) -> Vector3:
 
 static func _box_body(size: Vector3) -> StaticBody3D:
 	var body := StaticBody3D.new()
+	# Mundo na camada 1. Parado, não procura colisão com nada (máscara vazia).
+	body.collision_layer = PhysicsLayers.WORLD
+	body.collision_mask = 0
 	var shape := CollisionShape3D.new()
 	shape.shape = BoxShape3D.new()
 	shape.shape.size = size

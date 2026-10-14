@@ -2,6 +2,9 @@ extends Node
 ## Teste de fumaça: roda a cena principal em modo headless e verifica o loop básico.
 ## Uso: godot --headless --path . res://tests/smoke_test.tscn
 
+## Pasta dos testes de save: dentro de .godot/ (ignorada pelo git), nunca no user:// do jogador.
+const SAVE_TEST_DIR := "res://.godot/testes/offline_save"
+
 var failures := 0
 
 
@@ -10,8 +13,16 @@ func _ready() -> void:
 	_test_layers()
 	await _test_sim_without_view()
 	await _test_two_players()
+	await _test_collision_layers()
+	var real_saves := _real_save_files()
+	_remove_dir(SAVE_TEST_DIR)
+	_test_offline_save()
+	_test_save_isolation()
 
 	var main: Node3D = load("res://scenes/main.tscn").instantiate()
+	_check(main.offline_save == null, "save: desligado por padrão quando o jogo roda dentro de um teste")
+	var game_saves := OfflineSave.new(SAVE_TEST_DIR + "/jogo")
+	main.offline_save = game_saves
 	add_child(main)
 	await get_tree().process_frame
 	var world: WorldSim = main.world
@@ -22,6 +33,8 @@ func _ready() -> void:
 
 	main.start_game("guerreiro")
 	var player: PlayerBody = main.player
+	var save_path := game_saves.path_for(main.character.id)
+	_check(FileAccess.file_exists(save_path) and _saved_level(save_path) == 1, "save: personagem novo é gravado ao entrar, no nível 1")
 	for i in 30:
 		await get_tree().physics_frame
 	_check(player.is_on_floor(), "jogador fica no chão")
@@ -98,8 +111,11 @@ func _ready() -> void:
 		if e.is_alive():
 			e.brain.state = EnemyBrain.State.IDLE
 			e.brain.target_id = EnemyBrain.NO_TARGET
+	DirAccess.remove_absolute(save_path)
 	world.apply_damage(WorldSim.NO_ENTITY, player.id, 99999)
 	_check(player.is_dead, "jogador morre")
+	var dead_save := game_saves.load_character(main.character.id)
+	_check(dead_save != null and dead_save.position.is_equal_approx(world.player_spawn()), "save: grava ao morrer, já no ponto de renascimento")
 	_check(main.hud.death_label.visible, "HUD mostra a tela de morte")
 	var respawn_ticks := world.ticks_for(GameData.rules.jogador_renascimento)
 	await _physics_frames(respawn_ticks - 1)
@@ -114,6 +130,10 @@ func _ready() -> void:
 	var level_before: int = player.level
 	world.give_xp(player.id, player.xp_to_next_level())
 	_check(player.level == level_before + 1 and events.level_up[-1] == [player.id, level_before + 1], "sobe de nível e emite o evento")
+	_check(_saved_level(save_path) == player.level, "save: grava ao subir de nível")
+	DirAccess.remove_absolute(save_path)
+	main.notification(NOTIFICATION_WM_CLOSE_REQUEST)
+	_check(_saved_level(save_path) == player.level, "save: grava ao fechar o jogo")
 
 	# Ajudante: sem OpenJarvis, usa falas prontas do elemento.
 	var companion: Companion = main.companion
@@ -134,6 +154,12 @@ func _ready() -> void:
 		for event in ["inicio", "abate", "vida_baixa", "morte", "nivel", "ocioso", "sem_ia"]:
 			complete = complete and not element.falas.get(event, []).is_empty()
 		_check(complete, "elemento %s tem falas para todos os eventos" % element_id)
+
+	await _test_continue_from_save(main, game_saves)
+	main.offline_save = null
+	_remove_dir(SAVE_TEST_DIR)
+	DirAccess.remove_absolute(SAVE_TEST_DIR.get_base_dir())  # Só apaga se ficou vazia.
+	_check(_real_save_files() == real_saves, "save: o teste não mexeu nos saves do jogador (%s)" % OfflineSave.DEFAULT_DIR)
 
 	print("SMOKE TEST: %s" % ("OK" if failures == 0 else "%d FALHA(S)" % failures))
 	get_tree().quit(1 if failures else 0)
@@ -268,7 +294,7 @@ func _test_rules() -> void:
 	_test_enemy_brain()
 
 	# As regras puras não podem depender de cena, entrada, efeitos nem rede.
-	var forbidden := ["extends Node", "Input.", "Fx.", "get_tree", "get_node", "multiplayer", "GameData."]
+	var forbidden := ["extends Node", "Input.", "Fx.", "get_tree", "get_node", "multiplayer", "GameData.", "FileAccess", "DirAccess", "user://"]
 	for file_name in DirAccess.get_files_at("res://scripts/rules"):
 		if not file_name.ends_with(".gd"):
 			continue
@@ -363,11 +389,10 @@ func _test_two_players() -> void:
 		"obstaculos": [],
 	})
 	var wolf: EnemyBody = world.enemies[0]
-	# Em diagonal, para o corpo de quem morreu não ficar no caminho até o próximo alvo
-	# (corpos ainda colidem entre si até a RD-002).
+	# Em fila: o inimigo passa por dentro de quem morreu para chegar ao próximo (RD-002).
 	var a := world.add_player("guerreiro", Vector3(0, 0.1, 3))
-	var b := world.add_player("cacador", Vector3(4, 0.1, 4))
-	var c := world.add_player("guerreiro", Vector3(-6, 0.1, 8))
+	var b := world.add_player("cacador", Vector3(0, 0.1, 6))
+	var c := world.add_player("guerreiro", Vector3(0, 0.1, 10))
 	var brain := wolf.brain
 	var leash: float = GameData.rules.inimigo_coleira
 
@@ -425,6 +450,224 @@ func _test_two_players() -> void:
 	_check(not wolf.is_alive(), "inimigo ainda morto um tick antes do renascimento")
 	world.step(dt)
 	_check(wolf.is_alive() and respawn_tick[0] == died_at + ticks - 1 and wolf.health == wolf.max_health, "inimigo renasce depois de %d ticks, com vida cheia" % ticks)
+	viewport.queue_free()
+	await _physics_frames(1)
+
+
+## Save offline (passo 7): gravação atômica com .bak, leitura, recuperação de arquivo quebrado e
+## recusa de formato desconhecido. Tudo na pasta de teste.
+func _test_offline_save() -> void:
+	var store := OfflineSave.new(SAVE_TEST_DIR + "/unidade")
+	var id := OfflineSave.new_id()
+	_check(store.is_valid_id(id) and id.begins_with("off-") and id.length() == 40 and id != OfflineSave.new_id(), "save: id off-<uuid>, novo a cada personagem")
+	_check(not store.is_valid_id("off-../../x") and not store.is_valid_id("on-" + id.trim_prefix("off-")), "save: recusa id que não é off-<uuid>")
+	_check(store.load_character("../segredo") == null and store.last_status == OfflineSave.Status.INVALID_ID, "save: não lê caminho fora da pasta")
+	_check(store.list_ids().is_empty() and store.latest_for_class("guerreiro") == null, "save: pasta vazia não tem personagem")
+
+	var state := CharacterState.new()
+	state.id = id
+	state.display_name = "Arin"
+	state.class_id = "guerreiro"
+	state.level = 3
+	state.xp = 40
+	state.zone_id = "zona_1"
+	state.position = Vector3(1.5, 1.0, -2.25)
+	state.played_seconds = 1234
+	_check(store.save(state) == OK, "save: grava o personagem")
+	var path := store.path_for(id)
+	_check(path == SAVE_TEST_DIR + "/unidade/" + id + ".json", "save: arquivo <pasta>/off-<uuid>.json")
+	var file: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	var keys: Array = file.personagem.keys() if file is Dictionary and file.get("personagem") is Dictionary else []
+	keys.sort()
+	_check(file is Dictionary and file.formato == OfflineSave.FORMAT and file.versao_jogo == ProjectSettings.get_setting("application/config/version") and str(file.salvo_em).ends_with("Z"), "save: arquivo com formato, versão do jogo e hora")
+	_check(keys == ["classe", "id", "nivel", "nome", "posicao", "tempo_jogado_s", "xp", "zona"], "save: personagem com as chaves da arquitetura, sem vida")
+	_check(not FileAccess.file_exists(path + ".tmp") and not FileAccess.file_exists(path + ".bak"), "save: primeira gravação sem .tmp nem .bak")
+	var loaded := store.load_character(id)
+	_check(loaded != null and loaded.to_dict() == state.to_dict() and not store.last_from_backup, "save: carrega igual ao que gravou")
+	_check(loaded != null and typeof(loaded.level) == TYPE_INT and typeof(loaded.xp) == TYPE_INT, "save: nível e XP voltam como inteiros")
+
+	# Segunda gravação: a anterior vira .bak.
+	state.level = 4
+	store.save(state)
+	_check(_saved_level(path) == 4 and _saved_level(path + ".bak") == 3 and not FileAccess.file_exists(path + ".tmp"), "save: a gravação anterior vira .bak")
+
+	# Arquivo principal quebrado: usa o .bak, e a próxima gravação não troca o .bak bom pelo quebrado.
+	_write(path, "{\"formato\": 1, \"personagem\": {\"id\": ")
+	loaded = store.load_character(id)
+	_check(loaded != null and loaded.level == 3 and store.last_from_backup, "save: arquivo corrompido recupera o .bak")
+	state.level = 5
+	store.save(state)
+	_check(_saved_level(path) == 5 and _saved_level(path + ".bak") == 3, "save: arquivo quebrado não vira .bak")
+	DirAccess.remove_absolute(path)
+	loaded = store.load_character(id)
+	_check(loaded != null and loaded.level == 3 and store.last_from_backup, "save: sem o arquivo principal, usa o .bak")
+	_check(store.list_ids() == [id], "save: lista o personagem que só tem .bak")
+	var broken := {"formato": 1, "personagem": {"id": id, "nome": "Arin", "classe": "guerreiro", "nivel": 0, "xp": 0, "zona": "zona_1", "posicao": [0, 0, 0], "tempo_jogado_s": 0}}
+	_write(path, JSON.stringify(broken))
+	loaded = store.load_character(id)
+	_check(loaded != null and loaded.level == 3 and store.last_from_backup, "save: JSON válido com dado impossível (nível 0) também recupera o .bak")
+	_write(path + ".bak", "não é json")
+	_check(store.load_character(id) == null and store.last_status == OfflineSave.Status.CORRUPT, "save: os dois quebrados, devolve nada sem travar")
+
+	# Formato desconhecido (de uma versão mais nova): recusa sem travar, sem usar o .bak e sem mexer no arquivo.
+	state.level = 9
+	var future := {"formato": 99, "versao_jogo": "9.9.9", "salvo_em": "2030-01-01T00:00:00Z", "personagem": state.to_dict()}
+	_write(path, JSON.stringify(future))
+	state.level = 3
+	_write(path + ".bak", JSON.stringify({"formato": 1, "salvo_em": "2026-01-01T00:00:00Z", "personagem": state.to_dict()}))
+	var before := FileAccess.get_file_as_string(path)
+	_check(store.load_character(id) == null and store.last_status == OfflineSave.Status.UNKNOWN_FORMAT and not store.last_from_backup, "save: formato desconhecido é recusado sem travar")
+	_check(FileAccess.get_file_as_string(path) == before, "save: formato desconhecido não é alterado")
+	_check(OfflineSave.migrate({"formato": 1.0}) == {"formato": 1.0} and OfflineSave.migrate({"formato": 2}).is_empty() and OfflineSave.migrate({}).is_empty(), "save: migrate conhece o formato 1 e recusa os outros")
+
+	# O mais recente da classe: pela hora gravada; ignora outra classe e o formato desconhecido.
+	for entry in [["2026-03-01T10:00:00Z", "guerreiro", 2], ["2026-03-02T10:00:00Z", "guerreiro", 7], ["2026-04-01T10:00:00Z", "cacador", 4]]:
+		var other := CharacterState.new()
+		other.id = OfflineSave.new_id()
+		other.display_name = "Outro"
+		other.class_id = entry[1]
+		other.level = entry[2]
+		other.zone_id = "zona_1"
+		_write(store.path_for(other.id), JSON.stringify({"formato": 1, "versao_jogo": "0.1.0", "salvo_em": entry[0], "personagem": other.to_dict()}))
+	var latest := store.latest_for_class("guerreiro")
+	_check(latest != null and latest.level == 7, "save: continua do save mais recente da classe")
+	_check(store.latest_for_class("cacador").level == 4 and store.latest_for_class("mago") == null, "save: cada classe acha o seu, classe sem save não acha nada")
+
+	# CharacterState recusa dado incompleto ou impossível.
+	var valid := state.to_dict()
+	_check(CharacterState.from_dict(valid) != null, "estado do personagem: dicionário completo é aceito")
+	for bad: Array in [["classe", null], ["nivel", 0], ["xp", -1], ["posicao", [1, 2]], ["id", 7], ["nivel", "3"]]:
+		var data := valid.duplicate()
+		if bad[1] == null:
+			data.erase(bad[0])
+		else:
+			data[bad[0]] = bad[1]
+		_check(CharacterState.from_dict(data) == null, "estado do personagem: recusa %s = %s" % [bad[0], var_to_str(bad[1])])
+
+
+## Nenhum código fora de scripts/offline/ conhece o save offline (nem a classe, nem a pasta).
+func _test_save_isolation() -> void:
+	var outside: Array[String] = []
+	for path in _script_files("res://scripts"):
+		if not path.begins_with("res://scripts/offline/"):
+			outside.append(path)
+	_check(outside.size() > 10, "save: confere %d scripts fora de scripts/offline/" % outside.size())
+	var clean := true
+	for path in outside:
+		clean = _code_free_of(path, ["OfflineSave", "offline_save", "user://offline"]) and clean
+	_check(clean, "save: nenhum código fora de scripts/offline/ lê o save offline")
+
+
+## Continuar do save: com um save da classe, o jogo novo começa dele (mesmo id, nível, XP e lugar).
+func _test_continue_from_save(main: Node3D, saves: OfflineSave) -> void:
+	var saved: CharacterState = saves.load_character(main.character.id)
+	var again: Node3D = load("res://scenes/main.tscn").instantiate()
+	again.offline_save = saves
+	add_child(again)
+	await get_tree().process_frame
+	again.start_game("guerreiro")
+	var body: PlayerBody = again.player
+	_check(again.character.id == saved.id and body.level == saved.level and body.xp == saved.xp, "save: o jogo continua do save da mesma classe (nível %d)" % body.level)
+	_check(body.health == body.max_health and body.max_health == Progression.max_health_for(body.stats, saved.level), "save: volta com a vida cheia do nível")
+	_check(body.global_position.is_equal_approx(saved.position), "save: volta onde foi salvo")
+	_check(saves.list_ids().size() == 1, "save: continuar não cria outro personagem")
+	again.offline_save = null
+	again.queue_free()
+	await _physics_frames(1)
+
+
+## Nível gravado num arquivo de save (-1 se não der para ler).
+func _saved_level(path: String) -> int:
+	var data: Variant = JSON.parse_string(FileAccess.get_file_as_string(path)) if FileAccess.file_exists(path) else null
+	if data is Dictionary and data.get("personagem") is Dictionary:
+		return int(data.personagem.get("nivel", -1))
+	return -1
+
+
+func _write(path: String, text: String) -> void:
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	file.store_string(text)
+	file.close()
+
+
+## Arquivos na pasta real de saves do jogador, com a hora de modificação (só leitura).
+func _real_save_files() -> Dictionary:
+	var found := {}
+	if DirAccess.dir_exists_absolute(OfflineSave.DEFAULT_DIR):
+		for file_name in DirAccess.get_files_at(OfflineSave.DEFAULT_DIR):
+			found[file_name] = FileAccess.get_modified_time(OfflineSave.DEFAULT_DIR + "/" + file_name)
+	return found
+
+
+## Apaga uma pasta de teste com tudo dentro.
+func _remove_dir(path: String) -> void:
+	if not DirAccess.dir_exists_absolute(path):
+		return
+	for sub in DirAccess.get_directories_at(path):
+		_remove_dir(path + "/" + sub)
+	for file_name in DirAccess.get_files_at(path):
+		DirAccess.remove_absolute(path + "/" + file_name)
+	DirAccess.remove_absolute(path)
+
+
+## Todos os .gd dentro de `folder`, recursivo.
+func _script_files(folder: String) -> Array[String]:
+	var found: Array[String] = []
+	for sub in DirAccess.get_directories_at(folder):
+		found.append_array(_script_files(folder + "/" + sub))
+	for file_name in DirAccess.get_files_at(folder):
+		if file_name.ends_with(".gd"):
+			found.append(folder + "/" + file_name)
+	return found
+
+
+## RD-002: camadas 1 = mundo, 2 = jogadores, 3 = inimigos, e todo corpo móvel colide só com o
+## mundo. Jogador atravessa jogador e inimigo, e inimigos não se empurram.
+func _test_collision_layers() -> void:
+	_check(PhysicsLayers.WORLD == 1 << 0 and PhysicsLayers.PLAYERS == 1 << 1 and PhysicsLayers.ENEMIES == 1 << 2, "camadas: 1 mundo, 2 jogadores, 3 inimigos")
+	for layer in [[1, "mundo"], [2, "jogadores"], [3, "inimigos"]]:
+		_check(ProjectSettings.get_setting("layer_names/3d_physics/layer_%d" % layer[0]) == layer[1], "camada %d se chama %s no editor" % layer)
+	var viewport := _isolated_world()
+	var world := WorldSim.new()
+	viewport.add_child(world)
+	world.setup({
+		"nome": "Teste",
+		"spawn_jogador": [0, 0.1, 60],
+		"chao": {"posicao": [0, -0.5, 0], "tamanho": [140, 1, 140]},
+		"inimigos": [{"tipo": "lobo_sombrio", "posicao": [0, 0.1, 0]}, {"tipo": "lobo_sombrio", "posicao": [0, 0.1, 0]}],
+		"obstaculos": [{"posicao": [30, 0, 0], "tamanho": [2, 2, 2]}],
+	})
+	var walker := world.add_player("guerreiro", Vector3(0, 0.1, 6))
+	var blocker := world.add_player("cacador", Vector3(0, 0.1, 3))
+	var statics := world.find_children("*", "StaticBody3D", true, false)
+	_check(statics.size() == 2 and statics.all(func(body: StaticBody3D): return body.collision_layer == PhysicsLayers.WORLD), "chão e obstáculos na camada do mundo")
+	_check(walker.collision_layer == PhysicsLayers.PLAYERS and walker.collision_mask == PhysicsLayers.WORLD, "jogador na camada 2, colide só com o mundo")
+	var wolf: EnemyBody = world.enemies[0]
+	_check(wolf.collision_layer == PhysicsLayers.ENEMIES and wolf.collision_mask == PhysicsLayers.WORLD, "inimigo na camada 3, colide só com o mundo")
+	await _physics_frames(10)
+
+	# Anda 90 ticks para -Z, passando pelo outro jogador (z = 3) e pelos lobos (z = 0):
+	# ninguém segura, então anda a distância cheia.
+	var frame := InputFrame.new()
+	frame.move = Vector2(0, -1)
+	walker.input_source = func() -> InputFrame: return frame
+	var start := walker.global_position
+	var ticks := 90
+	await _physics_frames(ticks)
+	var expected: float = walker.stats.velocidade * ticks / float(world.tick_rate)
+	var walked := start.z - walker.global_position.z
+	_check(absf(walked - expected) < 0.05 and walker.global_position.z < -1.0, "jogador atravessa jogador e inimigos (andou %.2f de %.2f m)" % [walked, expected])
+	var gap := EnemyBrain.flat_distance(world.enemies[0].global_position, world.enemies[1].global_position)
+	_check(gap < 0.1, "inimigos no mesmo ponto não se empurram (%.2f m)" % gap)
+
+	# O mundo continua sólido: andando contra o obstáculo, o jogador para nele.
+	frame.move = Vector2.ZERO
+	walker.global_position = Vector3(26, 0.1, 0)
+	frame.yaw = -PI / 2.0  # Olha e anda para +X.
+	frame.move = Vector2(0, -1)
+	await _physics_frames(120)
+	_check(walker.global_position.x < 29.0 - 0.3, "o mundo continua sólido para o jogador (x = %.2f)" % walker.global_position.x)
+	walker.input_source = Callable()
 	viewport.queue_free()
 	await _physics_frames(1)
 

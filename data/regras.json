@@ -6,5 +6,6 @@
 	"inimigo_tempo_max_volta": 6.0,
 	"inimigo_folga_ataque": 1.2,
 	"inimigo_velocidade_volta": 1.5,
-	"inimigo_raio_chegada": 0.6
+	"inimigo_raio_chegada": 0.6,
+	"offline_salvamento_intervalo": 60.0
 }
