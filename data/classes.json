@@ -6,17 +6,17 @@
 		"vida_base": 140,
 		"vida_por_nivel": 25,
 		"velocidade": 6.0,
-		"ataque": { "nome": "Golpe", "dano": 14, "alcance": 2.6, "angulo": 100, "recarga": 0.7 },
-		"habilidade": { "nome": "Golpe Giratório", "dano": 26, "alcance": 4.0, "angulo": 360, "recarga": 6.0 }
+		"ataque": { "nome": "Golpe", "dano": 11, "alcance": 2.6, "angulo": 100, "recarga": 0.7 },
+		"habilidade": { "nome": "Golpe Giratório", "dano": 18, "alcance": 4.0, "angulo": 360, "recarga": 6.0, "cura_por_acerto": 0.05 }
 	},
 	"cacador": {
 		"nome": "Caçador",
 		"papel": "Dano à distância",
 		"cor": [0.3, 0.7, 0.35],
-		"vida_base": 95,
-		"vida_por_nivel": 15,
+		"vida_base": 120,
+		"vida_por_nivel": 18,
 		"velocidade": 6.5,
-		"ataque": { "nome": "Disparo", "dano": 11, "alcance": 16.0, "angulo": 12, "recarga": 0.55 },
-		"habilidade": { "nome": "Rajada", "dano": 22, "alcance": 14.0, "angulo": 45, "recarga": 5.0 }
+		"ataque": { "nome": "Disparo", "dano": 10, "alcance": 10.0, "angulo": 12, "recarga": 0.55 },
+		"habilidade": { "nome": "Rajada", "dano": 22, "alcance": 10.0, "angulo": 45, "recarga": 5.0 }
 	}
 }

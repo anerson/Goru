@@ -117,6 +117,10 @@ func use_ability(ability_key: String) -> int:
 			continue
 		enemy.take_damage(damage)
 		hits += 1
+	# Cura uma fração da vida máxima por inimigo atingido (campo opcional, padrão 0).
+	var heal_per_hit: float = ability.get("cura_por_acerto", 0.0)
+	if hits > 0 and heal_per_hit > 0.0:
+		heal(max_health * heal_per_hit * hits)
 	_play_swing(ability.angulo >= 360)
 	return hits
 
@@ -132,6 +136,17 @@ func take_damage(amount: float) -> void:
 		model.rotation.x = -PI / 2.0
 		model.position.y = 0.4
 		died.emit()
+
+
+func heal(amount: float) -> void:
+	if is_dead or amount <= 0.0:
+		return
+	var healed := minf(amount, max_health - health)
+	if healed <= 0.0:
+		return
+	health += healed
+	health_changed.emit(health, max_health)
+	Fx.floating_text(get_parent(), global_position + Vector3.UP * 2.3, "+%d" % roundi(healed), Color(0.4, 1, 0.4))
 
 
 func respawn(at: Vector3) -> void:
