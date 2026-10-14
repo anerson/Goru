@@ -114,7 +114,8 @@ func _die() -> void:
 	visible = false
 	collision.set_deferred("disabled", true)
 	killed.emit(stats.xp)
-	await get_tree().create_timer(stats.respawn).timeout
+	# Conta em tempo de física (ticks), como o resto da simulação, e não em quadros de tela.
+	await get_tree().create_timer(stats.respawn, true, true).timeout
 	global_position = spawn_position
 	velocity = Vector3.ZERO
 	health = max_health

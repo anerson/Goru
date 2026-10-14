@@ -1,16 +1,18 @@
 extends CharacterBody3D
 ## Personagem do jogador: movimento em terceira pessoa, ataque, habilidade e progressão.
+## Não lê o teclado: a cada tick pede um InputFrame a `input_source` e o aplica com apply_input().
 
 signal health_changed(current: float, maximum: float)
 signal xp_changed(xp: int, xp_next: int, level: int)
 signal ability_used(ability_key: String, cooldown: float)
+## Emitido depois que a habilidade causou dano e cura.
+signal ability_resolved(ability_key: String, hits: int)
 signal died
 
 const GRAVITY := 20.0
 const JUMP_VELOCITY := 7.0
 const MOUSE_SENSITIVITY := 0.003
 const TURN_SPEED := 12.0
-const DAMAGE_PER_LEVEL := 0.1
 
 var class_id := "guerreiro"
 var stats: Dictionary
@@ -20,7 +22,11 @@ var level := 1
 var xp := 0
 var is_dead := false
 var controls_enabled := true
-var cooldowns := {"ataque": 0.0, "habilidade": 0.0}
+var cooldowns := Cooldowns.new()
+## Fonte da entrada: função sem argumentos que devolve o InputFrame do tick
+## (offline/local_input.gd no jogo, o bot no diagnóstico). Sem fonte, o jogador fica parado.
+var input_source: Callable
+var _previous_buttons := 0
 
 @onready var model: Node3D = $Model
 @onready var weapon: Node3D = $Model/Weapon
@@ -38,7 +44,7 @@ func _ready() -> void:
 	spring_arm.add_excluded_object(get_rid())
 	spring_arm.rotation.x = -0.35
 	camera.make_current()
-	max_health = _max_health_for(level)
+	max_health = Progression.max_health_for(stats, level)
 	health = max_health
 	health_changed.emit(health, max_health)
 	xp_changed.emit(xp, xp_to_next_level(), level)
@@ -64,8 +70,17 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
-	for key: String in cooldowns:
-		cooldowns[key] = maxf(cooldowns[key] - delta, 0.0)
+	var frame: InputFrame = input_source.call() if input_source.is_valid() else InputFrame.new()
+	apply_input(frame, delta)
+
+
+## Avança um tick com a intenção do jogador. Mesma função para o jogo local, o bot e,
+## no futuro, a previsão no cliente e o servidor.
+func apply_input(frame: InputFrame, delta: float) -> void:
+	cooldowns.tick(delta)
+	# Pular e habilidade valem na borda (apertou neste quadro); ataque vale enquanto segurado.
+	var pressed := frame.buttons & ~_previous_buttons
+	_previous_buttons = frame.buttons
 
 	if not is_on_floor():
 		velocity.y -= GRAVITY * delta
@@ -75,13 +90,11 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		return
 
-	if controls_enabled and Input.is_action_just_pressed("jump") and is_on_floor():
+	if pressed & InputFrame.JUMP and is_on_floor():
 		velocity.y = JUMP_VELOCITY
 
-	var input := Vector2.ZERO
-	if controls_enabled:
-		input = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
-	var direction := camera_pivot.global_basis * Vector3(input.x, 0.0, input.y)
+	# A direção é relativa ao giro da câmera; o módulo de `move` não importa (sempre normalizada).
+	var direction := Basis.from_euler(Vector3(0.0, frame.yaw, 0.0)) * Vector3(frame.move.x, 0.0, frame.move.y)
 	direction.y = 0.0
 	direction = direction.normalized()
 	velocity.x = direction.x * stats.velocidade
@@ -90,44 +103,34 @@ func _physics_process(delta: float) -> void:
 		model.rotation.y = lerp_angle(model.rotation.y, atan2(-direction.x, -direction.z), TURN_SPEED * delta)
 	move_and_slide()
 
-	if controls_enabled and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		if Input.is_action_pressed("attack"):
-			use_ability("ataque")
-		if Input.is_action_just_pressed("skill"):
-			use_ability("habilidade")
+	if frame.has(InputFrame.ATTACK):
+		use_ability("ataque", frame.yaw)
+	if pressed & InputFrame.SKILL:
+		use_ability("habilidade", frame.yaw)
 
 
-## Usa "ataque" ou "habilidade". Retorna quantos inimigos foram atingidos, ou -1 se não pôde usar.
-func use_ability(ability_key: String) -> int:
-	if is_dead or cooldowns[ability_key] > 0.0:
+## Usa "ataque" ou "habilidade" mirando no giro `yaw` (o da câmera).
+## Retorna quantos inimigos foram atingidos, ou -1 se não pôde usar.
+func use_ability(ability_key: String, yaw: float) -> int:
+	if is_dead or not cooldowns.is_ready(ability_key):
 		return -1
 	var ability: Dictionary = stats[ability_key]
-	cooldowns[ability_key] = ability.recarga
+	cooldowns.start(ability_key, ability.recarga)
 	ability_used.emit(ability_key, ability.recarga)
 
-	# Mira para onde a câmera olha.
-	model.rotation.y = camera_pivot.rotation.y
-	var forward := -model.global_basis.z
-	var half_angle := deg_to_rad(ability.angulo) / 2.0
-	var damage: float = ability.dano * damage_multiplier()
-	var hits := 0
-	for enemy in get_tree().get_nodes_in_group("enemies"):
-		if not enemy.is_alive():
-			continue
-		var to_enemy: Vector3 = enemy.global_position - global_position
-		to_enemy.y = 0.0
-		if to_enemy.length() > ability.alcance:
-			continue
-		if ability.angulo < 360 and to_enemy.length() > 0.01 and forward.angle_to(to_enemy.normalized()) > half_angle:
-			continue
-		enemy.take_damage(damage)
-		hits += 1
-	# Cura uma fração da vida máxima por inimigo atingido (campo opcional, padrão 0).
-	var heal_per_hit: float = ability.get("cura_por_acerto", 0.0)
-	if hits > 0 and heal_per_hit > 0.0:
-		heal(max_health * heal_per_hit * hits)
+	model.rotation.y = yaw
+	var enemies := get_tree().get_nodes_in_group("enemies")
+	var targets: Array = []
+	for enemy in enemies:
+		targets.append({"pos": enemy.global_position, "alive": enemy.is_alive()})
+	var hit := Combat.select_targets(global_position, yaw, ability, targets)
+	var damage := Combat.damage_for(ability, level, GameData.rules)
+	for index in hit:
+		enemies[index].take_damage(damage)
+	heal(Combat.heal_for_hits(ability, max_health, hit.size()))
 	_play_swing(ability.angulo >= 360)
-	return hits
+	ability_resolved.emit(ability_key, hit.size())
+	return hit.size()
 
 
 func take_damage(amount: float) -> void:
@@ -165,11 +168,12 @@ func respawn(at: Vector3) -> void:
 
 
 func add_xp(amount: int) -> void:
-	xp += amount
-	while xp >= xp_to_next_level():
-		xp -= xp_to_next_level()
-		level += 1
-		max_health = _max_health_for(level)
+	var state := {"level": level, "xp": xp}
+	var levels_gained := Progression.apply_xp(state, amount, GameData.rules)
+	xp = state.xp
+	for new_level in levels_gained:
+		level = new_level
+		max_health = Progression.max_health_for(stats, level)
 		health = max_health
 		health_changed.emit(health, max_health)
 		Fx.floating_text(get_parent(), global_position + Vector3.UP * 2.6, "Nível %d!" % level, Color(1, 0.85, 0.2))
@@ -177,15 +181,11 @@ func add_xp(amount: int) -> void:
 
 
 func xp_to_next_level() -> int:
-	return 100 * level
+	return Progression.xp_to_next_level(level, GameData.rules)
 
 
 func damage_multiplier() -> float:
-	return 1.0 + DAMAGE_PER_LEVEL * (level - 1)
-
-
-func _max_health_for(for_level: int) -> float:
-	return stats.vida_base + stats.vida_por_nivel * (for_level - 1)
+	return Combat.damage_multiplier(level, GameData.rules)
 
 
 func _play_swing(spin: bool) -> void:

@@ -46,7 +46,7 @@ func _process(_delta: float) -> void:
 		return
 	for key: String in ability_labels:
 		var ability: Dictionary = player.stats[key]
-		var remaining: float = player.cooldowns[key]
+		var remaining: float = player.cooldowns.remaining(key)
 		var hint := "Clique" if key == "ataque" else "Q"
 		var status := "pronto" if remaining <= 0.0 else "%.1fs" % remaining
 		ability_labels[key].text = "[%s] %s: %s" % [hint, ability.nome, status]

@@ -1,5 +1,7 @@
 extends Node
 ## Diagnóstico: um bot joga cada classe por alguns minutos e mede o combate.
+## O bot entrega um InputFrame por tick ao jogador, como o teclado faria; não usa o Input global.
+## Tudo conta em ticks de física, então o resultado não depende do FPS (ver tests/referencia_diagnostico.md).
 ## Com tela, também salva capturas. Uso:
 ##   godot --path . res://tests/diagnostico.tscn -- --saida=/pasta --segundos=120
 
@@ -8,6 +10,9 @@ var seconds := 120.0
 var main: Node3D
 var player: CharacterBody3D
 var metrics := {}
+var bot_frame := InputFrame.new()
+var _bot_yaw := 0.0
+var _health_snapshot := 0.0
 
 
 func _ready() -> void:
@@ -28,17 +33,22 @@ func _ready() -> void:
 func _run_class(class_id: String) -> String:
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
-	await _frames(5)
+	# Esperas em ticks de física, para o estado inicial não depender do FPS.
+	await _physics_frames(5)
 	await _shot("%s_0_menu" % class_id)
 	main.start_game(class_id)
 	player = main.player
+	bot_frame = InputFrame.new()
+	player.input_source = _bot_input
 	metrics = {"dano_causado": 0.0, "dano_recebido": 0.0, "mortes": 0, "abates": 0,
 		"tempo_andando": 0.0, "tempo_atacando": 0.0, "tempo_morto": 0.0, "ttk": [], "fps": []}
 	player.health_changed.connect(_on_health_changed.bind([player.health]))
 	player.died.connect(func(): metrics.mortes += 1)
+	player.ability_used.connect(_on_ability_used)
+	player.ability_resolved.connect(_on_ability_resolved)
 	for enemy in get_tree().get_nodes_in_group("enemies"):
 		enemy.killed.connect(func(_xp): metrics.abates += 1)
-	await _frames(30)
+	await _physics_frames(30)
 	await _shot("%s_1_inicio" % class_id)
 
 	var engaged_at := {}
@@ -53,7 +63,7 @@ func _run_class(class_id: String) -> String:
 		if shots_taken < 3 and elapsed > 6.0 + shots_taken * 12.0:
 			await _shot("%s_%d_combate" % [class_id, shots_taken + 2])
 			shots_taken += 1
-	_release_all()
+	bot_frame = InputFrame.new()
 
 	var ttk: Array = metrics.ttk
 	var avg_ttk: float = 0.0 if ttk.is_empty() else ttk.reduce(func(a, b): return a + b) / ttk.size()
@@ -69,8 +79,12 @@ func _run_class(class_id: String) -> String:
 	return line
 
 
+## Decide o quadro de entrada deste tick. Roda no início do tick, antes do _physics_process do jogador.
 func _bot_step(delta: float, engaged_at: Dictionary, now: float) -> void:
-	_release_all()
+	var frame := InputFrame.new()
+	frame.seq = bot_frame.seq + 1
+	frame.yaw = _bot_yaw
+	bot_frame = frame
 	if player.is_dead:
 		metrics.tempo_morto += delta
 		return
@@ -89,20 +103,34 @@ func _bot_step(delta: float, engaged_at: Dictionary, now: float) -> void:
 	if target == null:
 		return
 	var to_target := target.global_position - player.global_position
-	player.camera_pivot.rotation.y = atan2(-to_target.x, -to_target.z)
+	_bot_yaw = atan2(-to_target.x, -to_target.z)
+	frame.yaw = _bot_yaw
+	player.camera_pivot.rotation.y = _bot_yaw  # Só para as capturas de tela.
 	var attack_range: float = player.stats.ataque.alcance
 	if best > attack_range * 0.8:
-		Input.action_press("move_forward")
+		frame.move = Vector2(0.0, -1.0)  # Para a frente, como a tecla W.
 		metrics.tempo_andando += delta
 	else:
 		if not engaged_at.has(target):
 			engaged_at[target] = now
 		metrics.tempo_atacando += delta
-		var health_before := _enemy_health_total()
-		player.use_ability("ataque")
-		if best <= player.stats.habilidade.alcance:
-			player.use_ability("habilidade")
-		metrics.dano_causado += health_before - _enemy_health_total()
+		frame.buttons |= InputFrame.ATTACK
+		# A habilidade dispara na borda do botão: o bot só aperta quando ela está pronta,
+		# e solta no tick seguinte (com a recarga correndo), como uma pessoa faria.
+		if best <= player.stats.habilidade.alcance and player.cooldowns.is_ready("habilidade"):
+			frame.buttons |= InputFrame.SKILL
+
+
+func _bot_input() -> InputFrame:
+	return bot_frame
+
+
+func _on_ability_used(_ability_key: String, _cooldown: float) -> void:
+	_health_snapshot = _enemy_health_total()
+
+
+func _on_ability_resolved(_ability_key: String, _hits: int) -> void:
+	metrics.dano_causado += _health_snapshot - _enemy_health_total()
 
 
 func _enemy_health_total() -> float:
@@ -118,14 +146,14 @@ func _on_health_changed(current: float, _maximum: float, last: Array) -> void:
 	last[0] = current
 
 
-func _release_all() -> void:
-	for action in ["move_forward", "move_back", "move_left", "move_right", "attack", "skill"]:
-		Input.action_release(action)
-
-
 func _frames(count: int) -> void:
 	for i in count:
 		await get_tree().process_frame
+
+
+func _physics_frames(count: int) -> void:
+	for i in count:
+		await get_tree().physics_frame
 
 
 func _shot(shot_name: String) -> void:

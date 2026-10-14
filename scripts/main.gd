@@ -8,6 +8,7 @@ const RESPAWN_DELAY := 3.0
 
 var player: CharacterBody3D
 var companion: Companion
+var local_input: LocalInput
 var _chosen_class := ""
 
 @onready var hud: CanvasLayer = $HUD
@@ -30,6 +31,8 @@ func start_game(class_id: String, element_id := "folha") -> void:
 	player.class_id = class_id
 	add_child(player)
 	player.global_position = GameData.to_vector3(GameData.zone.spawn_jogador)
+	local_input = LocalInput.new(player)
+	player.input_source = local_input.next_frame
 	player.died.connect(_on_player_died)
 	hud.bind_player(player)
 	companion = Companion.new()
@@ -87,6 +90,7 @@ func _on_enemy_killed(xp_reward: int) -> void:
 
 func _on_player_died() -> void:
 	hud.show_death(RESPAWN_DELAY)
-	await get_tree().create_timer(RESPAWN_DELAY).timeout
+	# Conta em tempo de física (ticks), como o resto da simulação, e não em quadros de tela.
+	await get_tree().create_timer(RESPAWN_DELAY, true, true).timeout
 	player.respawn(GameData.to_vector3(GameData.zone.spawn_jogador))
 	hud.hide_death()
