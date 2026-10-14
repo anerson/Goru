@@ -1,0 +1,78 @@
+extends Node
+## Teste de fumaça: roda a cena principal em modo headless e verifica o loop básico.
+## Uso: godot --headless --path . res://tests/smoke_test.tscn
+
+var failures := 0
+
+
+func _ready() -> void:
+	var main: Node3D = load("res://scenes/main.tscn").instantiate()
+	add_child(main)
+	await get_tree().process_frame
+
+	_check(GameData.classes.size() >= 2, "carrega as classes")
+	_check(main.enemies_root.get_child_count() == GameData.zone.inimigos.size(), "cria todos os inimigos da zona")
+
+	main.start_game("guerreiro")
+	var player: CharacterBody3D = main.player
+	for i in 30:
+		await get_tree().physics_frame
+	_check(player.is_on_floor(), "jogador fica no chão")
+
+	# Coloca um inimigo na frente do jogador e mata ele com ataques.
+	var enemy: CharacterBody3D = main.enemies_root.get_child(0)
+	enemy.global_position = player.global_position + Vector3(0, 0, -1.5)
+	player.camera_pivot.rotation.y = 0.0
+	var xp_before: int = player.xp
+	var hits := 0
+	for i in 20:
+		if not enemy.is_alive():
+			break
+		player.cooldowns["ataque"] = 0.0
+		hits += maxi(player.use_ability("ataque"), 0)
+		await get_tree().physics_frame
+	_check(hits > 0, "ataque acerta inimigo à frente")
+	_check(not enemy.is_alive(), "inimigo morre")
+	_check(player.xp > xp_before or player.level > 1, "jogador ganha XP")
+
+	# Inimigo atrás não é atingido pelo ataque frontal.
+	var behind: CharacterBody3D = main.enemies_root.get_child(1)
+	behind.global_position = player.global_position + Vector3(0, 0, 1.5)
+	player.cooldowns["ataque"] = 0.0
+	var health_before: float = behind.health
+	player.use_ability("ataque")
+	_check(behind.health == health_before, "ataque frontal não acerta atrás")
+
+	# Habilidade de 360° acerta atrás.
+	player.use_ability("habilidade")
+	_check(behind.health < health_before, "golpe giratório acerta em volta")
+
+	# Inimigo travado voltando para casa é teleportado de volta.
+	behind.state = behind.State.RETURN
+	behind.return_timer = behind.MAX_RETURN_TIME
+	behind.global_position = behind.spawn_position + Vector3(5, 0, 0)
+	await get_tree().physics_frame
+	_check(behind.state == behind.State.IDLE, "inimigo travado volta ao ponto de origem")
+
+	# Morte e renascimento. Afasta os inimigos para nada atacar durante o teste.
+	for e in get_tree().get_nodes_in_group("enemies"):
+		e.global_position = e.spawn_position
+		e.state = e.State.IDLE if e.is_alive() else e.state
+	player.take_damage(99999)
+	_check(player.is_dead, "jogador morre")
+	await get_tree().create_timer(main.RESPAWN_DELAY + 0.2).timeout
+	_check(not player.is_dead and player.health == player.max_health, "jogador renasce com vida cheia")
+
+	# Subida de nível.
+	var level_before: int = player.level
+	player.add_xp(player.xp_to_next_level())
+	_check(player.level == level_before + 1, "sobe de nível")
+
+	print("SMOKE TEST: %s" % ("OK" if failures == 0 else "%d FALHA(S)" % failures))
+	get_tree().quit(1 if failures else 0)
+
+
+func _check(condition: bool, description: String) -> void:
+	print(("  ok    " if condition else "  FALHA ") + description)
+	if not condition:
+		failures += 1

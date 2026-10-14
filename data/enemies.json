@@ -1,0 +1,28 @@
+{
+	"lobo_sombrio": {
+		"nome": "Lobo Sombrio",
+		"cor": [0.35, 0.3, 0.4],
+		"escala": 0.85,
+		"vida": 45,
+		"dano": 7,
+		"velocidade": 5.0,
+		"alcance_agro": 11.0,
+		"alcance_ataque": 1.8,
+		"recarga": 1.1,
+		"xp": 25,
+		"respawn": 10.0
+	},
+	"carnical": {
+		"nome": "Carniçal",
+		"cor": [0.55, 0.6, 0.35],
+		"escala": 1.2,
+		"vida": 110,
+		"dano": 15,
+		"velocidade": 3.2,
+		"alcance_agro": 8.0,
+		"alcance_ataque": 2.1,
+		"recarga": 1.8,
+		"xp": 60,
+		"respawn": 15.0
+	}
+}

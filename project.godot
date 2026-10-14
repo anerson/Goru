@@ -1,0 +1,23 @@
+; Engine configuration file.
+
+config_version=5
+
+[application]
+
+config/name="Goru"
+config/description="Protótipo offline de combate 3D do MMORPG Goru."
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.3", "Forward Plus")
+
+[autoload]
+
+GameData="*res://scripts/autoload/game_data.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+
+[rendering]
+
+anti_aliasing/quality/msaa_3d=2

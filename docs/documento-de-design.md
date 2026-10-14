@@ -130,12 +130,14 @@ O próximo marco concreto é um protótipo pequeno e jogável, não o jogo intei
 
 ## 11. Decisões em aberto
 
-- [ ] Nomes definitivos do mundo, do panteão, das raças, das classes e do vilão
+- [ ] Nomes definitivos do jogo (nome de trabalho: **Goru**), do mundo, do panteão, das raças, das classes e do vilão
 - [ ] Pipeline da história: agentes de IA, pessoas ou os dois
-- [ ] Plataforma: navegador, PC ou os dois
-- [ ] Motor: Godot, Unity, Unreal ou web (Three.js / Babylon.js)
-- [ ] Linguagem de script do cliente (Lua, como na referência, ou a do motor)
-- [ ] 3D ou 2,5D isométrico (define o custo da arte)
+- [x] Plataforma: **PC**
+- [x] Motor: **Godot 4.3**
+- [x] Linguagem de script do cliente: **GDScript** (a do motor)
+- [x] Visual: **3D completo** (custo de arte maior, aceito)
 - [ ] Origem da arte: equipe própria, freelancers, pacotes licenciados ou geração com IA
+- [x] Primeiro protótipo: **solo e offline** (rede fica para a fase seguinte)
+- [ ] Linguagem e arquitetura do servidor
 - [ ] Tamanho do servidor e região de lançamento
 - [ ] Autorização da Perfect World, se algum dado da referência for usado além de estudo

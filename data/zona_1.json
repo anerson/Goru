@@ -1,0 +1,22 @@
+{
+	"nome": "Bosque das Cinzas",
+	"spawn_jogador": [0, 1, 0],
+	"inimigos": [
+		{ "tipo": "lobo_sombrio", "posicao": [12, 1, -10] },
+		{ "tipo": "lobo_sombrio", "posicao": [15, 1, -13] },
+		{ "tipo": "lobo_sombrio", "posicao": [-14, 1, -8] },
+		{ "tipo": "lobo_sombrio", "posicao": [-11, 1, -12] },
+		{ "tipo": "carnical", "posicao": [0, 1, -28] },
+		{ "tipo": "carnical", "posicao": [24, 1, 18] },
+		{ "tipo": "lobo_sombrio", "posicao": [-22, 1, 16] },
+		{ "tipo": "lobo_sombrio", "posicao": [-19, 1, 20] }
+	],
+	"obstaculos": [
+		{ "posicao": [6, 0, -4], "tamanho": [1.5, 5, 1.5] },
+		{ "posicao": [-7, 0, 5], "tamanho": [2, 3, 2] },
+		{ "posicao": [18, 0, 2], "tamanho": [4, 2, 1] },
+		{ "posicao": [-18, 0, -20], "tamanho": [1.2, 7, 1.2] },
+		{ "posicao": [4, 0, -22], "tamanho": [6, 1.5, 1] },
+		{ "posicao": [-25, 0, 0], "tamanho": [1.5, 4, 8] }
+	]
+}
