@@ -69,6 +69,7 @@ func start_game(class_id: String, element_id := "folha") -> void:
 	local_input = LocalInput.new(camera_rig)
 	player.input_source = local_input.next_frame
 	hud.bind_player(player, GameData.classes[class_id])
+	hud.bind_target_source(world, player.id)
 	player.emit_state()
 	companion = Companion.new()
 	companion.name = "Companion"
