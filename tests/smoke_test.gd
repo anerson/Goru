@@ -83,6 +83,26 @@ func _ready() -> void:
 	player.add_xp(player.xp_to_next_level())
 	_check(player.level == level_before + 1, "sobe de nível")
 
+	# Ajudante: sem OpenJarvis, usa falas prontas do elemento.
+	var companion: Companion = main.companion
+	_check(companion != null and companion.element_id == "folha", "cria o ajudante com o elemento padrão")
+	var heard: Array[String] = []
+	companion.said.connect(func(text: String): heard.append(text))
+	companion.ai_available = false
+	companion.ask("Como eu ataco?")
+	_check(heard.size() == 1 and companion.element.falas.sem_ia.has(heard[0]), "sem OpenJarvis responde com fala pronta")
+	companion.react("morte", true)
+	_check(companion.element.falas.morte.has(heard[-1]), "reage a eventos com a fala do elemento")
+	_check(companion.game_context().contains("Classe: Guerreiro"), "contexto do ajudante tem a classe")
+	_check(Companion.clean_reply("<think>x</think> Oi.", 50) == "Oi.", "remove raciocínio interno da resposta")
+	_check(Companion.clean_reply("Primeira frase longa. Segunda frase que passa do limite.", 30) == "Primeira frase longa.", "corta a resposta no fim de uma frase")
+	for element_id: String in GameData.companions.elementos:
+		var element: Dictionary = GameData.companions.elementos[element_id]
+		var complete := true
+		for event in ["inicio", "abate", "vida_baixa", "morte", "nivel", "ocioso", "sem_ia"]:
+			complete = complete and not element.falas.get(event, []).is_empty()
+		_check(complete, "elemento %s tem falas para todos os eventos" % element_id)
+
 	print("SMOKE TEST: %s" % ("OK" if failures == 0 else "%d FALHA(S)" % failures))
 	get_tree().quit(1 if failures else 0)
 

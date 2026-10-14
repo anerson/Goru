@@ -13,6 +13,7 @@ MMORPG 3D de fantasia sombria em Godot 4.3 (GDScript), para PC. Nome de trabalho
 - **Escala em degraus:** fase 1 = 2 a 10 jogadores numa masmorra ou arena; fase 2 = 100 por zona; 10.000 simultâneos é meta de longo prazo e só depois de provar as fases anteriores.
 - **Originalidade (seção 1 do documento):** a estrutura de sistemas pode se inspirar no Forsaken World; nomes, textos, números, código, arte e sons nunca. Material extraído de outros jogos não entra no repositório.
 - **Loja justa (seção 7):** nunca vender poder que só existe na loja.
+- **Ajudante por elemento:** só conversa e aconselha, nunca age no jogo nem decide regra. Funciona sem nada instalado (falas prontas) e ganha conversa livre se o jogador tiver o OpenJarvis rodando no próprio computador. O Sobrenatural zomba só das jogadas, nunca da pessoa (aparência, origem, religião, gênero, corpo, família), e sem palavrão pesado.
 
 ## Estrutura
 

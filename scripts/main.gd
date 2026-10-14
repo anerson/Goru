@@ -7,6 +7,8 @@ const ENEMY_SCENE := preload("res://scenes/enemy.tscn")
 const RESPAWN_DELAY := 3.0
 
 var player: CharacterBody3D
+var companion: Companion
+var _chosen_class := ""
 
 @onready var hud: CanvasLayer = $HUD
 @onready var enemies_root: Node3D = $Enemies
@@ -18,18 +20,34 @@ func _ready() -> void:
 	$MenuCamera.look_at_from_position(Vector3(0, 25, 30), Vector3.ZERO)
 	_build_obstacles()
 	_spawn_enemies()
-	hud.class_chosen.connect(start_game)
+	hud.class_chosen.connect(_on_class_chosen)
+	hud.element_chosen.connect(_on_element_chosen)
 	hud.show_class_selection(GameData.classes, GameData.zone.nome)
 
 
-func start_game(class_id: String) -> void:
+func start_game(class_id: String, element_id := "folha") -> void:
 	player = PLAYER_SCENE.instantiate()
 	player.class_id = class_id
 	add_child(player)
 	player.global_position = GameData.to_vector3(GameData.zone.spawn_jogador)
 	player.died.connect(_on_player_died)
 	hud.bind_player(player)
+	companion = Companion.new()
+	companion.name = "Companion"
+	add_child(companion)
+	companion.setup(element_id, player)
+	hud.bind_companion(companion)
+	companion.react("inicio", true)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+
+func _on_class_chosen(class_id: String) -> void:
+	_chosen_class = class_id
+	hud.show_element_selection(GameData.companions.elementos)
+
+
+func _on_element_chosen(element_id: String) -> void:
+	start_game(_chosen_class, element_id)
 
 
 func _spawn_enemies() -> void:
@@ -63,6 +81,8 @@ func _build_obstacles() -> void:
 func _on_enemy_killed(xp_reward: int) -> void:
 	if player:
 		player.add_xp(xp_reward)
+	if companion:
+		companion.react("abate")
 
 
 func _on_player_died() -> void:

@@ -19,6 +19,7 @@ var health := 1.0
 var level := 1
 var xp := 0
 var is_dead := false
+var controls_enabled := true
 var cooldowns := {"ataque": 0.0, "habilidade": 0.0}
 
 @onready var model: Node3D = $Model
@@ -44,6 +45,8 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not controls_enabled:
+		return
 	if event.is_action_pressed("toggle_mouse"):
 		var captured := Input.mouse_mode == Input.MOUSE_MODE_CAPTURED
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE if captured else Input.MOUSE_MODE_CAPTURED
@@ -72,10 +75,12 @@ func _physics_process(delta: float) -> void:
 		move_and_slide()
 		return
 
-	if Input.is_action_just_pressed("jump") and is_on_floor():
+	if controls_enabled and Input.is_action_just_pressed("jump") and is_on_floor():
 		velocity.y = JUMP_VELOCITY
 
-	var input := Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+	var input := Vector2.ZERO
+	if controls_enabled:
+		input = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 	var direction := camera_pivot.global_basis * Vector3(input.x, 0.0, input.y)
 	direction.y = 0.0
 	direction = direction.normalized()
@@ -85,7 +90,7 @@ func _physics_process(delta: float) -> void:
 		model.rotation.y = lerp_angle(model.rotation.y, atan2(-direction.x, -direction.z), TURN_SPEED * delta)
 	move_and_slide()
 
-	if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+	if controls_enabled and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		if Input.is_action_pressed("attack"):
 			use_ability("ataque")
 		if Input.is_action_just_pressed("skill"):

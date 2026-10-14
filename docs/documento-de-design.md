@@ -136,6 +136,21 @@ O offline serve para experimentar o jogo, jogar sem conexão e testar builds. O 
 | 2 | 100 por zona | Teste de carga com clientes simulados dentro da latência alvo |
 | 3 | 10.000 simultâneos (meta de longo prazo) | Só é planejada depois da fase 2 aprovada |
 
+### 8.3 Ajudante por elemento
+
+O jogador escolhe um ajudante por elemento, que comenta a partida e responde perguntas.
+
+| Elemento | Jeito de falar |
+| --- | --- |
+| Sobrenatural | Hostil e debochado; chama de burro e lerdo, sempre sobre a jogada |
+| Folha | Calmo e lento, com pausas |
+| Vento | Direto, uma frase curta |
+| Amor | Positivo, elogia e encoraja |
+
+- **Sem instalação:** falas prontas por evento (início, abate, vida baixa, morte, nível, parado) e dicas.
+- **Com o OpenJarvis no computador do jogador:** conversa livre por IA local, sem custo de servidor. O jogo envia só o que o jogador vê (classe, vida, nível, inimigos próximos).
+- **Limites:** o ajudante só fala; não ataca nem joga. O Sobrenatural nunca ofende a pessoa, só a jogada. Detalhes em `data/ajudantes.json`.
+
 ## 9. Pipeline da história
 
 A história é escrita do zero e melhora em rodadas. Cada rodada pega um tópico do backlog e passa por quatro papéis fixos, e nada entra no cânone sem a sua aprovação.
@@ -175,5 +190,6 @@ Enquanto isso, os 42 cargos estão consolidados em **12 agentes de IA** em `.cla
 - [x] Modo offline e online: **personagens separados** (seção 8.1)
 - [x] Escala: **em degraus**, de 2–10 jogadores até 10.000 (seção 8.2)
 - [x] Fase 1: jogadores e inimigos não se empurram (RD-002), XP de grupo cheia para quem causou dano, arena PvP depois da fase 1
+- [x] Ajudante: falas prontas para todos, conversa por IA opcional via OpenJarvis local, só fala e dá dicas (seção 8.3)
 - [ ] Região de lançamento
 - [ ] Autorização da Perfect World, se algum dado da referência for usado além de estudo

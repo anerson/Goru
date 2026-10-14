@@ -18,6 +18,7 @@ MMORPG de fantasia sombria. Nome de trabalho: Goru. Este repositório contém o 
 | Q | Habilidade |
 | Espaço | Pular |
 | Roda do mouse | Zoom |
+| Enter | Falar com o ajudante |
 | Esc | Soltar ou prender o mouse |
 
 ## O que o protótipo tem
@@ -27,6 +28,33 @@ MMORPG de fantasia sombria. Nome de trabalho: Goru. Este repositório contém o 
 - Vida, XP, subida de nível, morte e renascimento
 - Sem rede, loja nem endgame (de propósito)
 
+## Ajudante
+
+Depois da classe, o jogador escolhe o elemento do ajudante, que comenta a partida e responde perguntas (Enter):
+
+| Elemento | Jeito |
+| --- | --- |
+| Sobrenatural | Hostil e debochado. Zomba das jogadas, nunca da pessoa. |
+| Folha | Calmo, fala devagar. |
+| Vento | Direto, uma frase só. |
+| Amor | Positivo e encorajador. |
+
+Sem nada instalado, o ajudante usa falas prontas. Para conversa livre, rode o [OpenJarvis](https://github.com/open-jarvis/OpenJarvis) no mesmo computador:
+
+```sh
+curl -fsSL https://open-jarvis.github.io/OpenJarvis/install.sh | bash   # instala OpenJarvis, Ollama e um modelo
+jarvis serve                                                           # deixa a API em http://127.0.0.1:8000
+```
+
+O jogo detecta sozinho ao começar a partida (canto superior esquerdo mostra o estado). Personalidades, falas e o endereço ficam em `data/ajudantes.json`; o endereço também pode vir da variável `GORU_OPENJARVIS_URL`.
+
+Para testar sem o OpenJarvis, use o servidor falso:
+
+```sh
+python3 tools/openjarvis_falso.py 8765 /tmp/registro.jsonl &
+GORU_OPENJARVIS_URL=http://127.0.0.1:8765 godot --headless --path . res://tests/ajudante_ia_test.tscn -- --registro=/tmp/registro.jsonl
+```
+
 ## Dados
 
 Os números do jogo ficam em `data/` e podem ser editados sem mexer em código:
@@ -34,6 +62,7 @@ Os números do jogo ficam em `data/` e podem ser editados sem mexer em código:
 - `data/classes.json`: vida, velocidade, dano, alcance, ângulo e recarga de cada classe
 - `data/enemies.json`: atributos, XP e tempo de renascimento dos inimigos
 - `data/zona_1.json`: onde ficam o jogador, os inimigos e os obstáculos
+- `data/ajudantes.json`: personalidade, limites e falas de cada elemento do ajudante
 
 ## Teste automático
 

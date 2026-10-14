@@ -10,17 +10,20 @@ const KEY_ACTIONS := {
 	"jump": [KEY_SPACE],
 	"skill": [KEY_Q],
 	"toggle_mouse": [KEY_ESCAPE],
+	"chat": [KEY_ENTER, KEY_KP_ENTER],
 }
 
 var classes: Dictionary
 var enemies: Dictionary
 var zone: Dictionary
+var companions: Dictionary
 
 
 func _ready() -> void:
 	classes = _load_table("res://data/classes.json")
 	enemies = _load_table("res://data/enemies.json")
 	zone = _load_table("res://data/zona_1.json")
+	companions = _load_table("res://data/ajudantes.json")
 	_register_inputs()
 
 
