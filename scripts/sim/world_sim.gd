@@ -112,10 +112,12 @@ func _physics_process(delta: float) -> void:
 
 ## Avança um tick: inimigos, jogadores (entrada, movimento e habilidades) e renascimentos.
 func step(delta: float) -> void:
-	for enemy in enemies:
+	var pushes := _separation(delta)
+	for index in enemies.size():
+		var enemy := enemies[index]
 		# A lista de alvos é montada para cada inimigo: quem morreu no golpe de um inimigo
 		# anterior, neste mesmo tick, já aparece morto para o seguinte.
-		var attacked := enemy.step(delta, _targets())
+		var attacked := enemy.step(delta, _targets(), pushes[index])
 		if attacked != EnemyBrain.NO_TARGET:
 			apply_damage(enemy.id, attacked, enemy.stats.dano)
 	for player in players:
@@ -213,6 +215,19 @@ func _tick_respawns() -> void:
 		else:
 			continue
 		respawned.emit(id, body.global_position)
+
+
+## Deslocamento de separação de cada inimigo neste tick, calculado com as posições do começo do
+## tick (antes de qualquer um se mover), para o resultado não depender da ordem dos corpos.
+## Só se afastam os vivos que perseguem ou atacam (EnemyBody.is_engaged).
+func _separation(delta: float) -> Array[Vector3]:
+	var positions: Array = []
+	var active: Array = []
+	for enemy in enemies:
+		positions.append(enemy.global_position)
+		active.append(enemy.is_alive() and enemy.is_engaged())
+	return Separation.offsets(positions, active, rules.inimigo_separacao_distancia,
+		rules.inimigo_separacao_velocidade, delta)
 
 
 func _targets() -> Array:

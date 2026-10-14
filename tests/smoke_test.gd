@@ -14,6 +14,7 @@ func _ready() -> void:
 	await _test_sim_without_view()
 	await _test_two_players()
 	await _test_collision_layers()
+	await _test_enemy_separation()
 	var real_saves := _real_save_files()
 	_remove_dir(SAVE_TEST_DIR)
 	_test_offline_save()
@@ -214,8 +215,10 @@ func _test_input_frames(main: Node3D, player: CharacterBody3D) -> void:
 	await _physics_frames(1)
 	_check(used.count("habilidade") == 1, "habilidade só dispara ao apertar, não segurando")
 	main.hud._process(0.0)
-	var skill_text: String = main.hud.ability_labels.habilidade.text
-	_check(skill_text.contains(player.stats.habilidade.nome) and not skill_text.contains("pronto"), "HUD mostra a recarga pelo sinal da habilidade")
+	# O rótulo do espaço só tem o nome; a recarga aparece no escurecimento e no número de tempo.
+	var skill_slot: Dictionary = main.hud.ability_slots.habilidade
+	_check(skill_slot.name.text.contains(player.stats.habilidade.nome), "HUD mostra o nome da habilidade no espaço")
+	_check(main.hud.cooldown_ratio("habilidade") > 0.0 and skill_slot.time.visible, "HUD mostra a recarga pelo sinal da habilidade")
 	frame.buttons = 0
 	player.ability_used.disconnect(on_used)
 	player.cooldowns.reset("ataque")
@@ -292,6 +295,7 @@ func _test_rules() -> void:
 	_check(cooldowns.is_ready("habilidade"), "recarga pode ser zerada")
 
 	_test_enemy_brain()
+	_test_separation_rule()
 
 	# As regras puras não podem depender de cena, entrada, efeitos nem rede.
 	var forbidden := ["extends Node", "Input.", "Fx.", "get_tree", "get_node", "multiplayer", "GameData.", "FileAccess", "DirAccess", "user://"]
@@ -657,8 +661,11 @@ func _test_collision_layers() -> void:
 	var expected: float = walker.stats.velocidade * ticks / float(world.tick_rate)
 	var walked := start.z - walker.global_position.z
 	_check(absf(walked - expected) < 0.05 and walker.global_position.z < -1.0, "jogador atravessa jogador e inimigos (andou %.2f de %.2f m)" % [walked, expected])
+	# Os lobos, que nasceram no mesmo ponto, perseguem os jogadores: quem os afasta é a regra de
+	# separação (rules/separation.gd), não a física, que não liga um inimigo ao outro.
 	var gap := EnemyBrain.flat_distance(world.enemies[0].global_position, world.enemies[1].global_position)
-	_check(gap < 0.1, "inimigos no mesmo ponto não se empurram (%.2f m)" % gap)
+	var min_gap: float = GameData.rules.inimigo_separacao_distancia
+	_check(gap > min_gap - 0.05, "inimigos que perseguem se afastam pela regra, sem colisão entre eles (%.2f m)" % gap)
 
 	# O mundo continua sólido: andando contra o obstáculo, o jogador para nele.
 	frame.move = Vector2.ZERO
@@ -670,6 +677,79 @@ func _test_collision_layers() -> void:
 	walker.input_source = Callable()
 	viewport.queue_free()
 	await _physics_frames(1)
+
+
+## Separação entre inimigos, pura (rules/separation.gd): recebe posições, devolve deslocamentos.
+func _test_separation_rule() -> void:
+	var dt := 1.0 / 60.0
+	var min_distance := 1.7
+	var speed := 3.0
+	var alone := Separation.offsets([Vector3(2, 0, 3)], [true], min_distance, speed, dt)
+	_check(alone == [Vector3.ZERO], "separação: inimigo sozinho não se mexe")
+	var far := Separation.offsets([Vector3.ZERO, Vector3(2, 0, 0)], [true, true], min_distance, speed, dt)
+	_check(far == [Vector3.ZERO, Vector3.ZERO], "separação: longe o bastante, ninguém se mexe")
+	var idle := Separation.offsets([Vector3.ZERO, Vector3.ZERO], [true, false], min_distance, speed, dt)
+	_check(idle == [Vector3.ZERO, Vector3.ZERO], "separação: inimigo fora da luta não empurra nem é empurrado")
+	var first := Separation.offsets([Vector3.ZERO, Vector3.ZERO], [true, true], min_distance, speed, dt)
+	_check(first[0].is_equal_approx(-first[1]) and first[0].y == 0.0, "separação: no mesmo ponto, um vai para cada lado, no plano")
+	_check(is_equal_approx(first[0].length(), speed * dt), "separação: o passo de um tick respeita a velocidade máxima")
+	_check(first == Separation.offsets([Vector3.ZERO, Vector3.ZERO], [true, true], min_distance, speed, dt), "separação: mesma entrada, mesmo resultado")
+	# Dois inimigos no mesmo ponto, aplicando o deslocamento tick a tick, chegam à distância mínima.
+	var positions := [Vector3(5, 0, 5), Vector3(5, 0, 5)]
+	for tick in 120:
+		var step := Separation.offsets(positions, [true, true], min_distance, speed, dt)
+		positions = [positions[0] + step[0], positions[1] + step[1]]
+	var gap := EnemyBrain.flat_distance(positions[0], positions[1])
+	_check(gap > min_distance - 0.01 and gap <= min_distance + 0.001, "separação: dois no mesmo ponto se afastam até a distância mínima (%.3f m)" % gap)
+	var middle: Vector3 = (positions[0] + positions[1]) / 2.0
+	_check(middle.is_equal_approx(Vector3(5, 0, 5)), "separação: os dois se afastam por igual, sem sair do lugar juntos")
+	var stacked := [Vector3.ZERO, Vector3.ZERO, Vector3.ZERO]
+	var three := Separation.offsets(stacked, [true, true, true], min_distance, speed, dt)
+	_check(not three[0].is_equal_approx(three[1]) and not three[1].is_equal_approx(three[2]) and not three[0].is_equal_approx(three[2]), "separação: três no mesmo ponto saem em direções diferentes")
+
+
+## Separação na WorldSim: parados em casa, inimigos no mesmo ponto ficam como estão; perseguindo,
+## se afastam até a distância da tabela. Duas rodadas iguais dão posições idênticas.
+func _test_enemy_separation() -> void:
+	var first := await _separation_run()
+	var second := await _separation_run()
+	var min_gap: float = GameData.rules.inimigo_separacao_distancia
+	_check(first.idle_gap < 0.01, "separação na sim: parados no mesmo ponto não se mexem (%.2f m)" % first.idle_gap)
+	_check(first.engaged and first.gap > min_gap - 0.05, "separação na sim: atacando o mesmo alvo, ficam a %.2f m (mínimo %.2f m)" % [first.gap, min_gap])
+	_check(first.positions == second.positions, "separação na sim: duas rodadas iguais, posições idênticas")
+
+
+func _separation_run() -> Dictionary:
+	var viewport := _isolated_world()
+	var world := WorldSim.new()
+	viewport.add_child(world)
+	world.setup({
+		"nome": "Teste",
+		"spawn_jogador": [0, 0.1, 60],
+		"chao": {"posicao": [0, -0.5, 0], "tamanho": [140, 1, 140]},
+		"inimigos": [{"tipo": "lobo_sombrio", "posicao": [0, 0.1, 0]}, {"tipo": "lobo_sombrio", "posicao": [0, 0.1, 0]}],
+		"obstaculos": [],
+	})
+	world.set_physics_process(false)
+	var player := world.add_player("guerreiro", Vector3(0, 0.1, 60))
+	player.set_physics_process(false)
+	var dt := 1.0 / world.tick_rate
+	var a: EnemyBody = world.enemies[0]
+	var b: EnemyBody = world.enemies[1]
+	await _physics_frames(1)
+	for i in 60:
+		world.step(dt)
+	var result := {"idle_gap": EnemyBrain.flat_distance(a.global_position, b.global_position)}
+	# O jogador chega perto (dentro do agro) e os dois lobos vão para cima dele.
+	player.global_position = Vector3(0, 0.1, 4)
+	for i in 180:
+		world.step(dt)
+	result.gap = EnemyBrain.flat_distance(a.global_position, b.global_position)
+	result.engaged = a.is_engaged() and b.is_engaged()
+	result.positions = [a.global_position, b.global_position]
+	viewport.queue_free()
+	await _physics_frames(1)
+	return result
 
 
 ## Espera, tick a tick, até `condition` ser verdadeira ou passar de `max_ticks`.

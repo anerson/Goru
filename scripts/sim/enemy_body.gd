@@ -37,9 +37,11 @@ func _ready() -> void:
 
 
 ## Avança um tick com a lista de alvos {"id", "pos", "alive"}.
+## `push` é o deslocamento de separação deste tick (rules/separation.gd), somado ao movimento
+## e aplicado com a física, para a parede continuar segurando. Não muda para onde o inimigo olha.
 ## Devolve o id de quem leva o golpe neste tick (EnemyBrain.NO_TARGET se ninguém);
 ## quem chama aplica o dano.
-func step(delta: float, targets: Array) -> int:
+func step(delta: float, targets: Array, push := Vector3.ZERO) -> int:
 	if not brain.is_alive():
 		return EnemyBrain.NO_TARGET
 	if not is_on_floor():
@@ -54,8 +56,8 @@ func step(delta: float, targets: Array) -> int:
 	if result.face_point != null:
 		_face(result.face_point)
 	var move: Vector3 = result.move
-	velocity.x = move.x
-	velocity.z = move.z
+	velocity.x = move.x + push.x / delta
+	velocity.z = move.z + push.z / delta
 	if move != Vector3.ZERO:
 		_face(global_position + move)
 	move_and_slide()
@@ -64,6 +66,12 @@ func step(delta: float, targets: Array) -> int:
 
 func is_alive() -> bool:
 	return brain.is_alive()
+
+
+## Perseguindo ou atacando: só esses se afastam uns dos outros. Parado em casa e voltando
+## para casa, o inimigo não empurra nem é empurrado (a posição de nascimento vem da zona).
+func is_engaged() -> bool:
+	return brain.state == EnemyBrain.State.CHASE or brain.state == EnemyBrain.State.ATTACK
 
 
 ## Aplica dano de `attacker_id` e devolve quanto de vida saiu (0 se morto ou voltando para casa).
