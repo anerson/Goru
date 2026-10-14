@@ -1,4 +1,4 @@
-# Forsaken Online: Documento de Design
+# Goru: Documento de Design
 
 Oct 13, 2026 · @anderson
 
