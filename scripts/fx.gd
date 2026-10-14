@@ -8,6 +8,7 @@ static func floating_text(parent: Node, at: Vector3, text: String, color: Color)
 	label.modulate = color
 	label.outline_size = 10
 	label.font_size = 56
+	label.pixel_size = 0.012
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.no_depth_test = true
 	parent.add_child(label)

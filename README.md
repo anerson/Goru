@@ -43,4 +43,12 @@ godot --headless --path . res://tests/smoke_test.tscn
 
 Verifica o loop básico (ataque, morte do inimigo, XP, renascimento e nível) e sai com código 0 se tudo passar.
 
+## Diagnóstico de balanceamento
+
+```sh
+godot --path . res://tests/diagnostico.tscn -- --saida=/pasta/capturas --segundos=120
+```
+
+Um bot joga cada classe pelo tempo indicado e imprime abates, mortes, dano e tempo andando ou atacando. Com `--saida`, também salva capturas de tela. O bot é simples (não desvia nem usa a habilidade com estratégia), então compare as classes entre si, não com um jogador real.
+
 Material extraído de jogos de referência não entra neste repositório (ver seção 1 do documento).

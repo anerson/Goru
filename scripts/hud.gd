@@ -12,6 +12,7 @@ var ability_labels := {}
 var class_panel: PanelContainer
 var death_label: Label
 var game_ui: Control
+var crosshair: Label
 
 
 func _ready() -> void:
@@ -21,6 +22,12 @@ func _ready() -> void:
 	death_label.grow_horizontal = Control.GROW_DIRECTION_BOTH
 	death_label.visible = false
 	add_child(death_label)
+	crosshair = _label("+", 28, Color(1, 1, 1, 0.8))
+	crosshair.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	crosshair.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	crosshair.grow_vertical = Control.GROW_DIRECTION_BOTH
+	crosshair.visible = false
+	add_child(crosshair)
 
 
 func _process(_delta: float) -> void:
@@ -60,11 +67,14 @@ func show_class_selection(classes: Dictionary, zone_name: String) -> void:
 
 func bind_player(new_player: Node) -> void:
 	player = new_player
+	if is_instance_valid(class_panel):
+		class_panel.queue_free()
 	player.health_changed.connect(_on_health_changed)
 	player.xp_changed.connect(_on_xp_changed)
 	_on_health_changed(player.health, player.max_health)
 	_on_xp_changed(player.xp, player.xp_to_next_level(), player.level)
 	game_ui.visible = true
+	crosshair.visible = true
 
 
 func show_death(delay: float) -> void:
@@ -77,7 +87,6 @@ func hide_death() -> void:
 
 
 func _on_class_pressed(class_id: String) -> void:
-	class_panel.queue_free()
 	class_chosen.emit(class_id)
 
 
