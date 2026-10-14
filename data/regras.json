@@ -1,4 +1,10 @@
 {
 	"xp_por_nivel": 100,
-	"dano_por_nivel": 0.1
+	"dano_por_nivel": 0.1,
+	"jogador_renascimento": 3.0,
+	"inimigo_coleira": 22.0,
+	"inimigo_tempo_max_volta": 6.0,
+	"inimigo_folga_ataque": 1.2,
+	"inimigo_velocidade_volta": 1.5,
+	"inimigo_raio_chegada": 0.6
 }

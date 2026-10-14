@@ -46,8 +46,7 @@ func _run_class(class_id: String) -> String:
 	player.died.connect(func(): metrics.mortes += 1)
 	player.ability_used.connect(_on_ability_used)
 	player.ability_resolved.connect(_on_ability_resolved)
-	for enemy in get_tree().get_nodes_in_group("enemies"):
-		enemy.killed.connect(func(_xp): metrics.abates += 1)
+	main.world.entity_died.connect(_on_entity_died)
 	await _physics_frames(30)
 	await _shot("%s_1_inicio" % class_id)
 
@@ -90,7 +89,7 @@ func _bot_step(delta: float, engaged_at: Dictionary, now: float) -> void:
 		return
 	var target: Node3D = null
 	var best := INF
-	for enemy in get_tree().get_nodes_in_group("enemies"):
+	for enemy in main.world.enemies:
 		if not enemy.is_alive():
 			if engaged_at.has(enemy):
 				metrics.ttk.append(now - engaged_at[enemy])
@@ -105,7 +104,7 @@ func _bot_step(delta: float, engaged_at: Dictionary, now: float) -> void:
 	var to_target := target.global_position - player.global_position
 	_bot_yaw = atan2(-to_target.x, -to_target.z)
 	frame.yaw = _bot_yaw
-	player.camera_pivot.rotation.y = _bot_yaw  # Só para as capturas de tela.
+	main.camera_rig.rotation.y = _bot_yaw  # Só para as capturas de tela.
 	var attack_range: float = player.stats.ataque.alcance
 	if best > attack_range * 0.8:
 		frame.move = Vector2(0.0, -1.0)  # Para a frente, como a tecla W.
@@ -135,9 +134,14 @@ func _on_ability_resolved(_ability_key: String, _hits: int) -> void:
 
 func _enemy_health_total() -> float:
 	var total := 0.0
-	for enemy in get_tree().get_nodes_in_group("enemies"):
+	for enemy in main.world.enemies:
 		total += enemy.health
 	return total
+
+
+func _on_entity_died(id: int, _killer_id: int, _participants: Array) -> void:
+	if main.world.is_enemy(id):
+		metrics.abates += 1
 
 
 func _on_health_changed(current: float, _maximum: float, last: Array) -> void:

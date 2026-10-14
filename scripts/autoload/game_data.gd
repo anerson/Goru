@@ -17,7 +17,7 @@ var classes: Dictionary
 var enemies: Dictionary
 var zone: Dictionary
 var companions: Dictionary
-## Constantes de regra (XP por nível, dano por nível). Usadas por scripts/rules/.
+## Constantes de regra (XP e dano por nível, renascimento, coleira do inimigo). Usadas por scripts/rules/ e scripts/sim/.
 var rules: Dictionary
 
 
@@ -27,7 +27,8 @@ func _ready() -> void:
 	zone = _load_table("res://data/zona_1.json")
 	companions = _load_table("res://data/ajudantes.json")
 	rules = _load_table("res://data/regras.json")
-	for key in ["xp_por_nivel", "dano_por_nivel"]:
+	for key in ["xp_por_nivel", "dano_por_nivel", "jogador_renascimento", "inimigo_coleira",
+			"inimigo_tempo_max_volta", "inimigo_folga_ataque", "inimigo_velocidade_volta", "inimigo_raio_chegada"]:
 		if not rules.has(key):
 			push_error("data/regras.json sem o campo %s" % key)
 	_register_inputs()

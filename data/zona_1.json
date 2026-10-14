@@ -1,6 +1,7 @@
 {
 	"nome": "Bosque das Cinzas",
 	"spawn_jogador": [0, 1, 0],
+	"chao": { "posicao": [0, -0.5, 0], "tamanho": [120, 1, 120] },
 	"inimigos": [
 		{ "tipo": "lobo_sombrio", "posicao": [-8, 1, -25] },
 		{ "tipo": "lobo_sombrio", "posicao": [-5, 1, -27] },

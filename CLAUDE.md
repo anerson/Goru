@@ -19,10 +19,14 @@ MMORPG 3D de fantasia sombria em Godot 4.3 (GDScript), para PC. Nome de trabalho
 
 | Pasta | Conteúdo |
 | --- | --- |
-| `data/` | Tabelas JSON de classes, inimigos e zonas. Balanceamento se faz aqui, não no código. |
-| `scenes/` | Cenas Godot (`main`, `player`, `enemy`). |
-| `scripts/` | GDScript. `autoload/game_data.gd` carrega os JSON e registra os controles. |
-| `tests/` | `smoke_test` (regras básicas) e `diagnostico` (bot que mede balanceamento). |
+| `data/` | Tabelas JSON: classes, inimigos, zona, regras gerais (`regras.json`) e ajudantes. Balanceamento se faz aqui, não no código. |
+| `scripts/rules/` | Regras puras (combate, progressão, recargas, cérebro do inimigo, quadro de entrada). Sem Node, Input, Fx nem rede: rodam igual no offline e no servidor. |
+| `scripts/sim/` | Simulação: `world_sim.gd` (dona das entidades, ticks e eventos), corpos de jogador e inimigo, `zone_builder.gd`. Sem malha, câmera nem HUD. |
+| `scripts/view/` | Apresentação: malhas, câmera, efeitos. Só ouve sinais da simulação. |
+| `scripts/offline/` | Jogo offline (`offline_game.gd`) e leitura do teclado (`local_input.gd`, único lugar que lê `Input` para jogar). |
+| `scripts/hud.gd`, `scripts/companion.gd` | Interface e ajudante. Só ouvem sinais; o ajudante só fala. |
+| `scenes/` | `main.tscn` (abre o jogo), corpos (`*_body.tscn`, só colisão) e views (`*_view.tscn`, `camera_rig.tscn`). |
+| `tests/` | `smoke_test` (regras e camadas), `diagnostico` (bot de balanceamento, referência em `referencia_diagnostico.md`) e `ajudante_ia_test`. |
 | `docs/` | Documento de design. |
 | `.claude/agents/` | A equipe de agentes (ver abaixo). |
 

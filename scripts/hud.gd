@@ -1,12 +1,14 @@
 extends CanvasLayer
 ## Interface: escolha de classe e de ajudante, vida, experiência, recargas, fala do ajudante e tela de morte.
+## Não lê o estado do jogador: só ouve sinais (vida, XP, habilidade usada) e guarda o que precisa exibir.
 
 signal class_chosen(class_id: String)
 signal element_chosen(element_id: String)
+## O chat abriu (true) ou fechou (false). Quem cuida da entrada desliga e religa os controles.
+signal chat_toggled(is_open: bool)
 
 const SPEECH_HOLD := 6.0
 
-var player: Node
 var health_bar: ProgressBar
 var health_text: Label
 var xp_bar: ProgressBar
@@ -24,6 +26,9 @@ var speech_text: Label
 var chat_input: LineEdit
 var ai_label: Label
 var _speech_tween: Tween
+## Estado de exibição das habilidades: nome (da tabela) e segundos de recarga que faltam.
+var _ability_names := {}
+var _cooldown_left := {}
 
 
 func _ready() -> void:
@@ -41,15 +46,16 @@ func _ready() -> void:
 	add_child(crosshair)
 
 
-func _process(_delta: float) -> void:
-	if player == null:
+func _process(delta: float) -> void:
+	if _ability_names.is_empty():
 		return
 	for key: String in ability_labels:
-		var ability: Dictionary = player.stats[key]
-		var remaining: float = player.cooldowns.remaining(key)
+		# Contagem só para exibir: quem decide se a habilidade está pronta é a simulação.
+		var remaining: float = maxf(_cooldown_left.get(key, 0.0) - delta, 0.0)
+		_cooldown_left[key] = remaining
 		var hint := "Clique" if key == "ataque" else "Q"
 		var status := "pronto" if remaining <= 0.0 else "%.1fs" % remaining
-		ability_labels[key].text = "[%s] %s: %s" % [hint, ability.nome, status]
+		ability_labels[key].text = "[%s] %s: %s" % [hint, _ability_names.get(key, key), status]
 		ability_labels[key].modulate = Color.WHITE if remaining <= 0.0 else Color(0.6, 0.6, 0.6)
 
 
@@ -101,15 +107,19 @@ func show_element_selection(elements: Dictionary) -> void:
 	add_child(element_panel)
 
 
-func bind_player(new_player: Node) -> void:
-	player = new_player
+## Liga o HUD aos sinais do jogador. `class_stats` é a entrada de data/classes.json,
+## usada só para os nomes das habilidades. O estado inicial chega pelos próprios sinais
+## (quem chama pede ao corpo para reemiti-lo).
+func bind_player(player: Node, class_stats: Dictionary) -> void:
 	for panel in [class_panel, element_panel]:
 		if is_instance_valid(panel):
 			panel.queue_free()
+	for key: String in ability_labels:
+		_ability_names[key] = class_stats[key].nome
+		_cooldown_left[key] = 0.0
 	player.health_changed.connect(_on_health_changed)
 	player.xp_changed.connect(_on_xp_changed)
-	_on_health_changed(player.health, player.max_health)
-	_on_xp_changed(player.xp, player.xp_to_next_level(), player.level)
+	player.ability_used.connect(_on_ability_used)
 	game_ui.visible = true
 	crosshair.visible = true
 
@@ -140,7 +150,7 @@ func show_speech(text: String) -> void:
 func open_chat() -> void:
 	chat_input.visible = true
 	chat_input.grab_focus()
-	player.controls_enabled = false
+	chat_toggled.emit(true)
 	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 
 
@@ -148,7 +158,7 @@ func close_chat() -> void:
 	chat_input.clear()
 	chat_input.release_focus()
 	chat_input.visible = false
-	player.controls_enabled = true
+	chat_toggled.emit(false)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
 
@@ -247,6 +257,10 @@ func _on_health_changed(current: float, maximum: float) -> void:
 	health_bar.max_value = maximum
 	health_bar.value = current
 	health_text.text = "Vida %d / %d" % [ceili(current), ceili(maximum)]
+
+
+func _on_ability_used(ability_key: String, cooldown: float) -> void:
+	_cooldown_left[ability_key] = cooldown
 
 
 func _on_xp_changed(xp: int, xp_next: int, level: int) -> void:

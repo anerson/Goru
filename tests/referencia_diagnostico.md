@@ -56,3 +56,19 @@ Igual ao passo 0, campo por campo.
 ### Passo 2 (`InputFrame`)
 
 Guerreiro, dano recebido: 704 para 699 (um golpe de lobo a menos). Todo o resto ficou igual. Motivo: o bot antigo chamava `use_ability()` no começo do tick, antes de os inimigos se moverem. Agora ele só entrega o quadro, e o ataque é resolvido no `_physics_process` do jogador, depois dos inimigos, como acontece quando uma pessoa joga. A diferença fica dentro da segunda faixa de tolerância. A tabela de referência acima já é a do passo 2.
+
+### Passos 3, 4 e 5 (view separada, `EnemyBrain`, `WorldSim`)
+
+Igual à referência, campo por campo, ao fim de cada passo:
+
+| Passo | Guerreiro (nível, abates, mortes, causado, recebido, TTK, andando, atacando, morto) | Caçador (mesmas colunas) |
+| --- | --- | --- |
+| 3 | 5, 35, 0, 2910, 699, 3,1 s, 33%, 66%, 0% | 5, 31, 0, 2490, 468, 3,1 s, 27%, 72%, 0% |
+| 4 | 5, 35, 0, 2910, 699, 3,1 s, 33%, 66%, 0% | 5, 31, 0, 2490, 468, 3,1 s, 27%, 72%, 0% |
+| 5 | 5, 35, 0, 2910, 699, 3,1 s, 33%, 66%, 0% | 5, 31, 0, 2490, 468, 3,1 s, 27%, 72%, 0% |
+
+A ordem dentro do tick foi mantida de propósito: a `WorldSim` avança os inimigos na ordem da zona, depois os jogadores (entrada, movimento e habilidades) e por último os renascimentos, que é a mesma ordem de antes (nós de inimigo antes do nó do jogador na árvore, temporizadores de física no fim do tick). A XP do abate continua sendo dada dentro do golpe que mata, antes do próximo alvo.
+
+Renascimento em ticks: o inimigo renasce `round(respawn × 60)` ticks depois da morte, contando o tick da morte (720 e 900 ticks, os mesmos que o `create_timer` de física dava). O jogador renasce em `round(3 × 60) = 180` ticks; o `create_timer` dava 181, porque 3,0 menos 180 × (1/60) em ponto flutuante sobra um resto positivo. A diferença é de um tick (17 ms) e não aparece no diagnóstico, em que ninguém morre.
+
+Uma rodada curta com tela virtual (`xvfb-run`, `--segundos=40`, cerca de 5 FPS) deu os mesmos números no commit anterior e depois do passo 5: Guerreiro 3, 10, 0, 780, 203, 3,2 s; Caçador 2, 9, 0, 709, 176, 3,0 s.
