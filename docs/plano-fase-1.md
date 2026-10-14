@@ -33,7 +33,7 @@ Regra para todas: `smoke_test` verde ao terminar; se tocar regra, `diagnostico` 
 
 | Id | Tarefa | Responsável | Depende de | Critério de pronto | Dias-pessoa |
 | --- | --- | --- | --- | --- | --- |
-| P1 | Fechar a rodada de balanceamento em andamento | `game-designer` | nada | Antes e depois do `diagnostico` registrados; números aprovados pelo `game-designer`; `data/` sem mudança pendente | 2 |
+| P1 | ~~Fechar a rodada de balanceamento em andamento~~ **Feito** (Guerreiro 35 abates/0 mortes, Caçador 27/1, ambos abaixo de 50% andando) | `game-designer` | nada | Antes e depois do `diagnostico` registrados; números aprovados pelo `game-designer`; `data/` sem mudança pendente | 2 |
 | P2 | Teste humano de 15 min do protótipo offline | dono do projeto | P1 | 15 min jogados; notas escritas (o que diverte, o que irrita, bugs); veredito "segue" ou "ajusta" | 0,5 |
 | P3 | Triagem do teste humano | `game-designer` + `produtor` | P2 | Cada nota vira correção feita ou item de backlog; zero bloqueante aberto | 1,5 |
 
@@ -105,9 +105,9 @@ O prazo é em relação ao passo, porque não há datas sem o tamanho da equipe.
 | Id | Decisão | Prazo | Recomendação do produtor |
 | --- | --- | --- | --- |
 | D1 | Aprovar a arquitetura da fase 1 (RD-001) e este plano | Antes do passo 0 (semana 1) | Aprovar |
-| D2 | Aprovar a RD-002 (entidades não colidem entre si) | Antes do passo 6 (semana 4) | Aprovar se o aval do `game-designer` vier com o antes e depois |
-| D3 | Regra de XP em grupo (o padrão provisório é XP cheia para quem causou dano) | Provisória no passo 5; final antes do passo 12 (semana 7) | Manter a provisória na fase 1 e rever com dados |
-| D4 | Arena PvP dentro da fase 1 ou no backlog | Antes do passo 15 (semana 8) | Backlog (ver seção 6) |
+| D2 | Aprovar a RD-002 (entidades não colidem entre si) | **Decidido: aprovada.** O `diagnostico` antes e depois continua obrigatório no passo 6 | Aprovar se o aval do `game-designer` vier com o antes e depois |
+| D3 | Regra de XP em grupo | **Decidido: XP cheia para quem causou dano.** Rever com dados depois do portão | Manter a provisória na fase 1 e rever com dados |
+| D4 | Arena PvP dentro da fase 1 ou no backlog | **Decidido: depois da fase 1** (backlog) | Backlog (ver seção 6) |
 | D5 | Hospedagem: provedor, região e orçamento mensal da VPS | Antes do passo 10 (semana 6) | Pedir ao `devops-seguranca` duas opções com custo |
 | D6 | Quem são as 4 pessoas da sessão humana e quando | Antes do passo 10 (semana 6) | Escolher pessoas em cidades ou provedores diferentes |
 | D7 | Contratar o programador sênior de multiplayer/backend antes da rede | Antes do passo 8 (semana 4) | Sim, se houver orçamento; muda a estimativa do bloco B |

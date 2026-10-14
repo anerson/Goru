@@ -4,7 +4,7 @@ Out 14, 2026 · arquiteto-tecnico · status: proposta
 
 Escopo: de 2 a 10 jogadores numa masmorra ou arena, com servidor autoritativo, e o modo offline como personagem separado. Base: `CLAUDE.md`, seções 8, 8.1 e 8.2 do documento de design, e o código em `scripts/`, `scenes/` e `tests/` no estado de hoje.
 
-A fase 1 começa com PvE cooperativo na zona atual (`data/zona_1.json`). A arena PvP vem por último dentro da fase, porque é a única parte que pode exigir compensação de atraso (ver riscos).
+A fase 1 começa com PvE cooperativo na zona atual (`data/zona_1.json`). A arena PvP ficou para depois da fase 1, por decisão do dono do projeto, porque é a única parte que pode exigir compensação de atraso (ver riscos). XP em grupo: cheia para quem causou dano.
 
 ---
 
@@ -38,6 +38,8 @@ A fase 1 começa com PvE cooperativo na zona atual (`data/zona_1.json`). A arena
 ### RD-002: entidades móveis não colidem entre si na fase 1
 
 Hoje jogador e inimigo são `CharacterBody3D` na camada 1 e se empurram. Com rede, a colisão com corpos de outras pessoas é a principal causa de divergência na previsão. Proposta de camadas: 1 = mundo, 2 = jogadores, 3 = inimigos. Todos colidem só com a camada 1. Isso muda a sensação do combate, então precisa do aval do `game-designer` e do antes e depois do `diagnostico`.
+
+**Status:** aprovada pelo dono do projeto. O antes e depois do `diagnostico` continua obrigatório quando a mudança for feita.
 
 ---
 

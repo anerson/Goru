@@ -174,5 +174,6 @@ Enquanto isso, os 42 cargos estão consolidados em **12 agentes de IA** em `.cla
 - [ ] Linguagem e arquitetura do servidor
 - [x] Modo offline e online: **personagens separados** (seção 8.1)
 - [x] Escala: **em degraus**, de 2–10 jogadores até 10.000 (seção 8.2)
+- [x] Fase 1: jogadores e inimigos não se empurram (RD-002), XP de grupo cheia para quem causou dano, arena PvP depois da fase 1
 - [ ] Região de lançamento
 - [ ] Autorização da Perfect World, se algum dado da referência for usado além de estudo
