@@ -114,6 +114,28 @@ A arquitetura copia a ideia que deu certo na referência: o motor compilado faz 
 
 Na referência, 109 funções de jogo e 38 de interface bastavam para 1.548 janelas e 632 scripts. As mais usadas consultavam o personagem (nível de habilidade e de efeitos), mostravam e escondiam elementos e preenchiam textos. Essa é a ordem de prioridade para a API do Forsaken Online, com nomes próprios. O script do cliente nunca fala com a rede: toda regra que vale dinheiro ou poder fica no servidor.
 
+### 8.1 Modo offline e modo online
+
+Offline e online são **personagens separados**, como no Diablo 2. Isso fecha a porta para a trapaça mais simples: editar o save offline e entrar no PvP com nível máximo.
+
+| | Personagem offline | Personagem online |
+| --- | --- | --- |
+| Onde fica salvo | No computador do jogador | Só no servidor |
+| Precisa de internet | Não | Sim |
+| Upar sozinho | Sim | Sim (conectado) |
+| PvP, masmorra em grupo, comércio, ranking | Não | Sim |
+| Pode virar o outro tipo | Nunca | Nunca |
+
+O offline serve para experimentar o jogo, jogar sem conexão e testar builds. O código de regras (dano, XP, habilidades) é o mesmo nos dois modos; no online ele roda no servidor.
+
+### 8.2 Escala em degraus
+
+| Fase | Meta de jogadores | Portão para passar |
+| --- | --- | --- |
+| 1 | 2 a 10 numa masmorra ou arena | Partida completa sem dessincronizar e sem regra decidida no cliente |
+| 2 | 100 por zona | Teste de carga com clientes simulados dentro da latência alvo |
+| 3 | 10.000 simultâneos (meta de longo prazo) | Só é planejada depois da fase 2 aprovada |
+
 ## 9. Pipeline da história
 
 A história é escrita do zero e melhora em rodadas. Cada rodada pega um tópico do backlog e passa por quatro papéis fixos, e nada entra no cânone sem a sua aprovação.
@@ -128,6 +150,17 @@ O próximo marco concreto é um protótipo pequeno e jogável, não o jogo intei
 
 &#91;embedded content: roteiro · 5 fases, 4 portões, sem datas\]
 
+### 10.1 Equipe
+
+A equipe de referência para o pico de produção tem 42 pessoas: direção 3, programação 14, arte 3D 8, design 5, QA 4, animação e efeitos 3, direção e gestão 3, interface 2, operações e comunidade 2, áudio 1. Ela não é contratada de uma vez. A ordem é:
+
+1. Diretor técnico, programador sênior de multiplayer/backend e game designer principal.
+2. Programadores de gameplay e de rede, para a fase 1 de escala.
+3. Diretor de arte e artista técnico, depois do protótipo de rede aprovado.
+4. O restante conforme cada portão do roteiro for aprovado.
+
+Enquanto isso, os 42 cargos estão consolidados em **12 agentes de IA** em `.claude/agents/` (lista e cobertura no `CLAUDE.md`). Eles escrevem texto e código; nas áreas de arte, animação e áudio, entregam especificações, não os assets.
+
 ## 11. Decisões em aberto
 
 - [ ] Nomes definitivos do jogo (nome de trabalho: **Goru**), do mundo, do panteão, das raças, das classes e do vilão
@@ -139,5 +172,7 @@ O próximo marco concreto é um protótipo pequeno e jogável, não o jogo intei
 - [ ] Origem da arte: equipe própria, freelancers, pacotes licenciados ou geração com IA
 - [x] Primeiro protótipo: **solo e offline** (rede fica para a fase seguinte)
 - [ ] Linguagem e arquitetura do servidor
-- [ ] Tamanho do servidor e região de lançamento
+- [x] Modo offline e online: **personagens separados** (seção 8.1)
+- [x] Escala: **em degraus**, de 2–10 jogadores até 10.000 (seção 8.2)
+- [ ] Região de lançamento
 - [ ] Autorização da Perfect World, se algum dado da referência for usado além de estudo
