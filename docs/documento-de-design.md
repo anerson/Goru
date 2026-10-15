@@ -29,16 +29,16 @@ Forsaken Online é um MMORPG de fantasia sombria em que raças rivais precisam c
 
 ## 3. Mundo e história
 
-A história segue um mito em camadas: cada camada entrega ao jogo uma raça, uma perda ou um vilão. Os nomes abaixo são vagas a preencher, e nenhum deve repetir os da referência.
+A história segue um mito em camadas: cada camada entrega ao jogo uma raça, uma perda ou um vilão. Os nomes aprovados estão em `docs/capitulo-1.md` e nenhum repete os da referência.
 
 | Camada | O que acontece | O que entrega ao jogo |
 | --- | --- | --- |
-| Criação | Um criador molda o mundo e seus marcos (uma árvore, um céu de estrelas) | Cenário e panteão |
-| Herdeiros | Três deuses recebem o mundo e patrocinam raças diferentes | Origem e lealdade de cada raça |
-| Primeira guerra | Uma força do caos ataca; um continente afunda | Primeira perda e regiões em ruínas |
-| Segunda guerra | Um herói mortal usa relíquias para selar os deuses e o inimigo | Protagonismo dos mortais |
+| Criação | O Oleiro coze o mundo de Goru no seu forno | Cenário e panteão |
+| Herdeiros | Prumo (ordem), Seiva (vida) e Veio (terra) recebem o mundo e patrocinam raças diferentes | Origem e lealdade de cada raça |
+| Primeira guerra | A Friagem, um frio que sobe da névoa, racha o mundo; o continente do Fundo afunda | Primeira perda e regiões em ruínas |
+| Segunda guerra | A forneira Arminda fecha a rachadura do céu com barro em brasa e os Três Ferros; o remendo é a cicatriz no céu, e seus soldados, cozidos junto, viram os Imortais | Protagonismo dos mortais e a raça dos Imortais |
 | Vácuo | Sem deuses, uma raça domina e as outras se dividem | Mundo jogável e tensão política |
-| Vilão ativo | Um líder reúne os restos do caos num exército | Antagonista da campanha |
+| Vilão ativo | Odália, a primeira Imortal, quer reabrir o céu para que os Imortais possam morrer | Antagonista da campanha |
 | Expansões | Cada atualização abre uma raça, zona, classe ou sistema | Conteúdo contínuo |
 
 A campanha principal é contada em **capítulos**, e cada capítulo fecha uma faixa de nível. O texto em si sai do pipeline da seção 9, partindo do zero.
@@ -233,7 +233,8 @@ Enquanto isso, os 42 cargos estão consolidados em **12 agentes de IA** em `.cla
 
 ## 11. Decisões em aberto
 
-- [ ] Nomes definitivos do jogo (nome de trabalho: **Goru**), do mundo, do panteão, das raças, das classes e do vilão
+- [x] Mundo **Goru**, panteão (Oleiro, Prumo, Seiva, Veio), Friagem, Arminda, vilã **Odália** e zona 1 **Capão do Sereno** (`docs/capitulo-1.md`)
+- [ ] Nome comercial do jogo, nomes das raças e das classes
 - [ ] Pipeline da história: agentes de IA, pessoas ou os dois
 - [x] Plataforma: **PC**
 - [x] Motor: **Godot 4.3**

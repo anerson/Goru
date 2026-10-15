@@ -1,4 +1,6 @@
-# Goru: capítulo 1 da campanha (proposta)
+# Goru: capítulo 1 da campanha
+
+> **Aprovado pelo dono do projeto em 15/10/2026:** mundo Goru; o Oleiro, a Friagem e os deuses Prumo, Seiva e Veio; a heroína Arminda; a vilã Odália; zona 1 "Capão do Sereno"; textos das 3 primeiras missões (seção 5). As 15 missões entram depois de itens, inventário e NPC. As propostas menores (seção 1.6) e os conflitos da seção 7 continuam em aberto.
 
 Out 15, 2026 · `narrativa-missoes` · **PROPOSTA PARA APROVAÇÃO. Nada aqui é cânone.**
 
