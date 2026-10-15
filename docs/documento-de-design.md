@@ -94,6 +94,61 @@ O endgame se apoia em camadas de melhoria do personagem que o jogador avança ao
 
 Profissões gastam **vigor**, um recurso diário que limita a produção e protege a economia de bots.
 
+### 6.1 Sistemas de guilda, mundo e infraestrutura
+
+Sete estruturas comuns no gênero, que o Goru ainda não tinha. São ideias de sistema, sem dono. Os nomes, números e regras abaixo são próprios do Goru, e nenhum dado de outro jogo entra no repositório (seção 1).
+
+| # | Sistema | Fase | Responsáveis |
+| --- | --- | --- | --- |
+| 1 | Marcas: território de guilda | 3 | `game-designer`, `engenheiro-rede-backend` |
+| 2 | Vigília: guerra em mapa grande | 3 | `game-designer`, `engenheiro-rede-backend`, `qa` |
+| 3 | Missões em tabela de dados | Formato na fase 1; volume a partir da 2 | `narrativa-missoes`, `programador-gameplay` |
+| 4 | Voo como degrau de progressão | Depois da fase 3 | `game-designer`, `arte-e-audio` |
+| 5 | Música por região | 2 | `arte-e-audio` |
+| 6 | Atualizador do jogo | 1, antes do primeiro teste com gente de fora | `devops-seguranca` |
+| 7 | Interface salva por conta | 2 | `ui-ux`, `engenheiro-rede-backend` |
+
+**1. Marcas (território de guilda).** O mundo jogável é dividido em 12 Marcas, cada uma com uma cidade e suas zonas de caça.
+- **Disputa:** uma vez por semana, numa janela fixa de 1 hora, as guildas inscritas disputam cada Marca. A vencedora fica com ela até a disputa seguinte.
+- **Bônus:** membros da guilda dona ganham +5% de XP e de coleta na Marca. A guilda recebe até 3% de taxa sobre o mercado da cidade, e o estandarte dela aparece na cidade.
+- **Contra o domínio permanente:**
+  - Uma guilda segura no máximo 2 Marcas.
+  - A partir da 4ª semana seguida, a guilda paga um dízimo crescente, em moeda de jogo, para manter a Marca.
+  - Alianças têm no máximo 2 guildas.
+- O bônus nunca é poder que só se ganha ali: é ritmo e dinheiro, alinhado ao pilar 3.
+
+**2. Vigília (guerra em mapa grande).** Campo de batalha instanciado com dois lados, até 40 contra 40.
+- **Objetivo:** controlar 5 faróis e levar uma relíquia carregável até a base. Partida de até 25 minutos.
+- **Fila:** por papel (tanque, cura, dano), sem pré-formar mais de 5 por grupo, para não virar briga de guilda pronta contra jogadores soltos.
+- **Recompensa:** moeda de honra, que compra visual e equipamento de PvP no mesmo patamar de poder do equivalente de PvE, nunca acima.
+- **Depende de:** compensação de atraso e teste de carga da fase 2 aprovado.
+
+**3. Missões em tabela de dados.** Cada missão é um registro em `data/missoes/*.json`, nunca código.
+- **Campos:** `id`, `nivel_min`, `pre_requisitos`, `tipo` (conversa, matar, coletar, entregar, escoltar, explorar, instância), `objetivos`, `recompensa` e as chaves dos textos.
+- **Validador automático:** acusa id repetido, pré-requisito inexistente e recompensa fora da faixa do nível.
+- **Volume:** 40 missões na fatia vertical, 400 no lançamento e mais 100 por trimestre depois.
+- **Regra de variedade:** no máximo 30% das missões de uma região podem ser "mate N". Cada capítulo da campanha tem pelo menos uma missão que use o ajudante (seção 8.3) de um jeito que só o Goru tem.
+
+**4. Voo como degrau de progressão.** Montaria terrestre continua no nível 15 (seção 6).
+- **Quando libera:** o voo chega no nível 60, ao fim do capítulo 4, e só se conquista jogando. A loja vende apenas aparência de montaria voadora.
+- **Onde não vale:**
+  - Só funciona em regiões abertas.
+  - Não funciona em masmorras, na Vigília, nem numa Marca durante a disputa.
+- **Ritmo:** o voo é mais lento que o teleporte entre cidades, para o mundo continuar existindo no chão.
+
+**5. Música por região.** Cada região tem 3 faixas próprias (exploração, combate e cidade), e cada masmorra tem 1 tema.
+- **Música em camadas:** a faixa de exploração ganha uma camada de percussão em combate, em vez de cortar para outra música.
+- **Produção e licença:** feita por compositor contratado, com a licença de cada faixa registrada em `docs/` (guia de estilo, seção de áudio). A meta para a primeira região é 4 faixas.
+
+**6. Atualizador do jogo.** Obrigatório antes de qualquer teste com gente de fora.
+- **Manifesto de versão:** um JSON com hash de cada arquivo, assinado pelo servidor.
+- **Download:** incremental por HTTP, só dos arquivos que mudaram, com retomada em caso de queda.
+- **Conferência:** o cliente verifica os hashes antes de abrir o jogo. O servidor de jogo já recusa cliente com `data_hash` diferente (arquitetura da fase 1), então o atualizador evita que o jogador caia nessa recusa sem saber o porquê.
+
+**7. Interface salva por conta.** Posição e tamanho dos painéis, atalhos de teclado, tamanho de texto e opções de acessibilidade.
+- **Onde fica salva:** no modo offline, em `user://`. No online, no servidor, junto da conta, para valer em qualquer computador.
+- **Formato:** um arquivo com número de formato, como o save offline, com exportar e importar para o jogador levar a configuração de um personagem para outro.
+
 ## 7. Economia e loja
 
 A loja da referência vendia 753 itens. Ela se apoiava em três alavancas: promoções com prazo (183 itens, desconto mediano de 35%), brindes junto da compra (556 itens) e pacotes (46 itens com "pacote" no nome). O preço mediano era 300 unidades de moeda premium (de 5 a 7.500).
