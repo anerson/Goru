@@ -66,7 +66,7 @@ P1 tem de fechar antes do passo 0: se o balanceamento mudar depois, a referênci
 | 15 | `tools/teste_rede.sh` com 10 bots, métricas e rodada do portão | `qa` + `engenheiro-rede-backend` | 12, 13, 14 | Script sai com código 0; relatório com os critérios 1 a 7 do portão | 4 |
 | H1 | Servidor numa VPS com IP público, porta 24600, log e reinício | `devops-seguranca` | 8, decisão D5 | Cliente de fora da rede local conecta e joga 10 min | 1,5 |
 | H2 | Atualizador do jogo: manifesto de versão assinado, download incremental por HTTP com retomada, verificação de hash (documento de design, seção 6.1, item 6) | `devops-seguranca` | H1 | Cliente desatualizado baixa só os arquivos que mudaram e abre o jogo; manifesto adulterado é recusado | 3 |
-| M1 | Formato de missões em `data/missoes/*.json` com validador automático e 3 missões de exemplo no offline (seção 6.1, item 3) | `narrativa-missoes` + `programador-gameplay` | 5 | Validador acusa id repetido, pré-requisito inexistente e recompensa fora da faixa; as 3 missões podem ser completadas no offline | 3 |
+| Q1 | Formato de missões em `data/missoes/*.json` com validador automático e 3 missões de exemplo no offline (seção 6.1, item 3) | `narrativa-missoes` + `programador-gameplay` | 5 | Validador acusa id repetido, pré-requisito inexistente e recompensa fora da faixa; as 3 missões podem ser completadas no offline | 3 |
 | 16 | Sessão humana de 30 min e relatório | `qa` (+ dono do projeto) | 15, H1, H2, decisão D6 | 4 pessoas, máquinas e redes diferentes; zero bug bloqueante aberto | 2 |
 
 **Soma:** pendências 4 · bloco A 17 · bloco B 30,5 · **total 51,5 dias-pessoa.**
