@@ -9,5 +9,7 @@
 	"inimigo_raio_chegada": 0.6,
 	"inimigo_separacao_distancia": 1.7,
 	"inimigo_separacao_velocidade": 3.0,
-	"offline_salvamento_intervalo": 60.0
+	"offline_salvamento_intervalo": 60.0,
+	"missao_xp_min_fracao": 0.25,
+	"missao_xp_max_fracao": 1.0
 }

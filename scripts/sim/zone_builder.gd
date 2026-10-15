@@ -43,6 +43,15 @@ static func enemy_spawns(zone: Dictionary) -> Array[Dictionary]:
 	return spawns
 
 
+## Pontos de exploração da zona (campo "pontos"): {id: {"posicao": Vector3, "raio": float}}.
+## Usados pelas missões de explorar (rules/quest_log.gd).
+static func points(zone: Dictionary) -> Dictionary:
+	var found := {}
+	for point: Dictionary in zone.get("pontos", []):
+		found[point.id] = {"posicao": GameData.to_vector3(point.posicao), "raio": float(point.raio)}
+	return found
+
+
 static func player_spawn(zone: Dictionary) -> Vector3:
 	return GameData.to_vector3(zone.spawn_jogador)
 

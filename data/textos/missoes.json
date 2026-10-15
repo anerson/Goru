@@ -1,0 +1,17 @@
+{
+	"_fonte": "Textos do capítulo 1 (docs/capitulo-1.md, seção 5), aprovados pelo dono do projeto. Para mudar um texto, troque aqui, sem mexer nas missões.",
+	"missao.c1_dedo_de_pedra.titulo": "O Dedo de Pedra",
+	"missao.c1_dedo_de_pedra.descricao": "A lasca caiu perto do Dedo de Pedra, aquela coluna alta no noroeste. Vai lá e me diz o que viu. Não toca em nada que brilhe.",
+	"missao.c1_dedo_de_pedra.objetivo_1": "Vá até o Dedo de Pedra.",
+	"missao.c1_dedo_de_pedra.conclusao": "Chão rachado e gelado no meio do mato? É lasca, sim. Pelo rastro, alguém já levou a maior parte.",
+
+	"missao.c1_olho_branco.titulo": "Olho branco",
+	"missao.c1_olho_branco.descricao": "Os lobos comeram lasca. Agora têm olho branco e não fogem de fogo. Derruba {total} antes que cheguem nas cabras.",
+	"missao.c1_olho_branco.objetivo_1": "Lobos Sombrios: {atual}/{total}",
+	"missao.c1_olho_branco.conclusao": "Viu os olhos? Continuam acesos depois de mortos. Isso não é coisa de bicho.",
+
+	"missao.c1_o_poceiro.titulo": "O poceiro",
+	"missao.c1_o_poceiro.descricao": "Tem um morto andando perto do Dedo. É o Juca, que cavava poço para nós. A lasca caiu na cova dele. Deita ele de novo, por favor.",
+	"missao.c1_o_poceiro.objetivo_1": "Deite um Carniçal.",
+	"missao.c1_o_poceiro.conclusao": "Obrigada. Amanhã a gente enterra o Juca longe de qualquer luz."
+}

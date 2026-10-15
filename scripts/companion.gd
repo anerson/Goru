@@ -66,7 +66,7 @@ func _process(delta: float) -> void:
 		react("ocioso", true)
 
 
-## Fala uma reação pronta ao evento (inicio, abate, vida_baixa, morte, nivel, ocioso).
+## Fala uma reação pronta ao evento (inicio, abate, vida_baixa, morte, nivel, ocioso, missao_concluida).
 func react(event: String, force := false) -> void:
 	if not force and _cooldown > 0.0:
 		return

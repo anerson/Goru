@@ -121,3 +121,9 @@ Foi escolhida no lugar de posições de ataque em volta do alvo porque é uma fu
 **Leitura.** Com os inimigos espalhados em volta do jogador, cada golpe em arco pega menos alvos ao mesmo tempo. O Guerreiro, que vive de acertar vários de uma vez, perde 25% do dano causado e 7 abates, e fica no nível 4. O Caçador perde pouco (a Rajada pega menos alvos, o disparo simples não muda). Com 1,4 m os nomes dos rótulos ainda se encostavam nas capturas, e o Guerreiro morreu uma vez; com 1,7 m os rótulos ficam lado a lado e ninguém morre. A meta (25 a 35 abates, 0 ou 1 morte, menos de 50% andando) segue cumprida pelas duas classes. Nenhum número de classe ou inimigo foi mudado. A queda do Guerreiro é para o `game-designer` avaliar.
 
 **Capturas** (tela virtual, `--segundos=45`): antes, dois Lobos Sombrios no mesmo ponto, com os rótulos sobrepostos ("Lobo Sombrio" escrito duas vezes por cima). Depois, com 1,7 m, os dois lobos e o Carniçal ficam lado a lado em volta do Guerreiro, cada um com o rótulo inteiro. Ainda pode haver sobreposição quando um inimigo está atrás do outro na linha da câmera; isso é perspectiva e não se resolve afastando no chão.
+
+### Q1 (missões)
+
+Igual à referência, campo por campo: Guerreiro 4, 28, 0, 2196, 764, 3,0 s, 27%, 72%, 0%; Caçador 5, 31, 0, 2490, 440, 2,9 s, 26%, 73%, 0%.
+
+O diagnóstico roda com as missões desligadas (`main.quests_enabled = false`): a XP das recompensas mudaria nível e dano do bot, e o diagnóstico mede só o combate. Para comparar, `--com-missoes` liga as missões e mostra quantas o bot concluiu. Com as 3 missões do capítulo 1, o resultado também é idêntico e o bot conclui 0: ele só persegue o inimigo mais próximo, nunca chega ao Dedo de Pedra, e as missões de matar dependem dessa. Uma missão futura sem esse pré-requisito mudaria o resultado com `--com-missoes`, mas não o diagnóstico padrão.

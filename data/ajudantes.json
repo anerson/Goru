@@ -48,6 +48,10 @@
 					"Subiu de nível. Agora é um burro um pouco mais forte.",
 					"Nível novo. Não deixa subir pra cabeça, que lá é vazio."
 				],
+				"missao_concluida": [
+					"Missão feita. Até um burro acerta o caminho se andar bastante.",
+					"Concluiu. Demorou tanto que achei que tinha se perdido na névoa."
+				],
 				"ocioso": [
 					"Vai ficar parado aí? Os lobos não vão se matar sozinhos.",
 					"Dormiu? Mexe esse personagem, lerdo."
@@ -90,6 +94,10 @@
 					"Você cresceu... Como um broto que vira árvore.",
 					"Mais forte agora... Sinto suas raízes mais fundas."
 				],
+				"missao_concluida": [
+					"Mais um passo na trilha... A floresta lembra de quem a ajuda.",
+					"Concluído... Respire. A próxima espera por você."
+				],
 				"ocioso": [
 					"Descansar também é caminho... Quando quiser, seguimos.",
 					"O vento mexe as folhas... Vamos andar um pouco?"
@@ -116,6 +124,10 @@
 				"vida_baixa": ["Vida baixa. Recua.", "Sai daí."],
 				"morte": ["Morreu. De novo.", "Renasce e volta."],
 				"nivel": ["Nível novo.", "Mais forte. Segue."],
+				"missao_concluida": [
+					"Missão cumprida. Segue.",
+					"Feito. Próxima."
+				],
 				"ocioso": ["Parado. Move.", "Tem inimigo esperando."],
 				"sem_ia": ["Q em grupo. Clique no resto.", "Vida baixa: recua.", "Conversa livre: instala o OpenJarvis."]
 			}
@@ -150,6 +162,10 @@
 				"nivel": [
 					"Subiu de nível! Que orgulho!",
 					"Olha você crescendo! Merecido demais."
+				],
+				"missao_concluida": [
+					"Missão concluída! Eu sabia que você ia conseguir!",
+					"Você terminou! Que orgulho de andar ao seu lado!"
 				],
 				"ocioso": [
 					"Tudo bem por aí? Quando quiser, a gente continua!",

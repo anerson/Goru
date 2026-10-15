@@ -18,6 +18,13 @@ signal entity_died(id: int, killer_id: int, participants: Array)
 signal xp_gained(id: int, amount: int)
 signal level_up(id: int, level: int)
 signal respawned(id: int, position: Vector3)
+## Missões (rules/quest_log.gd). Só para jogadores com start_quests(). A XP da recompensa já foi
+## dada quando quest_completed sai.
+signal quest_started(player_id: int, quest_id: String)
+signal quest_progressed(player_id: int, quest_id: String, progress: Array)
+signal quest_completed(player_id: int, quest_id: String, xp: int)
+## O estado de missões do jogador mudou (cópia, para exibir): {"ativas": {...}, "concluidas": [...]}.
+signal quest_log_changed(player_id: int, state: Dictionary)
 
 const PLAYER_BODY_SCENE := preload("res://scenes/player_body.tscn")
 const ENEMY_BODY_SCENE := preload("res://scenes/enemy_body.tscn")
@@ -33,6 +40,8 @@ var tick := 0
 var tick_rate: int = Engine.physics_ticks_per_second
 var players: Array[PlayerBody] = []
 var enemies: Array[EnemyBody] = []
+## Catálogo de missões {id: missão} (GameData.quests). Vazio: ninguém recebe missão.
+var quest_catalog: Dictionary
 
 var _entities := {}
 var _next_id := 1
@@ -40,16 +49,24 @@ var _next_id := 1
 var _respawns: Array[Dictionary] = []
 ## Por inimigo, os ids dos jogadores que causaram dano a ele desde que nasceu ou voltou para casa.
 var _participants := {}
+## Por jogador com missões ligadas, o estado de missões dele (QuestLog).
+var _quest_states := {}
+## Pontos de exploração da zona (ZoneBuilder.points).
+var _points := {}
+## Dando a XP de uma recompensa: a missão liberada por nível novo só chega depois do aviso de concluída.
+var _granting_reward := false
 var _zone_root: Node3D
 var _enemies_root: Node3D
 var _players_root: Node3D
 
 
 ## Monta a zona e cria os inimigos dela. Chamar uma vez, já dentro da árvore.
-## `rules_table` vazio usa GameData.rules.
-func setup(zone_data: Dictionary, rules_table := {}) -> void:
+## `rules_table` vazio usa GameData.rules; `quests` null usa GameData.quests.
+func setup(zone_data: Dictionary, rules_table := {}, quests: Variant = null) -> void:
 	zone = zone_data
 	rules = rules_table if not rules_table.is_empty() else GameData.rules
+	quest_catalog = quests if quests is Dictionary else GameData.quests
+	_points = ZoneBuilder.points(zone)
 	_zone_root = _child_root("Zone")
 	_enemies_root = _child_root("Enemies")
 	_players_root = _child_root("Players")
@@ -78,6 +95,7 @@ func remove_player(id: int) -> void:
 		return
 	players.erase(body)
 	_entities.erase(id)
+	_quest_states.erase(id)
 	for enemy_id: int in _participants:
 		_participants[enemy_id].erase(id)
 	_respawns = _respawns.filter(func(entry: Dictionary) -> bool: return entry.id != id)
@@ -124,6 +142,7 @@ func step(delta: float) -> void:
 		var frame := player.next_input()
 		for ability_key in player.apply_input(frame, delta):
 			resolve_ability(player.id, ability_key, frame.yaw)
+	_check_exploration()
 	_tick_respawns()
 	tick += 1
 
@@ -179,7 +198,79 @@ func give_xp(id: int, amount: int) -> Array[int]:
 	xp_gained.emit(id, amount)
 	for level in levels:
 		level_up.emit(id, level)
+	# Nível novo pode liberar missão com nivel_min.
+	if not levels.is_empty() and not _granting_reward:
+		_accept_quests(id)
 	return levels
+
+
+## Liga as missões para o jogador `id`, a partir do estado salvo (QuestLog; vazio = começo).
+## Ajusta o estado ao catálogo atual e já entrega as missões disponíveis.
+func start_quests(id: int, saved := {}) -> void:
+	if not is_player(id):
+		return
+	var state: Variant = QuestLog.parse_state(saved) if not saved.is_empty() else QuestLog.new_state()
+	if state == null:
+		state = QuestLog.new_state()
+	_quest_states[id] = QuestLog.sanitize(state, quest_catalog)
+	_accept_quests(id)
+	quest_log_changed.emit(id, quest_state(id))
+
+
+func has_quests(id: int) -> bool:
+	return _quest_states.has(id)
+
+
+## Cópia do estado de missões do jogador (vazio se as missões dele não estão ligadas).
+func quest_state(id: int) -> Dictionary:
+	return _quest_states[id].duplicate(true) if _quest_states.has(id) else {}
+
+
+## Passa um evento (QuestLog) para as missões do jogador: progresso, conclusão, XP da
+## recompensa e as missões que a conclusão libera.
+func quest_event(id: int, event: Dictionary) -> void:
+	if not _quest_states.has(id):
+		return
+	var result := QuestLog.apply_event(_quest_states[id], quest_catalog, event, _points)
+	if result.progressed.is_empty():
+		return
+	_quest_states[id] = result.state
+	for quest_id: String in result.progressed:
+		if result.state.ativas.has(quest_id):
+			quest_progressed.emit(id, quest_id, result.state.ativas[quest_id].progresso.duplicate())
+	for quest_id: String in result.completed:
+		var reward: int = int(quest_catalog[quest_id].recompensa.xp)
+		# Por enquanto só a XP é dada; ouro e itens da tabela esperam o inventário.
+		_granting_reward = true
+		give_xp(id, reward)
+		_granting_reward = false
+		quest_completed.emit(id, quest_id, reward)
+	_accept_quests(id)
+	quest_log_changed.emit(id, quest_state(id))
+
+
+func _accept_quests(id: int) -> void:
+	var player: PlayerBody = _entities.get(id) as PlayerBody
+	if player == null or not _quest_states.has(id):
+		return
+	var result := QuestLog.accept_available(_quest_states[id], quest_catalog, player.level)
+	if result.accepted.is_empty():
+		return
+	_quest_states[id] = result.state
+	for quest_id: String in result.accepted:
+		quest_started.emit(id, quest_id)
+	quest_log_changed.emit(id, quest_state(id))
+
+
+## Missões de explorar: confere, no fim do movimento do tick, quem chegou a um ponto.
+func _check_exploration() -> void:
+	if _quest_states.is_empty():
+		return
+	for player in players:
+		if player.is_dead or not _quest_states.has(player.id):
+			continue
+		if QuestLog.needs_position(_quest_states[player.id], quest_catalog):
+			quest_event(player.id, {"tipo": QuestLog.EVENT_POSITION, "posicao": player.global_position})
 
 
 func _on_killed(target: Node3D, killer_id: int) -> void:
@@ -192,6 +283,9 @@ func _on_killed(target: Node3D, killer_id: int) -> void:
 		var shares := Progression.xp_shares(target.stats.xp, participants)
 		for id: int in shares:
 			give_xp(id, shares[id])
+		# Missões contam o abate só para quem causou dano, como a XP.
+		for id: int in participants:
+			quest_event(id, {"tipo": QuestLog.EVENT_KILL, "inimigo": target.enemy_id})
 	else:
 		_respawns.append({"id": target.id, "ticks": ticks_for(rules.jogador_renascimento)})
 	entity_died.emit(target.id, killer_id, participants)

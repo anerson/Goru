@@ -1,6 +1,6 @@
 extends CanvasLayer
 ## Interface: escolha de classe e de ajudante, vida, experiência, barra de habilidades, quadro do alvo,
-## fala do ajudante e tela de morte.
+## rastreador de missões, avisos de missão, fala do ajudante e tela de morte.
 ## Só ouve sinais (vida, XP, habilidade usada, golpe acertado) e guarda o que precisa exibir. Não lê o
 ## estado do jogador; do alvo, lê nome, vida e posição (esta só para esconder o quadro quando ele some
 ## de vista, medida a partir da câmera).
@@ -11,6 +11,16 @@ signal element_chosen(element_id: String)
 signal chat_toggled(is_open: bool)
 
 const SPEECH_HOLD := 6.0
+## Quanto tempo um aviso de missão fica na tela antes de sumir (segundos), e o desbotar.
+const NOTICE_HOLD := 5.0
+const NOTICE_FADE := 0.8
+## Topo dos avisos: abaixo do quadro do alvo (margem de 20 + uns 70 px de quadro + folga).
+const NOTICE_TOP := 120.0
+const NOTICE_WIDTH := 520.0
+const QUEST_PANEL_WIDTH := 280.0
+## No máximo esta quantidade de avisos na tela; chegando outro, o mais antigo sai. Com 2, a pilha
+## termina bem acima da mira (centro da tela).
+const MAX_NOTICES := 2
 ## Quadro do alvo some quando o alvo fica mais longe que isto da câmera (metros). Só exibição.
 ## A câmera fica até 12 m atrás do jogador; 30 m da câmera dá uns 18 a 30 m do jogador.
 const TARGET_MAX_DISTANCE := 30.0
@@ -62,6 +72,12 @@ var target_bar: ProgressBar
 var target: Node3D
 var _world: Node
 var _player_id := 0
+## Rastreador de missões (direita, abaixo da ajuda) e as linhas dele, por id de missão.
+var quest_panel: PanelContainer
+var quest_list: VBoxContainer
+var quest_rows := {}
+## Avisos de missão nova e concluída (topo, abaixo do quadro do alvo). Somem sozinhos.
+var notice_box: VBoxContainer
 ## Inimigos que o jogador acertou na habilidade em curso. Uma habilidade resolve todos os golpes
 ## de uma vez (WorldSim.resolve_ability), então a escolha fica para o fim do quadro (_choose_target).
 var _pending_hits: Array[Node3D] = []
@@ -216,6 +232,106 @@ func bind_target_source(world: Node, player_id: int) -> void:
 	_world = world
 	_player_id = player_id
 	world.damage_dealt.connect(_on_damage_dealt)
+
+
+## Liga o rastreador e os avisos de missão aos eventos da simulação (`world`: WorldSim) para o
+## jogador `player_id`. Só exibição: os textos vêm de data/textos/missoes.json, as metas do
+## catálogo, e o progresso chega pelos sinais.
+func bind_quests(world: Node, player_id: int) -> void:
+	_player_id = player_id
+	world.quest_log_changed.connect(_on_quest_log_changed)
+	world.quest_started.connect(_on_quest_started)
+	world.quest_completed.connect(_on_quest_completed)
+
+
+## Mostra um aviso no topo, que some sozinho depois de NOTICE_HOLD segundos.
+## `title` em brasa (destaque do guia), `detail` menor em cinza-névoa.
+func show_notice(title: String, detail := "") -> Control:
+	var shown := notice_box.get_children().filter(func(node: Node) -> bool: return not node.is_queued_for_deletion())
+	while shown.size() >= MAX_NOTICES:
+		var oldest: Node = shown.pop_front()
+		notice_box.remove_child(oldest)
+		oldest.queue_free()
+	var box := VBoxContainer.new()
+	box.name = "Notice"
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_theme_constant_override("separation", 2)
+	var head := _label(title, 22, COLOR_EMBER)
+	head.name = "Title"
+	box.add_child(head)
+	if not detail.is_empty():
+		var body := _label(detail, 15, COLOR_BONE)
+		body.name = "Detail"
+		body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		body.custom_minimum_size.x = NOTICE_WIDTH
+		box.add_child(body)
+	notice_box.add_child(box)
+	var tween := box.create_tween()
+	tween.tween_interval(NOTICE_HOLD)
+	tween.tween_property(box, "modulate:a", 0.0, NOTICE_FADE)
+	tween.tween_callback(box.queue_free)
+	return box
+
+
+## Texto de progresso de um objetivo, como no rastreador: "Lobos Sombrios: 2/5".
+## O texto da tabela pode usar {atual} e {total}; sem eles, a contagem vai no fim quando a meta
+## passa de 1 ("Lobos Sombrios 2/5"), e objetivo de uma vez só ("Vá até...") fica só com o texto.
+static func objective_line(objective: Dictionary, count: int) -> String:
+	var text := GameData.quest_text(objective.texto)
+	var goal := QuestLog.goal_for(objective)
+	if text.contains("{atual}") or text.contains("{total}"):
+		return text.format({"atual": count, "total": goal})
+	return "%s %d/%d" % [text, count, goal] if goal > 1 else text
+
+
+## Texto da missão (título, descrição, conclusão) com {total} trocado pela meta do primeiro objetivo.
+static func quest_line(quest: Dictionary, field: String) -> String:
+	return GameData.quest_text(quest.textos[field]).format({"total": QuestLog.goal_for(quest.objetivos[0])})
+
+
+func _on_quest_log_changed(player_id: int, state: Dictionary) -> void:
+	if player_id != _player_id:
+		return
+	for child in quest_list.get_children():
+		child.queue_free()
+	quest_rows.clear()
+	for quest_id: String in state.ativas:
+		var quest: Dictionary = GameData.quests.get(quest_id, {})
+		if quest.is_empty():
+			continue
+		var row := VBoxContainer.new()
+		row.name = "Quest_" + quest_id
+		row.add_theme_constant_override("separation", 0)
+		var title := _label(quest_line(quest, "titulo"), 16, COLOR_BONE)
+		title.name = "Title"
+		title.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		row.add_child(title)
+		var progress: Array = state.ativas[quest_id].progresso
+		var lines: Array[Label] = []
+		for index in quest.objetivos.size():
+			var line := _label(objective_line(quest.objetivos[index], int(progress[index])), 14, COLOR_MIST)
+			line.name = "Objective%d" % index
+			line.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+			row.add_child(line)
+			lines.append(line)
+		quest_list.add_child(row)
+		quest_rows[quest_id] = {"row": row, "title": title, "objectives": lines}
+	quest_panel.visible = not quest_rows.is_empty()
+
+
+func _on_quest_started(player_id: int, quest_id: String) -> void:
+	if player_id != _player_id or not GameData.quests.has(quest_id):
+		return
+	var quest: Dictionary = GameData.quests[quest_id]
+	show_notice("Nova missão: " + quest_line(quest, "titulo"), quest_line(quest, "descricao"))
+
+
+func _on_quest_completed(player_id: int, quest_id: String, xp: int) -> void:
+	if player_id != _player_id or not GameData.quests.has(quest_id):
+		return
+	var quest: Dictionary = GameData.quests[quest_id]
+	show_notice("Missão concluída: %s  (+%d XP)" % [quest_line(quest, "titulo"), xp], quest_line(quest, "conclusao"))
 
 
 func bind_companion(new_companion: Companion) -> void:
@@ -497,12 +613,21 @@ func _build_game_ui() -> void:
 
 	_build_target_frame()
 
-	# Em duas linhas, à direita, para não encostar no quadro do alvo.
+	# Coluna da direita: ajuda em duas linhas (para não encostar no quadro do alvo) e, abaixo dela,
+	# o rastreador de missões (guia de estilo, seção 6: missões abaixo do mapa, fora do centro).
+	var right := VBoxContainer.new()
+	right.name = "RightColumn"
+	right.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	right.size_flags_horizontal = Control.SIZE_SHRINK_END
+	right.add_theme_constant_override("separation", 10)
+	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	game_ui.add_child(right)
 	var help := _label("WASD mover · Mouse câmera · Espaço pular\nEnter falar com o ajudante · Esc soltar mouse", 14, Color(0.8, 0.8, 0.85))
 	help.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	help.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	help.size_flags_horizontal = Control.SIZE_SHRINK_END
-	game_ui.add_child(help)
+	right.add_child(help)
+	_build_quest_panel(right)
+	_build_notices()
 
 
 ## Um espaço da barra: tecla no canto, nome embaixo, segundos no meio e o escurecimento por cima.
@@ -546,6 +671,45 @@ func _ability_slot(key: String) -> Dictionary:
 	time.visible = false
 	slot.add_child(time)
 	return {"slot": slot, "shade": shade, "time": time, "name": name_label, "key": hint}
+
+
+## Rastreador: painel reto do guia, título "Missões" e uma linha por missão ativa.
+func _build_quest_panel(parent: Control) -> void:
+	quest_panel = PanelContainer.new()
+	quest_panel.name = "QuestTracker"
+	quest_panel.size_flags_horizontal = Control.SIZE_SHRINK_END
+	quest_panel.custom_minimum_size.x = QUEST_PANEL_WIDTH
+	quest_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := _panel_style(COLOR_IRON)
+	style.set_content_margin_all(10)
+	quest_panel.add_theme_stylebox_override("panel", style)
+	quest_panel.visible = false
+	parent.add_child(quest_panel)
+	var lines := VBoxContainer.new()
+	lines.add_theme_constant_override("separation", 6)
+	quest_panel.add_child(lines)
+	var header := _label("Missões", 14, COLOR_MIST)
+	header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	lines.add_child(header)
+	quest_list = VBoxContainer.new()
+	quest_list.name = "List"
+	quest_list.add_theme_constant_override("separation", 8)
+	lines.add_child(quest_list)
+
+
+## Avisos: coluna no topo ao centro, abaixo do quadro do alvo e longe da barra e do balão.
+func _build_notices() -> void:
+	notice_box = VBoxContainer.new()
+	notice_box.name = "Notices"
+	notice_box.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	notice_box.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	notice_box.offset_top = NOTICE_TOP
+	notice_box.custom_minimum_size.x = NOTICE_WIDTH
+	notice_box.offset_left = -NOTICE_WIDTH / 2.0
+	notice_box.offset_right = NOTICE_WIDTH / 2.0
+	notice_box.add_theme_constant_override("separation", 10)
+	notice_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(notice_box)
 
 
 ## Quadro do alvo: topo ao centro, nome, tipo e vida do inimigo exibido.

@@ -1,5 +1,6 @@
 extends Node
-## Teste da interface: dificuldade na escolha de classe, quadro do alvo e barra de habilidades.
+## Teste da interface: dificuldade na escolha de classe, quadro do alvo, barra de habilidades e
+## rastreador e avisos de missão.
 ## Só confere o que a HUD mostra; as regras de combate são do smoke_test.
 ## Uso: godot --headless --path . res://tests/hud_test.tscn
 ## Com tela, salva capturas: godot --path . res://tests/hud_test.tscn -- --saida=/pasta
@@ -96,10 +97,80 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_check(not hud.target_frame.visible, "alvo: quadro some quando o alvo fica longe")
 
+	await _test_quests(main, hud, world, player)
 	_test_layout(hud)
 
 	print("HUD TEST: %s" % ("OK" if failures == 0 else "%d FALHA(S)" % failures))
 	get_tree().quit(1 if failures else 0)
+
+
+## Rastreador de missões e avisos: missão inicial, conclusão de explorar, progresso dos lobos.
+func _test_quests(main: Node3D, hud: CanvasLayer, world: WorldSim, player: PlayerBody) -> void:
+	# O personagem novo recebeu a primeira missão ao entrar.
+	_check(hud.quest_panel.visible and hud.quest_rows.keys() == ["c1_dedo_de_pedra"], "missões: rastreador com a missão de explorar")
+	var row: Dictionary = hud.quest_rows.get("c1_dedo_de_pedra", {})
+	_check(not row.is_empty() and row.title.text == "O Dedo de Pedra" and row.objectives[0].text == "Vá até o Dedo de Pedra.", "missões: rastreador mostra título e objetivo da tabela de textos")
+
+	# Chega ao ponto: aviso de concluída (com a XP), aviso da próxima e fala do ajudante.
+	var point: Dictionary = ZoneBuilder.points(GameData.zone).dedo_de_pedra
+	player.global_position = point.posicao
+	main.camera_rig.rotation.y = 0.0
+	for i in 3:
+		await get_tree().physics_frame
+	await get_tree().process_frame
+	var titles: Array[String] = []
+	for notice in hud.notice_box.get_children():
+		if not notice.is_queued_for_deletion():
+			titles.append(notice.get_node("Title").text)
+	_check(titles.has("Missão concluída: O Dedo de Pedra  (+%d XP)" % GameData.quests.c1_dedo_de_pedra.recompensa.xp), "missões: aviso ao concluir, com a XP")
+	_check(titles.has("Nova missão: Olho branco"), "missões: aviso ao receber a missão seguinte")
+	_check(hud.speech_panel.visible and main.companion.element.falas.missao_concluida.has(hud.speech_text.text), "missões: o ajudante comenta a missão concluída")
+	_check(hud.quest_rows.keys() == ["c1_olho_branco"], "missões: rastreador troca a concluída pela nova")
+	_check(hud.notice_box.get_child_count() == hud.MAX_NOTICES, "missões: no máximo %d avisos na tela (o mais antigo sai)" % hud.MAX_NOTICES)
+	# Espera o balão terminar de escrever, para a captura mostrar a fala inteira.
+	await get_tree().create_timer(3.0).timeout
+	await _shot("hud_missao_concluida")
+	_test_quest_layout(hud, "aviso e rastreador")
+
+	# Dois lobos abatidos: "Lobos Sombrios: 2/5".
+	var killed := 0
+	for enemy in world.enemies:
+		if killed == 2:
+			break
+		if enemy.enemy_id == "lobo_sombrio" and enemy.is_alive():
+			world.apply_damage(player.id, enemy.id, 99999)
+			killed += 1
+	await get_tree().process_frame
+	_check(hud.quest_rows.c1_olho_branco.objectives[0].text == "Lobos Sombrios: 2/5", "missões: progresso no rastreador (%s)" % hud.quest_rows.c1_olho_branco.objectives[0].text)
+	_check(hud.objective_line({"tipo": "matar", "quantidade": 5, "texto": "sem_chave_ainda"}, 2) == "sem_chave_ainda 2/5", "missões: texto sem {atual} ganha a contagem no fim")
+	main.companion.react("missao_concluida", true)
+	await get_tree().create_timer(3.0).timeout
+	await _shot("hud_rastreador")
+
+	# Os avisos somem sozinhos.
+	var notice: Control = hud.show_notice("Teste de aviso")
+	await get_tree().create_timer(hud.NOTICE_HOLD - 0.5).timeout
+	var still_there: bool = is_instance_valid(notice) and notice.get_parent() == hud.notice_box
+	await get_tree().create_timer(hud.NOTICE_FADE + 0.8).timeout
+	_check(still_there and hud.notice_box.get_child_count() == 0, "missões: avisos somem depois de %.1f s" % (hud.NOTICE_HOLD + hud.NOTICE_FADE))
+
+
+## Rastreador e avisos não cobrem o quadro do alvo, a barra de habilidades, o balão do ajudante nem a vida.
+func _test_quest_layout(hud: CanvasLayer, moment: String) -> void:
+	var quest_rect: Rect2 = hud.quest_panel.get_global_rect()
+	var notice_rect: Rect2 = hud.notice_box.get_global_rect()
+	var target_rect: Rect2 = hud.target_frame.get_global_rect()
+	var bar_rect: Rect2 = hud.ability_slots.ataque.slot.get_parent().get_global_rect()
+	var speech_rect: Rect2 = hud.speech_panel.get_parent().get_global_rect()
+	var health_rect: Rect2 = hud.health_bar.get_parent().get_global_rect()
+	var screen: Rect2 = hud.get_viewport().get_visible_rect()
+	print("  retângulos (%s): rastreador %s, avisos %s, alvo %s" % [moment, quest_rect, notice_rect, target_rect])
+	for other: Array in [[target_rect, "o quadro do alvo"], [bar_rect, "a barra de habilidades"], [speech_rect, "o balão do ajudante"], [health_rect, "vida e XP"]]:
+		_check(not quest_rect.intersects(other[0]), "layout: rastreador não cobre %s" % other[1])
+		_check(not notice_rect.intersects(other[0]), "layout: avisos não cobrem %s" % other[1])
+	_check(screen.encloses(quest_rect) and quest_rect.position.x >= screen.size.x * 2.0 / 3.0, "layout: rastreador cabe na tela, fora do terço central (à direita)")
+	_check(not quest_rect.intersects(notice_rect), "layout: avisos não cobrem o rastreador")
+	_check(notice_rect.end.y < screen.size.y / 2.0 - 20.0, "layout: avisos terminam acima da mira (y %d)" % notice_rect.end.y)
 
 
 func _test_difficulty(hud: CanvasLayer) -> void:

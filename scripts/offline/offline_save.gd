@@ -15,7 +15,8 @@ extends RefCounted
 enum Status { OK, NOT_FOUND, CORRUPT, UNKNOWN_FORMAT, INVALID_ID, WRITE_FAILED }
 
 ## Formato atual do arquivo. Subiu o formato: acrescente o passo em migrate().
-const FORMAT := 1
+## 1: personagem sem missões. 2: personagem com "missoes" (ativas e concluídas).
+const FORMAT := 2
 const DEFAULT_DIR := "user://offline/personagens"
 const ID_PREFIX := "off-"
 const BACKUP_SUFFIX := ".bak"
@@ -53,15 +54,24 @@ func path_for(id: String) -> String:
 	return "%s/%s.json" % [folder, id]
 
 
-## Converte um save antigo para o formato atual. Devolve {} se o formato for desconhecido.
+## Converte um save antigo para o formato atual, um passo de formato por vez, sem mexer em
+## `data`. Devolve {} se o formato for desconhecido. Cada passo é congelado: escreve o formato
+## seguinte como ele era, sem depender do código atual.
 static func migrate(data: Dictionary) -> Dictionary:
 	var raw_format: Variant = data.get("formato")
 	if not (raw_format is int or raw_format is float) or float(raw_format) != floorf(float(raw_format)):
 		return {}
-	match int(raw_format):
-		1:
-			return data
-	return {}
+	var format := int(raw_format)
+	if format < 1 or format > FORMAT:
+		return {}
+	var migrated := data.duplicate(true)
+	if format == 1:
+		# 1 -> 2: personagem ganha as missões, ainda sem nenhuma.
+		if migrated.get("personagem") is Dictionary and not migrated.personagem.has("missoes"):
+			migrated.personagem["missoes"] = {"ativas": {}, "concluidas": []}
+		format = 2
+	migrated.formato = format
+	return migrated
 
 
 ## Grava o personagem de forma atômica. Devolve OK ou o erro do arquivo.

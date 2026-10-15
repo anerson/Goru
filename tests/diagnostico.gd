@@ -4,9 +4,11 @@ extends Node
 ## Tudo conta em ticks de física, então o resultado não depende do FPS (ver tests/referencia_diagnostico.md).
 ## Com tela, também salva capturas. Uso:
 ##   godot --path . res://tests/diagnostico.tscn -- --saida=/pasta --segundos=120
+## Missões ficam desligadas (a XP delas mudaria o combate medido); --com-missoes liga, só para comparar.
 
 var out_dir := ""
 var seconds := 120.0
+var with_quests := false
 var main: Node3D
 var player: CharacterBody3D
 var metrics := {}
@@ -21,6 +23,8 @@ func _ready() -> void:
 			out_dir = arg.trim_prefix("--saida=")
 		elif arg.begins_with("--segundos="):
 			seconds = float(arg.trim_prefix("--segundos="))
+		elif arg == "--com-missoes":
+			with_quests = true
 	var report := []
 	for class_id: String in GameData.classes:
 		report.append(await _run_class(class_id))
@@ -32,6 +36,9 @@ func _ready() -> void:
 
 func _run_class(class_id: String) -> String:
 	main = load("res://scenes/main.tscn").instantiate()
+	# Missões desligadas: a XP das recompensas mudaria nível e dano do bot e tiraria o
+	# diagnóstico da referência (tests/referencia_diagnostico.md). O bot mede só o combate.
+	main.quests_enabled = with_quests
 	add_child(main)
 	# Esperas em ticks de física, para o estado inicial não depender do FPS.
 	await _physics_frames(5)
@@ -68,7 +75,8 @@ func _run_class(class_id: String) -> String:
 	var avg_ttk: float = 0.0 if ttk.is_empty() else ttk.reduce(func(a, b): return a + b) / ttk.size()
 	var fps: Array = metrics.fps
 	var avg_fps: float = fps.reduce(func(a, b): return a + b) / maxi(fps.size(), 1)
-	var line := "%s: nível %d, abates %d, mortes %d, dano causado %d, recebido %d, TTK médio %.1fs, andando %d%%, atacando %d%%, morto %d%%, FPS %.0f" % [
+	var quests_done: int = main.world.quest_state(player.id).get("concluidas", []).size()
+	var line := ("[com missões: %d concluídas] " % quests_done if with_quests else "") + "%s: nível %d, abates %d, mortes %d, dano causado %d, recebido %d, TTK médio %.1fs, andando %d%%, atacando %d%%, morto %d%%, FPS %.0f" % [
 		GameData.classes[class_id].nome, player.level, metrics.abates, metrics.mortes,
 		metrics.dano_causado, metrics.dano_recebido, avg_ttk,
 		100.0 * metrics.tempo_andando / seconds, 100.0 * metrics.tempo_atacando / seconds,

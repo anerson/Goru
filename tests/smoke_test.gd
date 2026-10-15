@@ -18,7 +18,11 @@ func _ready() -> void:
 	var real_saves := _real_save_files()
 	_remove_dir(SAVE_TEST_DIR)
 	_test_offline_save()
+	_test_quest_save()
 	_test_save_isolation()
+	_test_quest_rules()
+	_test_quest_validator()
+	await _test_quest_chain()
 
 	var main: Node3D = load("res://scenes/main.tscn").instantiate()
 	_check(main.offline_save == null, "save: desligado por padrão quando o jogo roda dentro de um teste")
@@ -34,6 +38,9 @@ func _ready() -> void:
 
 	main.start_game("guerreiro")
 	var player: PlayerBody = main.player
+	_check(GameData.quest_errors.is_empty() and GameData.quests.size() >= 3, "missões: o jogo carrega data/missoes sem erro (%d missões)" % GameData.quests.size())
+	_check(world.has_quests(player.id) and world.quest_state(player.id).ativas.keys() == ["c1_dedo_de_pedra"], "missões: personagem novo recebe a primeira missão ao entrar")
+	_check(main.hud.quest_panel.visible and main.hud.quest_rows.has("c1_dedo_de_pedra"), "missões: o rastreador mostra a missão")
 	var save_path := game_saves.path_for(main.character.id)
 	_check(FileAccess.file_exists(save_path) and _saved_level(save_path) == 1, "save: personagem novo é gravado ao entrar, no nível 1")
 	for i in 30:
@@ -132,6 +139,20 @@ func _ready() -> void:
 	world.give_xp(player.id, player.xp_to_next_level())
 	_check(player.level == level_before + 1 and events.level_up[-1] == [player.id, level_before + 1], "sobe de nível e emite o evento")
 	_check(_saved_level(save_path) == player.level, "save: grava ao subir de nível")
+	# Missão de explorar: chega ao ponto, conclui, a fala do ajudante sai e o save grava.
+	var point: Dictionary = ZoneBuilder.points(GameData.zone).dedo_de_pedra
+	DirAccess.remove_absolute(save_path)
+	var spoken: Array[String] = []
+	main.companion.said.connect(func(text: String): spoken.append(text))
+	player.global_position = point.posicao
+	await _physics_frames(2)
+	var after_explore := world.quest_state(player.id)
+	_check(after_explore.concluidas == ["c1_dedo_de_pedra"] and after_explore.ativas.has("c1_olho_branco"), "missões: chegar ao ponto conclui e libera a missão dos lobos")
+	_check(not spoken.is_empty() and main.companion.element.falas.missao_concluida.has(spoken[-1]), "missões: o ajudante reage com a fala de missão concluída do elemento")
+	var saved_quests: Variant = JSON.parse_string(FileAccess.get_file_as_string(save_path)).personagem.missoes if FileAccess.file_exists(save_path) else null
+	_check(saved_quests is Dictionary and saved_quests.concluidas == ["c1_dedo_de_pedra"], "save: grava ao concluir missão, com as missões")
+	player.global_position = world.player_spawn()
+	await _physics_frames(1)
 	DirAccess.remove_absolute(save_path)
 	main.notification(NOTIFICATION_WM_CLOSE_REQUEST)
 	_check(_saved_level(save_path) == player.level, "save: grava ao fechar o jogo")
@@ -152,7 +173,7 @@ func _ready() -> void:
 	for element_id: String in GameData.companions.elementos:
 		var element: Dictionary = GameData.companions.elementos[element_id]
 		var complete := true
-		for event in ["inicio", "abate", "vida_baixa", "morte", "nivel", "ocioso", "sem_ia"]:
+		for event in ["inicio", "abate", "vida_baixa", "morte", "nivel", "ocioso", "sem_ia", "missao_concluida"]:
 			complete = complete and not element.falas.get(event, []).is_empty()
 		_check(complete, "elemento %s tem falas para todos os eventos" % element_id)
 
@@ -484,7 +505,7 @@ func _test_offline_save() -> void:
 	var keys: Array = file.personagem.keys() if file is Dictionary and file.get("personagem") is Dictionary else []
 	keys.sort()
 	_check(file is Dictionary and file.formato == OfflineSave.FORMAT and file.versao_jogo == ProjectSettings.get_setting("application/config/version") and str(file.salvo_em).ends_with("Z"), "save: arquivo com formato, versão do jogo e hora")
-	_check(keys == ["classe", "id", "nivel", "nome", "posicao", "tempo_jogado_s", "xp", "zona"], "save: personagem com as chaves da arquitetura, sem vida")
+	_check(keys == ["classe", "id", "missoes", "nivel", "nome", "posicao", "tempo_jogado_s", "xp", "zona"], "save: personagem com as chaves da arquitetura e as missões, sem vida")
 	_check(not FileAccess.file_exists(path + ".tmp") and not FileAccess.file_exists(path + ".bak"), "save: primeira gravação sem .tmp nem .bak")
 	var loaded := store.load_character(id)
 	_check(loaded != null and loaded.to_dict() == state.to_dict() and not store.last_from_backup, "save: carrega igual ao que gravou")
@@ -522,7 +543,12 @@ func _test_offline_save() -> void:
 	var before := FileAccess.get_file_as_string(path)
 	_check(store.load_character(id) == null and store.last_status == OfflineSave.Status.UNKNOWN_FORMAT and not store.last_from_backup, "save: formato desconhecido é recusado sem travar")
 	_check(FileAccess.get_file_as_string(path) == before, "save: formato desconhecido não é alterado")
-	_check(OfflineSave.migrate({"formato": 1.0}) == {"formato": 1.0} and OfflineSave.migrate({"formato": 2}).is_empty() and OfflineSave.migrate({}).is_empty(), "save: migrate conhece o formato 1 e recusa os outros")
+	_check(OfflineSave.FORMAT == 2, "save: formato atual é o 2 (com missões)")
+	_check(OfflineSave.migrate({"formato": 1.0}) == {"formato": 2} and OfflineSave.migrate({"formato": 2}) == {"formato": 2}, "save: migrate leva o formato 1 ao 2 e mantém o 2")
+	_check(OfflineSave.migrate({"formato": 3}).is_empty() and OfflineSave.migrate({"formato": 0}).is_empty() and OfflineSave.migrate({}).is_empty() and OfflineSave.migrate({"formato": 1.5}).is_empty(), "save: migrate recusa formato desconhecido")
+	var old := {"formato": 1, "personagem": {"id": "x"}}
+	var migrated := OfflineSave.migrate(old)
+	_check(migrated.personagem.missoes == {"ativas": {}, "concluidas": []} and not old.personagem.has("missoes"), "save: migrar do 1 dá missões vazias sem mexer no original")
 
 	# O mais recente da classe: pela hora gravada; ignora outra classe e o formato desconhecido.
 	for entry in [["2026-03-01T10:00:00Z", "guerreiro", 2], ["2026-03-02T10:00:00Z", "guerreiro", 7], ["2026-04-01T10:00:00Z", "cacador", 4]]:
@@ -540,7 +566,9 @@ func _test_offline_save() -> void:
 	# CharacterState recusa dado incompleto ou impossível.
 	var valid := state.to_dict()
 	_check(CharacterState.from_dict(valid) != null, "estado do personagem: dicionário completo é aceito")
-	for bad: Array in [["classe", null], ["nivel", 0], ["xp", -1], ["posicao", [1, 2]], ["id", 7], ["nivel", "3"]]:
+	for bad: Array in [["classe", null], ["nivel", 0], ["xp", -1], ["posicao", [1, 2]], ["id", 7], ["nivel", "3"],
+			["missoes", null], ["missoes", {"ativas": []}], ["missoes", {"ativas": {"a": {"progresso": [-1]}}, "concluidas": []}],
+			["missoes", {"ativas": {"a": {"progresso": [1.5]}}, "concluidas": []}], ["missoes", {"ativas": {}, "concluidas": [3]}]]:
 		var data := valid.duplicate()
 		if bad[1] == null:
 			data.erase(bad[0])
@@ -575,9 +603,261 @@ func _test_continue_from_save(main: Node3D, saves: OfflineSave) -> void:
 	_check(body.health == body.max_health and body.max_health == Progression.max_health_for(body.stats, saved.level), "save: volta com a vida cheia do nível")
 	_check(body.global_position.is_equal_approx(saved.position), "save: volta onde foi salvo")
 	_check(saves.list_ids().size() == 1, "save: continuar não cria outro personagem")
+	_check(again.world.quest_state(body.id) == saved.quests and saved.quests.concluidas.has("c1_dedo_de_pedra"), "save: o jogo continua com as missões salvas")
 	again.offline_save = null
 	again.queue_free()
 	await _physics_frames(1)
+
+
+## Missões, regra pura (rules/quest_log.gd): disponibilidade, aceitar, progresso por evento e conclusão.
+func _test_quest_rules() -> void:
+	var catalog := {
+		"ir": {"nivel_min": 1, "pre_requisitos": [], "objetivos": [{"tipo": "explorar", "ponto": "marco"}]},
+		"lobos": {"nivel_min": 1, "pre_requisitos": ["ir"], "objetivos": [{"tipo": "matar", "inimigo": "lobo", "quantidade": 2}, {"tipo": "matar", "inimigo": "chefe", "quantidade": 1}]},
+		"tarde": {"nivel_min": 3, "pre_requisitos": ["ir"], "objetivos": [{"tipo": "matar", "inimigo": "lobo", "quantidade": 1}]},
+	}
+	var points := {"marco": {"posicao": Vector3(10, 1, 0), "raio": 2.0}}
+	var state := QuestLog.new_state()
+	_check(QuestLog.available(state, catalog, 5) == ["ir"], "missões: no começo só a missão sem pré-requisito está disponível")
+	var accepted := QuestLog.accept_available(state, catalog, 1)
+	_check(accepted.accepted == ["ir"] and state.ativas.is_empty(), "missões: aceitar devolve estado novo sem mexer no antigo")
+	state = accepted.state
+	_check(state.ativas.ir.progresso == [0], "missões: missão aceita começa com progresso zero")
+
+	var far := QuestLog.apply_event(state, catalog, {"tipo": "posicao", "posicao": Vector3(7.9, 1, 0)}, points)
+	_check(far.progressed.is_empty() and far.completed.is_empty(), "missões: fora do raio do ponto não conta")
+	var high := QuestLog.apply_event(state, catalog, {"tipo": "posicao", "posicao": Vector3(11, 9, 1)}, points)
+	_check(high.completed == ["ir"], "missões: dentro do raio conta, sem olhar a altura")
+	var killed_early := QuestLog.apply_event(state, catalog, {"tipo": "abate", "inimigo": "lobo"}, points)
+	_check(killed_early.progressed.is_empty(), "missões: abate não conta para missão que ainda não foi aceita")
+	state = high.state
+	_check(state.ativas.is_empty() and state.concluidas == ["ir"], "missões: concluída sai das ativas e entra nas concluídas")
+	_check(QuestLog.available(state, catalog, 1) == ["lobos"] and QuestLog.available(state, catalog, 3) == ["lobos", "tarde"], "missões: pré-requisito concluído e nível mínimo liberam as seguintes")
+
+	state = QuestLog.accept_available(state, catalog, 1).state
+	var step := QuestLog.apply_event(state, catalog, {"tipo": "abate", "inimigo": "rato"}, points)
+	_check(step.progressed.is_empty(), "missões: abate de outro tipo de inimigo não conta")
+	for i in 3:
+		step = QuestLog.apply_event(state, catalog, {"tipo": "abate", "inimigo": "lobo"}, points)
+		state = step.state
+	_check(state.ativas.lobos.progresso == [2, 0] and step.progressed.is_empty(), "missões: contagem para na meta (2 de 2) e não avança mais")
+	step = QuestLog.apply_event(state, catalog, {"tipo": "abate", "inimigo": "chefe"}, points)
+	_check(step.completed == ["lobos"] and step.state.concluidas == ["ir", "lobos"], "missões: com todos os objetivos cumpridos, conclui")
+	_check(QuestLog.needs_position(QuestLog.accept(QuestLog.new_state(), "ir", catalog), catalog) and not QuestLog.needs_position(step.state, catalog), "missões: só pede a posição quando há missão de explorar ativa")
+
+	# Estado vindo do save: tipos conferidos e ajustado ao catálogo atual.
+	_check(QuestLog.parse_state({"ativas": {"lobos": {"progresso": [1.0, 0.0]}}, "concluidas": ["ir"]}) == {"ativas": {"lobos": {"progresso": [1, 0]}}, "concluidas": ["ir"]}, "missões: estado salvo volta com números inteiros")
+	var old := {"ativas": {"sumiu": {"progresso": [1]}, "lobos": {"progresso": [9, 0]}, "tarde": {"progresso": [0, 0, 0]}}, "concluidas": ["ir"]}
+	var clean := QuestLog.sanitize(old, catalog)
+	_check(clean.ativas == {"lobos": {"progresso": [2, 0]}, "tarde": {"progresso": [0]}} and clean.concluidas == ["ir"], "missões: save antigo perde missão removida, limita a contagem e zera objetivos que mudaram")
+
+
+## Validador (rules/quest_validator.gd): os arquivos reais passam; cada erro é acusado com mensagem clara;
+## o GameData recusa uma pasta com erro.
+func _test_quest_validator() -> void:
+	var real := GameData.load_quests(GameData.QUESTS_DIR, GameData.quest_texts)
+	_check(real.errors.is_empty(), "validador: data/missoes/*.json sem erro%s" % ("" if real.errors.is_empty() else ": " + "; ".join(real.errors)))
+	_check(real.catalog.keys() == ["c1_dedo_de_pedra", "c1_olho_branco", "c1_o_poceiro"], "validador: 3 missões de exemplo na ordem do arquivo")
+	_check(real.catalog.c1_olho_branco.pre_requisitos == ["c1_dedo_de_pedra"] and real.catalog.c1_o_poceiro.pre_requisitos == ["c1_olho_branco"], "validador: exemplos encadeados por pré-requisito")
+	_check(real.catalog.c1_olho_branco.recompensa == {"xp": 60, "ouro": 0, "itens": {}}, "validador: recompensa normalizada com ouro e itens vazios")
+	_check(QuestValidator.xp_range(1, GameData.rules) == [25, 100] and QuestValidator.xp_range(2, GameData.rules) == [50, 200], "validador: faixa de XP de 25% a 100% do que o nível pede")
+
+	var zone := {"inimigos": [{"tipo": "lobo_sombrio", "posicao": [0, 0, 0]}], "pontos": [{"id": "marco", "nome": "Marco", "posicao": [0, 0, 0], "raio": 3}]}
+	var texts := {"t": "Título", "d": "Descrição", "c": "Conclusão", "o": "Objetivo"}
+	var good := func() -> Dictionary:
+		return {"id": "a", "zona": "z", "nivel_min": 1, "pre_requisitos": [], "tipo": "matar",
+			"objetivos": [{"tipo": "matar", "inimigo": "lobo_sombrio", "quantidade": 3, "texto": "o"}],
+			"recompensa": {"xp": 50}, "textos": {"titulo": "t", "descricao": "d", "conclusao": "c"}}
+	var run := func(quests: Array) -> Array[String]:
+		return QuestValidator.validate([{"arquivo": "teste.json", "dados": {"missoes": quests}}], texts, GameData.enemies, {"z": zone}, GameData.rules)
+	_check(run.call([good.call()]).is_empty(), "validador: missão correta passa")
+	var with_loot: Dictionary = good.call()
+	with_loot.recompensa = {"xp": 50, "ouro": 10, "itens": {"pocao_menor": 2}}
+	_check(run.call([with_loot]).is_empty(), "validador: ouro e itens na recompensa são aceitos (ainda sem conceder)")
+
+	var cases := []
+	var dup: Dictionary = good.call()
+	cases.append([[good.call(), dup], "id repetido"])
+	var req: Dictionary = good.call()
+	req.pre_requisitos = ["nao_existe"]
+	cases.append([[req], "pré-requisito inexistente \"nao_existe\""])
+	var unknown: Dictionary = good.call()
+	unknown.tipo = "dançar"
+	cases.append([[unknown], "tipo desconhecido"])
+	var later: Dictionary = good.call()
+	later.tipo = "escoltar"
+	cases.append([[later], "tipo \"escoltar\" reconhecido, mas ainda não suportado"])
+	var enemy: Dictionary = good.call()
+	enemy.objetivos[0].inimigo = "dragao"
+	cases.append([[enemy], "inimigo inexistente"])
+	var absent: Dictionary = good.call()
+	absent.objetivos[0].inimigo = "carnical"
+	cases.append([[absent], "inimigo \"carnical\" não aparece em z"])
+	var point: Dictionary = good.call()
+	point.objetivos = [{"tipo": "explorar", "ponto": "lugar_nenhum", "texto": "o"}]
+	cases.append([[point], "ponto inexistente \"lugar_nenhum\""])
+	var poor: Dictionary = good.call()
+	poor.recompensa.xp = 10
+	cases.append([[poor], "recompensa de 10 XP fora da faixa do nível 1 (25 a 100 XP)"])
+	var rich: Dictionary = good.call()
+	rich.recompensa.xp = 500
+	cases.append([[rich], "recompensa de 500 XP fora da faixa"])
+	var text: Dictionary = good.call()
+	text.textos.conclusao = "sem_texto"
+	cases.append([[text], "chave de texto inexistente \"sem_texto\""])
+	var loot: Dictionary = good.call()
+	loot.recompensa.itens = {"pocao": 0}
+	cases.append([[loot], "quantidade inválida"])
+	var typo: Dictionary = good.call()
+	typo.recompensa.xpp = 3
+	cases.append([[typo], "campo desconhecido em recompensa"])
+	var zoneless: Dictionary = good.call()
+	zoneless.zona = "zona_99"
+	cases.append([[zoneless], "zona inexistente"])
+	var cycle_a: Dictionary = good.call()
+	var cycle_b: Dictionary = good.call()
+	cycle_b.id = "b"
+	cycle_a.pre_requisitos = ["b"]
+	cycle_b.pre_requisitos = ["a"]
+	cases.append([[cycle_a, cycle_b], "pré-requisitos em ciclo"])
+	for case: Array in cases:
+		var errors: Array[String] = run.call(case[0])
+		var found := errors.any(func(line: String) -> bool: return line.contains(case[1]))
+		_check(found, "validador acusa: %s%s" % [case[1], "" if found else " (veio: %s)" % "; ".join(errors)])
+
+	# O jogo recusa uma pasta com missão inválida: nenhuma missão carrega, e o erro diz arquivo e id.
+	var folder := SAVE_TEST_DIR + "/missoes_ruins"
+	DirAccess.make_dir_recursive_absolute(folder)
+	var file: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(GameData.QUESTS_DIR + "/zona_1.json"))
+	_write(folder + "/a.json", JSON.stringify(file))
+	file.missoes[1].pre_requisitos = ["c1_fantasma"]
+	_write(folder + "/b.json", JSON.stringify(file))
+	_write(folder + "/c.json", "{ quebrado")
+	var refused := GameData.load_quests(folder, GameData.quest_texts)
+	print("        erros: %s" % "; ".join(refused.errors))
+	_check(refused.catalog.is_empty(), "validador: com erro, o jogo não carrega nenhuma missão")
+	_check(refused.errors.any(func(line: String) -> bool: return line.begins_with("b.json [c1_dedo_de_pedra]: id repetido (já usado em a.json)")), "validador: id repetido entre arquivos diz os dois arquivos")
+	_check(refused.errors.any(func(line: String) -> bool: return line.begins_with("c.json: JSON inválido")), "validador: arquivo com JSON quebrado é acusado")
+	_remove_dir(folder)
+
+
+## Missões na WorldSim, com a zona e o catálogo reais: encadeamento das 3 de exemplo, abate contando só
+## para quem causou dano, XP da recompensa e nível mínimo.
+func _test_quest_chain() -> void:
+	var viewport := _isolated_world()
+	var world := WorldSim.new()
+	viewport.add_child(world)
+	world.setup(GameData.zone)
+	world.set_physics_process(false)
+	var spawn := world.player_spawn()
+	var a := world.add_player("guerreiro", spawn)
+	var b := world.add_player("cacador", spawn + Vector3(1, 0, 0))
+	var bystander := world.add_player("cacador", spawn + Vector3(-1, 0, 0))
+	for body in [a, b, bystander]:
+		body.set_physics_process(false)
+	var completed: Array = []
+	var started: Array = []
+	world.quest_completed.connect(func(id: int, quest_id: String, xp: int): completed.append([id, quest_id, xp]))
+	world.quest_started.connect(func(id: int, quest_id: String): started.append([id, quest_id]))
+	for body in [a, b, bystander]:
+		world.start_quests(body.id)
+	_check(started.size() == 3 and started.all(func(entry: Array) -> bool: return entry[1] == "c1_dedo_de_pedra"), "cadeia: cada jogador recebe a missão de explorar")
+	var dt := 1.0 / world.tick_rate
+	var point: Dictionary = ZoneBuilder.points(GameData.zone).dedo_de_pedra
+	world.step(dt)
+	_check(completed.is_empty(), "cadeia: longe do ponto, nada conclui")
+	a.global_position = point.posicao + Vector3(point.raio - 0.5, 0, 0)
+	b.global_position = point.posicao
+	world.step(dt)
+	var explore_xp: int = GameData.quests.c1_dedo_de_pedra.recompensa.xp
+	_check(completed == [[a.id, "c1_dedo_de_pedra", explore_xp], [b.id, "c1_dedo_de_pedra", explore_xp]] and a.xp == explore_xp, "cadeia: chegar ao ponto conclui e dá a XP da tabela")
+	_check(world.quest_state(a.id).ativas.keys() == ["c1_olho_branco"] and world.quest_state(bystander.id).ativas.keys() == ["c1_dedo_de_pedra"], "cadeia: concluir libera a próxima só para quem concluiu")
+
+	# Abate conta só para quem causou dano (bystander também teria a missão se tivesse explorado).
+	bystander.global_position = point.posicao
+	world.step(dt)
+	var wolves := world.enemies.filter(func(enemy: EnemyBody) -> bool: return enemy.enemy_id == "lobo_sombrio")
+	world.apply_damage(a.id, wolves[0].id, 99999)
+	_check(world.quest_state(a.id).ativas.c1_olho_branco.progresso == [1] and world.quest_state(b.id).ativas.c1_olho_branco.progresso == [0]
+		and world.quest_state(bystander.id).ativas.c1_olho_branco.progresso == [0], "cadeia: abate conta só para quem causou dano")
+	world.apply_damage(b.id, wolves[1].id, 1)
+	world.apply_damage(a.id, wolves[1].id, 99999)
+	_check(world.quest_state(a.id).ativas.c1_olho_branco.progresso == [2] and world.quest_state(b.id).ativas.c1_olho_branco.progresso == [1], "cadeia: abate em grupo conta para cada um que bateu")
+	var carnical: EnemyBody = world.enemies.filter(func(enemy: EnemyBody) -> bool: return enemy.enemy_id == "carnical")[0]
+	world.apply_damage(a.id, carnical.id, 99999)
+	_check(world.quest_state(a.id).ativas.c1_olho_branco.progresso == [2], "cadeia: abate de outro inimigo não conta para os lobos")
+
+	completed.clear()
+	for index in range(2, 5):
+		world.apply_damage(a.id, wolves[index].id, 99999)
+	var level_before_reward: int = a.level
+	_check(completed.size() == 1 and completed[0][1] == "c1_olho_branco", "cadeia: 5 lobos concluem a missão dos lobos")
+	var state := world.quest_state(a.id)
+	_check(state.concluidas == ["c1_dedo_de_pedra", "c1_olho_branco"], "cadeia: concluídas em ordem")
+	# Nível 1 no começo da cadeia: 30 + 5 × 25 + 60 + 60 (Carniçal) passa de 100 XP, então já é nível 2.
+	_check(a.level >= 2 and state.ativas.has("c1_o_poceiro"), "cadeia: com nível 2, a missão do Carniçal (nivel_min 2) chega (nível %d)" % level_before_reward)
+	_check(not world.quest_state(b.id).ativas.has("c1_o_poceiro") and b.level == 1, "cadeia: quem não cumpriu o pré-requisito não recebe a missão do Carniçal")
+	world.apply_damage(a.id, world.enemies.filter(func(enemy: EnemyBody) -> bool: return enemy.enemy_id == "carnical")[1].id, 99999)
+	state = world.quest_state(a.id)
+	_check(state.ativas.is_empty() and state.concluidas.size() == 3, "cadeia: matar o Carniçal fecha as 3 missões")
+
+	# Nível mínimo: quem conclui os lobos ainda no nível 1 não recebe a do Carniçal até subir.
+	var c := world.add_player("guerreiro", spawn)
+	c.set_physics_process(false)
+	world.start_quests(c.id, {"ativas": {"c1_olho_branco": {"progresso": [4]}}, "concluidas": ["c1_dedo_de_pedra"]})
+	world.apply_damage(c.id, wolves[5].id, 99999)
+	_check(c.level == 1 and not world.quest_state(c.id).ativas.has("c1_o_poceiro"), "cadeia: no nível 1, a missão do Carniçal espera (XP %d)" % c.xp)
+	world.give_xp(c.id, c.xp_to_next_level())
+	_check(world.quest_state(c.id).ativas.has("c1_o_poceiro"), "cadeia: ao subir para o nível 2, a missão do Carniçal chega")
+	# Recompensa que sobe o nível: o aviso de concluída sai antes da missão que o nível novo libera.
+	var d := world.add_player("guerreiro", spawn)
+	d.set_physics_process(false)
+	world.start_quests(d.id, {"ativas": {"c1_olho_branco": {"progresso": [4]}}, "concluidas": ["c1_dedo_de_pedra"]})
+	world.give_xp(d.id, d.xp_to_next_level() - 30)
+	var order: Array[String] = []
+	world.quest_completed.connect(func(id: int, quest_id: String, _xp: int): if id == d.id: order.append("concluida:" + quest_id))
+	world.quest_started.connect(func(id: int, quest_id: String): if id == d.id: order.append("nova:" + quest_id))
+	world.apply_damage(d.id, wolves[6].id, 99999)
+	_check(d.level == 2 and order == ["concluida:c1_olho_branco", "nova:c1_o_poceiro"], "cadeia: com nível novo pela recompensa, conclusão vem antes da missão liberada (%s)" % ", ".join(order))
+	_check(world.quest_state(WorldSim.NO_ENTITY).is_empty() and not world.has_quests(WorldSim.NO_ENTITY), "cadeia: sem missões ligadas, estado vazio")
+	viewport.queue_free()
+	await _physics_frames(1)
+
+
+## Save com missões: grava e lê o estado de missões; save do formato 1 abre com missões vazias.
+func _test_quest_save() -> void:
+	var store := OfflineSave.new(SAVE_TEST_DIR + "/missoes")
+	var state := CharacterState.new()
+	state.id = OfflineSave.new_id()
+	state.display_name = "Arin"
+	state.class_id = "cacador"
+	state.level = 2
+	state.zone_id = "zona_1"
+	state.quests = {"ativas": {"c1_olho_branco": {"progresso": [3]}}, "concluidas": ["c1_dedo_de_pedra"]}
+	store.save(state)
+	var loaded := store.load_character(state.id)
+	_check(loaded != null and loaded.quests == state.quests and typeof(loaded.quests.ativas.c1_olho_branco.progresso[0]) == TYPE_INT, "save: missões ativas e concluídas voltam iguais, com progresso inteiro")
+	var file: Variant = JSON.parse_string(FileAccess.get_file_as_string(store.path_for(state.id)))
+	_check(file.formato == 2 and file.personagem.missoes.concluidas == ["c1_dedo_de_pedra"], "save: grava no formato 2 com as missões")
+
+	# Save antigo (formato 1, sem missões): abre, com missões vazias, e regrava no formato 2.
+	var legacy := CharacterState.new()
+	legacy.id = OfflineSave.new_id()
+	legacy.display_name = "Velho"
+	legacy.class_id = "guerreiro"
+	legacy.level = 3
+	legacy.xp = 12
+	legacy.zone_id = "zona_1"
+	var old_character := legacy.to_dict()
+	old_character.erase("missoes")
+	var path := store.path_for(legacy.id)
+	_write(path, JSON.stringify({"formato": 1, "versao_jogo": "0.1.0", "salvo_em": "2026-10-14T12:00:00Z", "personagem": old_character}))
+	loaded = store.load_character(legacy.id)
+	_check(loaded != null and loaded.level == 3 and loaded.xp == 12 and loaded.quests == QuestLog.new_state() and store.last_status == OfflineSave.Status.OK, "save: save do formato 1 abre, com missões vazias")
+	store.save(loaded)
+	_check(JSON.parse_string(FileAccess.get_file_as_string(path)).formato == 2 and _saved_level(path + ".bak") == 3, "save: regravado no formato 2; o .bak do formato 1 continua legível")
+	DirAccess.remove_absolute(path)
+	_check(store.load_character(legacy.id) != null and store.last_from_backup, "save: .bak do formato 1 também abre pela migração")
 
 
 ## Nível gravado num arquivo de save (-1 se não der para ler).

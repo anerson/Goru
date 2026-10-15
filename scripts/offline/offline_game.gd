@@ -5,7 +5,11 @@ extends Node3D
 ##
 ## Save do personagem offline (OfflineSave): ao escolher a classe, continua do save mais recente
 ## dessa classe, se houver; senão cria um personagem novo. Grava ao entrar, ao subir de nível,
-## ao morrer, ao fechar a janela e a cada `offline_salvamento_intervalo` segundos (data/regras.json).
+## ao morrer, ao concluir missão, ao fechar a janela e a cada `offline_salvamento_intervalo`
+## segundos (data/regras.json).
+##
+## Missões: a WorldSim cuida do progresso (rules/quest_log.gd); aqui só se liga o estado salvo,
+## o rastreador do HUD, o aviso e a fala do ajudante ao concluir.
 
 const PLAYER_VIEW_SCENE := preload("res://scenes/player_view.tscn")
 const ENEMY_VIEW_SCENE := preload("res://scenes/enemy_view.tscn")
@@ -22,6 +26,9 @@ var local_input: LocalInput
 var offline_save: OfflineSave
 ## Personagem em jogo, como vai para o save.
 var character: CharacterState
+## Liga as missões do jogador ao entrar. O diagnóstico desliga, para a XP das missões não mudar
+## o combate medido pelo bot. Mudar antes de start_game().
+var quests_enabled := true
 var _chosen_class := ""
 var _save_elapsed := 0.0
 var _played_base := 0
@@ -46,6 +53,7 @@ func _ready() -> void:
 	world.entity_died.connect(_on_entity_died)
 	world.respawned.connect(_on_respawned)
 	world.level_up.connect(_on_level_up)
+	world.quest_completed.connect(_on_quest_completed)
 	hud.class_chosen.connect(_on_class_chosen)
 	hud.element_chosen.connect(_on_element_chosen)
 	hud.chat_toggled.connect(_on_chat_toggled)
@@ -77,6 +85,10 @@ func start_game(class_id: String, element_id := "folha") -> void:
 	companion.setup(element_id, player)
 	hud.bind_companion(companion)
 	companion.react("inicio", true)
+	# Sem catálogo (missões recusadas pelo validador), não liga: o progresso salvo fica intacto.
+	if quests_enabled and not world.quest_catalog.is_empty():
+		hud.bind_quests(world, player.id)
+		world.start_quests(player.id, character.quests)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	save_character()
 
@@ -89,6 +101,8 @@ func save_character() -> Error:
 	character.level = player.level
 	character.xp = player.xp
 	character.zone_id = GameData.zone_id
+	if world.has_quests(player.id):
+		character.quests = world.quest_state(player.id)
 	if player.is_dead:
 		character.position = world.player_spawn()
 	elif player.is_inside_tree():
@@ -158,6 +172,14 @@ func _on_entity_died(id: int, _killer_id: int, participants: Array) -> void:
 func _on_respawned(id: int, _position: Vector3) -> void:
 	if player and id == player.id:
 		hud.hide_death()
+
+
+func _on_quest_completed(id: int, _quest_id: String, _xp: int) -> void:
+	if player == null or id != player.id:
+		return
+	if companion:
+		companion.react("missao_concluida", true)
+	save_character()
 
 
 func _on_level_up(id: int, _level: int) -> void:

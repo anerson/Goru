@@ -1,8 +1,8 @@
 class_name CharacterState
 extends RefCounted
-## Dados do personagem que sobrevivem entre sessões: quem é, classe, nível, XP, onde está e
-## quanto tempo jogou. Dados puros, sem Node nem arquivo: quem grava é OfflineSave (offline)
-## e, no futuro, o CharacterRepository do servidor (online). Os dois não se conhecem.
+## Dados do personagem que sobrevivem entre sessões: quem é, classe, nível, XP, onde está,
+## quanto tempo jogou e as missões (ativas com progresso, e concluídas). Dados puros, sem Node nem
+## arquivo: quem grava é OfflineSave (offline) e, no futuro, o CharacterRepository do servidor (online). Os dois não se conhecem.
 ##
 ## A vida não fica aqui: o personagem volta sempre com a vida cheia do nível
 ## (docs/arquitetura-fase-1.md, seção 4). As chaves do dicionário seguem o português de data/.
@@ -15,6 +15,8 @@ var xp := 0
 var zone_id := ""
 var position := Vector3.ZERO
 var played_seconds := 0
+## Estado de missões (QuestLog): {"ativas": {id: {"progresso": [...]}}, "concluidas": [...]}.
+var quests: Dictionary = QuestLog.new_state()
 
 
 func to_dict() -> Dictionary:
@@ -27,6 +29,7 @@ func to_dict() -> Dictionary:
 		"zona": zone_id,
 		"posicao": [position.x, position.y, position.z],
 		"tempo_jogado_s": played_seconds,
+		"missoes": quests.duplicate(true),
 	}
 
 
@@ -47,6 +50,9 @@ static func from_dict(data: Dictionary) -> CharacterState:
 			return null
 	if data.id.is_empty() or data.classe.is_empty() or int(data.nivel) < 1 or int(data.xp) < 0 or int(data.tempo_jogado_s) < 0:
 		return null
+	var quests: Variant = QuestLog.parse_state(data.get("missoes"))
+	if quests == null:
+		return null
 	var state := CharacterState.new()
 	state.id = data.id
 	state.display_name = data.nome
@@ -56,6 +62,7 @@ static func from_dict(data: Dictionary) -> CharacterState:
 	state.zone_id = data.zona
 	state.position = Vector3(float(raw_position[0]), float(raw_position[1]), float(raw_position[2]))
 	state.played_seconds = int(data.tempo_jogado_s)
+	state.quests = quests
 	return state
 
 
