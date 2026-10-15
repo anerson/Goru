@@ -64,3 +64,18 @@ Out 14, 2026 · análise de 5 capturas do jogo de referência enviadas pelo dono
 - A quantidade de elementos na tela: o Goru começa enxuto e cresce só com motivo.
 - Procura de grupo pelo chat como solução.
 - Missões de matar 20 da mesma coisa como base do conteúdo: aparecem na lista da referência e são o tipo de missão que o gênero inteiro já cansou.
+
+## 6. Lições da pesquisa pública sobre o jogo de referência
+
+Fonte: pesquisa de 15/10/2026 com avaliações e notícias públicas (MMOs.com, Massively OP, Engadget, Softpedia). Nenhum dado do jogo entra no Goru; só as conclusões de design.
+
+| O que a pesquisa mostra | O que o Goru faz com isso |
+| --- | --- |
+| A crítica principal era **pay-to-win**: a loja dava vantagem no PvP. A nota dos leitores foi 2,67 de 5, com o resto do jogo bem avaliado | Confirma a regra da loja justa (seção 7 do design). É a falha que mais derruba a reputação de um MMO gratuito; o Goru não negocia isso |
+| Segunda crítica: **PvE fácil demais** | Masmorras do Goru precisam de dificuldade que exija papel de grupo. Meta para o `game-designer`: grupo sem tanque ou sem cura não passa da masmorra da faixa |
+| Elogios: **variedade de raças e classes**, **interface**, **personalização do personagem** e **mais de 10 ocupações** | São exatamente os pilares 1, 2 e 5 do Goru; priorizar a criação de personagem e as profissões antes de expandir o mapa |
+| **Masmorras com dificuldade escalável** | Entra como ideia para a fase 2: a mesma masmorra em 2 ou 3 níveis de dificuldade, reaproveitando o mapa |
+| **Evento de servidor** em que as orações dos jogadores mudavam a "era" do servidor | Ideia própria para o Goru: os patronos (seção 4) ganham ou perdem força conforme a fé (seção 6) somada de todo o servidor, mudando um bônus semanal. Dá sentido coletivo à Fé |
+| **Enciclopédia e guia de nível dentro do jogo** | O ajudante por elemento (seção 8.3) faz esse papel com personalidade; falta uma tela de consulta para quem não quer conversar |
+| PvP aberto a partir do nível 30 | O Goru mantém o pilar 4: conflito sem PvP obrigatório |
+| O jogo **fechou em 30/11/2022** e hoje só existem **servidores privados** sem licença; não há fonte pública sobre o "Omega" | Os direitos continuam com a dona da marca. Reforça a seção 1 do design: nada do cliente ou dos dados entra no Goru |
