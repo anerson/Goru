@@ -1,0 +1,32 @@
+{
+	"nome": "Capão do Sereno",
+	"spawn_jogador": [0, 1, 0],
+	"chao": { "posicao": [0, -0.5, 0], "tamanho": [120, 1, 120] },
+	"inimigos": [
+		{ "tipo": "lobo_sombrio", "posicao": [-8, 1, -25] },
+		{ "tipo": "lobo_sombrio", "posicao": [-5, 1, -27] },
+		{ "tipo": "lobo_sombrio", "posicao": [-9, 1, -28] },
+		{ "tipo": "carnical", "posicao": [-6, 1, -30] },
+		{ "tipo": "lobo_sombrio", "posicao": [25, 1, -7] },
+		{ "tipo": "lobo_sombrio", "posicao": [28, 1, -9] },
+		{ "tipo": "lobo_sombrio", "posicao": [26, 1, -11] },
+		{ "tipo": "carnical", "posicao": [29, 1, -6] },
+		{ "tipo": "lobo_sombrio", "posicao": [13, 1, 25] },
+		{ "tipo": "lobo_sombrio", "posicao": [16, 1, 27] },
+		{ "tipo": "carnical", "posicao": [14, 1, 29] },
+		{ "tipo": "lobo_sombrio", "posicao": [-23, 1, 17] },
+		{ "tipo": "lobo_sombrio", "posicao": [-26, 1, 19] },
+		{ "tipo": "lobo_sombrio", "posicao": [-24, 1, 21] }
+	],
+	"pontos": [
+		{ "id": "dedo_de_pedra", "nome": "Dedo de Pedra", "posicao": [-18, 1, -17], "raio": 4.0 }
+	],
+	"obstaculos": [
+		{ "posicao": [6, 0, -4], "tamanho": [1.5, 5, 1.5] },
+		{ "posicao": [-7, 0, 5], "tamanho": [2, 3, 2] },
+		{ "posicao": [18, 0, 2], "tamanho": [4, 2, 1] },
+		{ "posicao": [-18, 0, -20], "tamanho": [1.2, 7, 1.2] },
+		{ "posicao": [4, 0, -22], "tamanho": [6, 1.5, 1] },
+		{ "posicao": [-25, 0, 0], "tamanho": [1.5, 4, 8] }
+	]
+}

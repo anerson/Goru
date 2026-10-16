@@ -1,0 +1,52 @@
+{
+	"missoes": [
+		{
+			"id": "c1_dedo_de_pedra",
+			"zona": "zona_1",
+			"nivel_min": 1,
+			"pre_requisitos": [],
+			"tipo": "explorar",
+			"objetivos": [
+				{ "tipo": "explorar", "ponto": "dedo_de_pedra", "texto": "missao.c1_dedo_de_pedra.objetivo_1" }
+			],
+			"recompensa": { "xp": 30 },
+			"textos": {
+				"titulo": "missao.c1_dedo_de_pedra.titulo",
+				"descricao": "missao.c1_dedo_de_pedra.descricao",
+				"conclusao": "missao.c1_dedo_de_pedra.conclusao"
+			}
+		},
+		{
+			"id": "c1_olho_branco",
+			"zona": "zona_1",
+			"nivel_min": 1,
+			"pre_requisitos": ["c1_dedo_de_pedra"],
+			"tipo": "matar",
+			"objetivos": [
+				{ "tipo": "matar", "inimigo": "lobo_sombrio", "quantidade": 5, "texto": "missao.c1_olho_branco.objetivo_1" }
+			],
+			"recompensa": { "xp": 60 },
+			"textos": {
+				"titulo": "missao.c1_olho_branco.titulo",
+				"descricao": "missao.c1_olho_branco.descricao",
+				"conclusao": "missao.c1_olho_branco.conclusao"
+			}
+		},
+		{
+			"id": "c1_o_poceiro",
+			"zona": "zona_1",
+			"nivel_min": 2,
+			"pre_requisitos": ["c1_olho_branco"],
+			"tipo": "matar",
+			"objetivos": [
+				{ "tipo": "matar", "inimigo": "carnical", "quantidade": 1, "texto": "missao.c1_o_poceiro.objetivo_1" }
+			],
+			"recompensa": { "xp": 100 },
+			"textos": {
+				"titulo": "missao.c1_o_poceiro.titulo",
+				"descricao": "missao.c1_o_poceiro.descricao",
+				"conclusao": "missao.c1_o_poceiro.conclusao"
+			}
+		}
+	]
+}
