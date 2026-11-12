@@ -13,9 +13,9 @@ const SUN_ELEVATION = 9; // degrees
 const SUN_AZIMUTH = 40;   // degrees
 
 export const QUALITY = [
-  { name: 'Leve', pixelRatio: () => Math.min(devicePixelRatio || 1, 1) * 0.75, shadow: 1024, ao: false },
-  { name: 'Alta', pixelRatio: () => Math.min(devicePixelRatio || 1, 1.25), shadow: 2048, ao: true },
-  { name: 'Ultra', pixelRatio: () => Math.min(devicePixelRatio || 1, 2), shadow: 4096, ao: true },
+  { name: 'Leve', pixelRatio: () => Math.min(devicePixelRatio || 1, 1) * 0.75, shadow: 1024, ao: false, foliage: 0.3 },
+  { name: 'Alta', pixelRatio: () => Math.min(devicePixelRatio || 1, 1.25), shadow: 2048, ao: true, foliage: 0.75 },
+  { name: 'Ultra', pixelRatio: () => Math.min(devicePixelRatio || 1, 2), shadow: 4096, ao: true, foliage: 1 },
 ];
 
 export function createEnvironment(canvas) {
@@ -26,8 +26,8 @@ export function createEnvironment(canvas) {
   renderer.shadowMap.type = THREE.PCFShadowMap; // soft since r182
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2('#d8b98f', 0.0014);
-  const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 3000);
+  scene.fog = new THREE.FogExp2('#d8b98f', 0.00022);
+  const camera = new THREE.PerspectiveCamera(55, 1, 0.3, 15000);
 
   const sunDir = new THREE.Vector3().setFromSphericalCoords(
     1, THREE.MathUtils.degToRad(90 - SUN_ELEVATION), THREE.MathUtils.degToRad(SUN_AZIMUTH));
@@ -60,13 +60,24 @@ export function createEnvironment(canvas) {
 
   scene.add(new THREE.HemisphereLight('#ffe6c4', '#5a5a36', 0.3));
   const sun = new THREE.DirectionalLight('#ffd49c', 4.2);
-  sun.position.copy(sunDir).multiplyScalar(300);
-  sun.target.position.set(0, 35, 0);
   sun.castShadow = true;
-  Object.assign(sun.shadow.camera, { left: -125, right: 125, top: 135, bottom: -110, near: 20, far: 700 });
-  sun.shadow.bias = -0.0005;
-  sun.shadow.normalBias = 0.35;
+  sun.shadow.bias = -0.0004;
+  sun.shadow.normalBias = 0.5;
   scene.add(sun, sun.target);
+
+  // The world is too big for one sharp shadow map, so the shadow box follows what you look
+  // at (threejs-materials-lighting: move the light and its target, don't grow the frustum).
+  // Walking: a 440 m box around the player. Orbiting: a 2.2 km box around the whole tree.
+  function setShadowFocus(center, half) {
+    sun.target.position.copy(center);
+    sun.position.copy(center).addScaledVector(sunDir, 3000);
+    const cam = sun.shadow.camera;
+    if (cam.right !== half) {
+      Object.assign(cam, { left: -half, right: half, top: half, bottom: -half, near: 100, far: 6500 });
+      cam.updateProjectionMatrix();
+    }
+  }
+  setShadowFocus(new THREE.Vector3(0, 300, 0), 1100);
 
   // Post: scene -> ground-truth ambient occlusion (darkens the hollow, the crevices between
   // strands and under the walkways) -> OutputPass for tone mapping and sRGB.
@@ -102,5 +113,5 @@ export function createEnvironment(canvas) {
   }
   function setTime(t) { sky.material.uniforms.time.value = t; }
 
-  return { renderer, scene, camera, sun, resize, setQuality, render, setTime };
+  return { renderer, scene, camera, sun, resize, setQuality, render, setTime, setShadowFocus };
 }

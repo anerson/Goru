@@ -57,6 +57,17 @@ export function createInput(canvas, joyEl, knobEl, { isWalking, onLook }) {
   joyEl.addEventListener('pointerup', joyEnd);
   joyEl.addEventListener('pointercancel', joyEnd);
 
+  // on-screen up/down buttons while flying
+  let touchUp = 0;
+  for (const [id, dir] of [['bUp', 1], ['bDown', -1]]) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    el.addEventListener('pointerdown', (e) => { touchUp = dir; el.setPointerCapture(e.pointerId); });
+    const stop = () => { touchUp = 0; };
+    el.addEventListener('pointerup', stop);
+    el.addEventListener('pointercancel', stop);
+  }
+
   return {
     keys,
     read() {
@@ -68,7 +79,11 @@ export function createInput(canvas, joyEl, knobEl, { isWalking, onLook }) {
       forward -= joy.y;
       right += joy.x;
       const run = keys.has('ShiftLeft') || keys.has('ShiftRight') || Math.hypot(joy.x, joy.y) > 0.95;
-      return { forward, right, run };
+      let up = 0;
+      if (keys.has('Space') || keys.has('KeyE')) up += 1;
+      if (keys.has('KeyC') || keys.has('KeyQ') || keys.has('ControlLeft')) up -= 1;
+      up += touchUp;
+      return { forward, right, up, run };
     },
     releaseLock() {
       try { if (document.pointerLockElement) document.exitPointerLock(); } catch { /* ignore */ }

@@ -1,15 +1,38 @@
-// Branches grown recursively from each limb tip, then clusters of narrow olive leaves
-// and fruit at the outer twigs. All drawn with InstancedMesh: ~70k leaves in 1 draw call.
+// Branches grown recursively from each limb tip, then sprigs of narrow olive leaves and fruit
+// at the outer twigs. Everything is instanced. Sprigs are written in shuffled order so a
+// lower quality setting can draw just the first N and still cover the whole crown evenly.
 import * as THREE from 'three';
 import { mulberry32 } from '../noise.js';
 import { SEED, TAU } from './layout.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const MAX_DEPTH = 8;
-const LEAVES_PER_SPOT = 46;
+const SPRIGS_PER_SPOT = 60;
+const CLUSTER_RADIUS = 22; // m
 
-function leafGeometry() {
-  // lanceolate blade with a slight fold along the midrib
+// One olive sprig, 1 unit long: eight lanceolate leaves alternating up a stem, plus a tip leaf.
+function sprigGeometry() {
+  const pos = [];
+  const leaf = (t, side, angle, len) => {
+    const bx = 0, by = t, w = 0.045;
+    const dx = Math.sin(angle) * side, dy = Math.cos(angle);
+    const tx = bx + dx * len, ty = by + dy * len;
+    const mx = bx + dx * len * 0.42, my = by + dy * len * 0.42;
+    const nx = -dy * w * side, ny = dx * w * side;
+    // two triangles, slightly folded along the midrib (z)
+    pos.push(bx, by, 0, mx + nx, my + ny, 0.02, tx, ty, 0);
+    pos.push(bx, by, 0, tx, ty, 0, mx - nx, my - ny, 0.02);
+  };
+  for (let k = 0; k < 8; k++) leaf(0.12 + k * 0.1, k % 2 ? 1 : -1, 0.75, 0.3 - k * 0.012);
+  leaf(0.9, 1, 0.05, 0.25);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+// a single leaf, for the ones that fall
+export function singleLeafGeometry() {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute([
     0, 0, 0, 0.11, 0.42, 0.03, 0, 1, 0,
@@ -53,14 +76,14 @@ export function buildCanopy(group, trunk, mats) {
     }
   }
 
-  trunk.limbEnds.forEach((L) => grow(L.p, L.d, 14, L.r * 1.02, 3));
-  trunk.limbMids.forEach((M) => grow(M.p, new THREE.Vector3(Math.cos(M.th), 0.9, Math.sin(M.th)).normalize(), 11, M.r * 0.55, 4));
+  trunk.limbEnds.forEach((L) => grow(L.p, L.d, 110, L.r * 1.02, 3));
+  trunk.limbMids.forEach((M) => grow(M.p, new THREE.Vector3(Math.cos(M.th), 0.9, Math.sin(M.th)).normalize(), 85, M.r * 0.5, 4));
 
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
 
-  const cylinder = new THREE.CylinderGeometry(0.86, 1, 1, 12, 1, true).translate(0, 0.5, 0);
+  const cylinder = new THREE.CylinderGeometry(0.86, 1, 1, 14, 1, true).translate(0, 0.5, 0);
   const bark = new THREE.InstancedMesh(cylinder, mats.bark, segs.length);
-  const joints = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 12, 8), mats.bark, segs.length + trunk.limbEnds.length);
+  const joints = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 14, 10), mats.bark, segs.length + trunk.limbEnds.length);
   segs.forEach((s, i) => {
     q.setFromUnitVectors(UP, s.d);
     bark.setMatrixAt(i, m4.compose(s.p, q, sc.set(s.r, s.l, s.r)));
@@ -71,42 +94,52 @@ export function buildCanopy(group, trunk, mats) {
   bark.castShadow = bark.receiveShadow = joints.castShadow = joints.receiveShadow = true;
   group.add(bark, joints);
 
-  const leafCount = spots.length * LEAVES_PER_SPOT;
-  const leaves = new THREE.InstancedMesh(leafGeometry(), mats.leaf, leafCount);
+  // shuffled slots: instance k of the mesh holds sprig order[k]
+  const total = spots.length * SPRIGS_PER_SPOT;
+  const order = Array.from({ length: total }, (_, i) => i);
+  for (let i = total - 1; i > 0; i--) { const j = (rand() * (i + 1)) | 0; [order[i], order[j]] = [order[j], order[i]]; }
+
+  const leaves = new THREE.InstancedMesh(sprigGeometry(), mats.leaf, total);
   const greens = ['#4a5733', '#56643b', '#636f45', '#3f4a2b', '#6e7a50', '#59663f'].map((h) => new THREE.Color(h));
   const silver = new THREE.Color('#8f9870');
-  const col = new THREE.Color(), e = new THREE.Euler(), pp = new THREE.Vector3();
+  const col = new THREE.Color(), e = new THREE.Euler(), pp = new THREE.Vector3(), out = new THREE.Vector3();
   const tipPoints = [];
-  let li = 0, maxY = 0, crownR = 0;
+  let n = 0, maxY = 0, crownR = 0;
   for (const sp of spots) {
     tipPoints.push(sp);
-    for (let k = 0; k < LEAVES_PER_SPOT; k++) {
-      const o = rv(1).normalize().multiplyScalar(Math.pow(rand(), 0.55) * 3.6);
-      o.y = Math.abs(o.y) * 0.6 + o.y * 0.4;
+    for (let k = 0; k < SPRIGS_PER_SPOT; k++) {
+      const o = rv(1).normalize().multiplyScalar(Math.pow(rand(), 0.5) * CLUSTER_RADIUS);
+      o.y = Math.abs(o.y) * 0.5 + o.y * 0.5;
       pp.copy(sp).add(o);
-      q.setFromEuler(e.set(rand() * TAU, rand() * TAU, rand() * TAU));
-      const s = 0.9 + rand() * 0.7;
-      leaves.setMatrixAt(li, m4.compose(pp, q, sc.set(s, s, s)));
-      leaves.setColorAt(li, col.copy(greens[(rand() * greens.length) | 0]).lerp(silver, rand() * 0.25));
-      maxY = Math.max(maxY, pp.y);
+      // point each sprig roughly outward from its cluster centre, then jitter
+      out.copy(o).normalize().add(rv(1.2)).normalize();
+      q.setFromUnitVectors(UP, out);
+      q.multiply(new THREE.Quaternion().setFromEuler(e.set(0, rand() * TAU, 0)));
+      const s = 4.5 + rand() * 2.5;
+      const slot = order[n++];
+      leaves.setMatrixAt(slot, m4.compose(pp, q, sc.set(s, s, s)));
+      leaves.setColorAt(slot, col.copy(greens[(rand() * greens.length) | 0]).lerp(silver, rand() * 0.25));
+      maxY = Math.max(maxY, pp.y + s);
       crownR = Math.max(crownR, Math.hypot(pp.x, pp.z));
-      li++;
     }
   }
   leaves.name = 'leaves';
   leaves.castShadow = leaves.receiveShadow = true;
   group.add(leaves);
 
-  const oliveCount = Math.min(3200, spots.length * 3);
+  const oliveCount = Math.min(5000, spots.length * 4);
   const olives = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 8), mats.olive, oliveCount);
   const oliveTones = ['#2e1d33', '#3b2640', '#5c6a2a', '#4a2a3a'].map((h) => new THREE.Color(h));
   for (let i = 0; i < oliveCount; i++) {
-    pp.copy(spots[(rand() * spots.length) | 0]).add(rv(5));
-    olives.setMatrixAt(i, m4.compose(pp, q.identity(), sc.set(0.2, 0.27, 0.2)));
+    pp.copy(spots[(rand() * spots.length) | 0]).add(rv(CLUSTER_RADIUS * 1.5));
+    olives.setMatrixAt(i, m4.compose(pp, q.identity(), sc.set(0.8, 1.1, 0.8)));
     olives.setColorAt(i, oliveTones[(rand() * oliveTones.length) | 0]);
   }
   olives.name = 'olives';
   group.add(olives);
 
-  return { tipPoints, leafCount, maxY, crownR, leafGeo: leaves.geometry };
+  return {
+    tipPoints, maxY, crownR, leaves, leafTotal: total,
+    setFoliage(fraction) { leaves.count = Math.max(1, Math.round(total * fraction)); },
+  };
 }
