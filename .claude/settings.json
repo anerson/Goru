@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "awesome-gamedev-agent-skills": {
+      "source": {
+        "source": "github",
+        "repo": "gamedev-skills/awesome-gamedev-agent-skills"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "gamedev@awesome-gamedev-agent-skills": true
+  }
+}
