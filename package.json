@@ -1,0 +1,14 @@
+{
+  "name": "goru",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Oliveira Colossal: a giant explorable olive tree in three.js",
+  "scripts": {
+    "start": "npx --yes serve@14.2.4 -l 5173 .",
+    "smoke": "node tests/smoke.mjs"
+  },
+  "dependencies": {
+    "three": "0.186.1"
+  }
+}
