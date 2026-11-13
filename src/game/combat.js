@@ -16,11 +16,12 @@ import { BIOMES, DISK_R } from '../tree/layout.js';
 import { CREATURES, FAUNA } from './creatures.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
-// Weapons. The staff is the explorer's; the Cetro do Coração is the Game Master's (gm.js):
-// it destroys any creature in one blow, reaches further and sweeps a wider arc.
+// Weapons. The explorer's staff is a melee weapon. The Cajado do GM belongs to the Game Master
+// (gm.js): infinite damage, and it fires a beam of sap at whatever is under the crosshair, up to
+// 40 m away (with nothing aimed it still sweeps close range).
 export const WEAPONS = {
   cajado: { name: 'Cajado do explorador', damage: [18, 26], range: 2.6, cone: Math.cos(THREE.MathUtils.degToRad(60)), cooldown: 0.45, color: '#fff2c8' },
-  cetro: { name: 'Cetro do Coração', damage: [9999, 9999], range: 6, cone: Math.cos(THREE.MathUtils.degToRad(80)), cooldown: 0.25, color: '#ffd76a' },
+  gm: { name: 'Cajado do GM', damage: [Infinity, Infinity], range: 6, reach: 40, cone: Math.cos(THREE.MathUtils.degToRad(80)), cooldown: 0.25, color: '#ffd76a' },
 };
 const CHASE_IN = 12, CHASE_OUT = 20, LEASH = 32, BOSS_LEASH = 46;
 
@@ -103,12 +104,12 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
 
   // ---------- damage ----------
   function hurtMob(m, amount, from) {
-    if (m.state === 'dead' || m.state === 'dormant') return;
+    if (m.state === 'dead' || m.state === 'dormant' || !(amount > 0)) return;
     m.hp -= amount;
     m.flash = 0.12;
     const away = m.pos.clone().sub(from).setY(0).normalize();
     m.knock.copy(away).multiplyScalar(m.boss ? 2 : 7);
-    popNumber(m.pos.clone().setY(m.pos.y + m.model.height + 0.6), String(Math.round(amount)), '#ffe9a8');
+    popNumber(m.pos.clone().setY(m.pos.y + m.model.height + 0.6), amount === Infinity ? '∞' : String(Math.round(amount)), amount === Infinity ? '#ffd76a' : '#ffe9a8');
     feedback(m.boss ? 'large' : 'medium');
     if (m.state === 'idle' || m.state === 'alert' || m.state === 'return') { m.state = 'chase'; m.timer = 0; }
     if (m.hp <= 0) die(m);
@@ -130,6 +131,53 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     feedback(amount >= 20 ? 'large' : 'medium');
   }
 
+  // ---------- aiming: the crosshair is the camera's centre ----------
+  // Melee: the creature closest to the centre inside the weapon's arc and reach, measured from
+  // where the camera looks. Ranged (Cajado do GM): the creature closest to the line of sight,
+  // within a few degrees, up to its reach. The HUD crosshair turns red over a target.
+  const camDir = new THREE.Vector3(), toMob = new THREE.Vector3();
+  let aimed = null;
+  function findAim() {
+    const me = walker.state;
+    camera.getWorldDirection(camDir);
+    const yaw = me.yaw, fwd = V(-Math.sin(yaw), 0, -Math.cos(yaw));
+    let best = null, bestScore = Infinity;
+    for (const m of mobs) {
+      if (m.state === 'dead' || m.state === 'dormant' || m.state === 'rise') continue;
+      const flat = Math.hypot(m.pos.x - me.x, m.pos.z - me.z);
+      if (weapon.reach) {
+        toMob.set(m.pos.x, m.pos.y + m.model.height * 0.5, m.pos.z).sub(camera.position);
+        const d = toMob.length();
+        if (d > weapon.reach + 6) continue;
+        const angle = Math.acos(Math.min(1, toMob.divideScalar(d).dot(camDir)));
+        const allow = THREE.MathUtils.degToRad(4) + Math.atan(m.model.radius / d);
+        if (angle < allow && angle < bestScore) { best = m; bestScore = angle; }
+      } else {
+        if (flat > weapon.range + m.model.radius || Math.abs(m.pos.y - me.feet) > 3) continue;
+        const dot = flat > 0.6 ? (fwd.x * (m.pos.x - me.x) + fwd.z * (m.pos.z - me.z)) / flat : 1;
+        if (dot < weapon.cone) continue;
+        const score = flat * (2 - dot);
+        if (score < bestScore) { best = m; bestScore = score; }
+      }
+    }
+    return best;
+  }
+
+  // the GM's sap beam
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1, 6, 1, true).translate(0, 0.5, 0).rotateX(Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color: '#ffd76a', transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }));
+  scene.add(beam);
+  let beamT = 0;
+  function fireBeam(from, to) {
+    beam.position.copy(from);
+    beam.lookAt(to);
+    beam.scale.set(1, 1, from.distanceTo(to));
+    beamT = 0.18;
+  }
+
+  // a roll between the weapon's min and max (Infinity - Infinity would be NaN, so fixed values skip it)
+  const rollDamage = (w) => (w.damage[0] === w.damage[1] ? w.damage[0] : w.damage[0] + rand() * (w.damage[1] - w.damage[0]));
+
   // ---------- the explorer attacks ----------
   function attack() {
     if (attackCd > 0 || game.busy || walker.state.flying) return;
@@ -137,10 +185,24 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     attackCd = PLAYER.cooldown;
     slash.material.color.set(PLAYER.color);
     slash.scale.setScalar(PLAYER.range / 2.6);
+    // swing toward the crosshair: the explorer turns to where the camera looks
+    character.setHeading(walker.state.yaw);
     character.swing();
     slashT = 0.18;
     const me = walker.state;
-    const heading = character.root.rotation.y;
+    const target = findAim();
+    if (PLAYER.reach) {
+      // ranged: a beam to the aimed creature, or straight ahead to the full reach
+      const tip = V(me.x, me.feet + 1.6, me.z);
+      camera.getWorldDirection(camDir);
+      const end = target ? V(target.pos.x, target.pos.y + target.model.height * 0.5, target.pos.z) : camera.position.clone().addScaledVector(camDir, PLAYER.reach);
+      fireBeam(tip, end);
+      if (target && target.pos.distanceTo(V(me.x, me.feet, me.z)) > PLAYER.range + target.model.radius) {
+        hurtMob(target, rollDamage(PLAYER), V(me.x, me.feet, me.z));
+        return;
+      }
+    }
+    const heading = walker.state.yaw;
     const fwd = V(-Math.sin(heading), 0, -Math.cos(heading));
     slash.position.set(me.x, me.feet + 1, me.z);
     slash.rotation.y = heading;
@@ -151,7 +213,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
       const dist = d.length();
       if (dist > PLAYER.range + m.model.radius || Math.abs(m.pos.y - me.feet) > 3) continue;
       if (dist > 0.6 && d.normalize().dot(fwd) < PLAYER.cone) continue;
-      hurtMob(m, PLAYER.damage[0] + rand() * (PLAYER.damage[1] - PLAYER.damage[0]), from);
+      hurtMob(m, rollDamage(PLAYER), from);
     }
   }
 
@@ -198,8 +260,8 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
       const me = walker.state, r = Math.hypot(me.x, me.z);
       const here = levelOf(me.feet, r);
       if (!here) return null;
-      const heading = character.root.rotation.y;
-      const x = me.x - Math.sin(heading) * 6, z = me.z - Math.cos(heading) * 6;
+      const heading = me.yaw; // where the crosshair looks
+      const x = me.x - Math.sin(heading) * 8, z = me.z - Math.cos(heading) * 8;
       const m = spawn(type, here.id, x, z, { temp: true, boss: CREATURES[type].boss ? 'gm' : undefined, state: 'chase' });
       m.yaw = heading + Math.PI;
       if (CREATURES[type].boss) hud.boss(CREATURES[type].name, 1);
@@ -421,6 +483,10 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     ringFxT -= dt;
     if (ringFxT > 0) { const k = 1 - ringFxT / 0.6; ringFx.scale.setScalar(Math.max(0.01, ringFxR * k)); ringFx.material.opacity = 0.8 * (1 - k); }
     else ringFx.material.opacity = 0;
+    aimed = game.busy ? null : findAim();
+    hud.aim(aimed ? { name: aimed.def.name, frac: Math.max(0, aimed.hp) / aimed.def.hp } : null, !!weapon.reach);
+    beamT -= dt;
+    beam.material.opacity = Math.max(0, beamT / 0.18) * 0.9;
     // slash fade
     slashT -= dt;
     slash.material.opacity = Math.max(0, slashT / 0.18) * 0.7;

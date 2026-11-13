@@ -52,7 +52,7 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
     tip.position.set(0, 0.75, 0);
     staff.add(tip);
     staffMesh = staff;
-    // the Game Master's Cetro do Coração: gold shaft, a crown of leaves and a living sap crystal
+    // the Cajado do GM: gold shaft, a crown of leaves and a living sap crystal
     sceptre = new THREE.Group();
     sceptre.position.copy(staff.position);
     sceptre.rotation.copy(staff.rotation);
@@ -128,8 +128,8 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
 
   function setWeapon(id) {
     if (!staffMesh) return;
-    staffMesh.visible = id !== 'cetro';
-    sceptre.visible = id === 'cetro';
+    staffMesh.visible = id !== 'gm';
+    sceptre.visible = id === 'gm';
   }
 
   return { root, update, idle, setWeapon, swing: () => { swingT = 0.3; if (sceptre?.visible) sceptre.userData.heart.rotation.y += 1; }, setHeading: (h) => { heading = h; root.rotation.y = h; } };

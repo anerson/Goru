@@ -19,6 +19,7 @@ export const METRICS = { eye: 1.65, step: 0.9, edgeDrop: 0.7, body: 0.3, walk: 6
 const PITCH_MIN = THREE.MathUtils.degToRad(-80), PITCH_MAX = THREE.MathUtils.degToRad(50);
 const ZOOM = { min: 2, max: 16, start: 6 };
 const PIVOT = 1.55; // m above the feet: shoulder height
+const SHOULDER = 0.8; // m to the right of the explorer
 const GRAVITY = 22;
 const WORLD_RADIUS = 3000;
 
@@ -180,6 +181,11 @@ export function createWalker({ walkables, rootMeshes, rootSegs, noGo = [] }) {
     // pull in at once when blocked, ease back out when clear
     cam.dist = free < cam.dist ? free : cam.dist + (free - cam.dist) * (1 - Math.exp(-4 * dt));
     camera.position.copy(cam.pivot).addScaledVector(look3, -cam.dist);
+    // over-the-shoulder: shift right so the crosshair at the centre of the screen is not hidden
+    // by the explorer (shrinks as the spring arm pulls in)
+    const shoulder = SHOULDER * Math.min(1, cam.dist / 2.5);
+    camera.position.x += Math.cos(state.yaw) * shoulder;
+    camera.position.z -= Math.sin(state.yaw) * shoulder;
     camera.rotation.set(state.pitch, state.yaw, 0, 'YXZ');
   }
 

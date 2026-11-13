@@ -71,7 +71,8 @@ function buildWorld() {
     terrain: new THREE.MeshStandardMaterial({ vertexColors: true, map: tex.terrainDetail, roughness: 0.95 }),
     slabUnder: new THREE.MeshStandardMaterial({ color: '#3a3326', map: tex.bark, roughness: 1, side: THREE.DoubleSide }),
     stone: new THREE.MeshStandardMaterial({ color: '#9b958a', roughness: 0.9 }),
-    basalt: new THREE.MeshStandardMaterial({ color: '#3a3330', roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -3 }),
+    // walkable raised paths over lava: double-sided so the floor ray finds them from above
+    basalt: new THREE.MeshStandardMaterial({ color: '#3a3330', roughness: 0.9, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3 }),
     ground: new THREE.MeshStandardMaterial({ vertexColors: true, map: tex.groundDetail, roughness: 1 }),
   };
   tex.groundDetail.repeat.set(1400, 1400);

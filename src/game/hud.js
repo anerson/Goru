@@ -33,6 +33,7 @@ export function createHud(root) {
     <div class="hud-toasts" id="hudToasts" aria-live="polite"></div>
     <div class="hud-boss" id="hudBoss" hidden><b id="hudBossName"></b><i><span id="hudBossBar"></span></i></div>
     <div class="hud-hurt" id="hudHurt"></div>
+    <div class="hud-aim" id="hudAim" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b><span id="hudAimLabel"></span></div>
     <div class="hud-end" id="hudEnd" hidden><div><h2>Fim do Ato I</h2><p id="hudEndText"></p><button type="button" id="hudEndOk">Continuar explorando</button></div></div>
   `;
   const $ = (id) => root.querySelector(`#${id}`);
@@ -123,6 +124,13 @@ export function createHud(root) {
     get dialogueOpen() { return !$('hudDialogue').hidden; },
     pick(i) { if (choices[i]) choices[i].pick(); },
     toggleBag,
+    // crosshair: neutral, or red with the target's name and health when something is aimed
+    aim(target, ranged) {
+      const a = $('hudAim');
+      a.classList.toggle('on', !!target);
+      a.classList.toggle('ranged', ranged);
+      $('hudAimLabel').textContent = target ? `${target.name} · ${Math.round(target.frac * 100)}%` : '';
+    },
     boss(name, frac) {
       $('hudBoss').hidden = !name;
       if (!name) return;
