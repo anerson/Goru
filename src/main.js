@@ -17,6 +17,7 @@ import { createCharacter } from './character.js';
 import { createGame } from './game/game.js';
 import { createHud } from './game/hud.js';
 import { createCombat } from './game/combat.js';
+import { createGM } from './game/gm.js';
 import {
   TRUNK, ringR, strandR, strandTheta,
   RAMP, GALLERY, BIOMES, LOOKOUT, TOP_BRIDGES, ENTRANCES, APPROACH, ROUTES, DISK_R, levelBridges, junctionAngle,
@@ -97,7 +98,8 @@ function buildWorld() {
   $('sHeight').textContent = `${Math.round(canopy.maxY)} m`;
   $('sCrown').textContent = `${(canopy.crownR * 2 / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`;
   $('sPaths').textContent = `${((paths.totalLength + biomes.trailLength) / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`;
-  return { walker, character, canopy, game, hud, combat, updateParticles, updateBiomes: biomes.update, paths: biomes.paths };
+  const gm = createGM({ root: $('gmPanel'), game, combat, hud, isJourney: () => journey && mode === 'walk' });
+  return { walker, character, canopy, game, hud, combat, gm, updateParticles, updateBiomes: biomes.update, paths: biomes.paths };
 }
 
 // ---------- places you can jump to ----------
@@ -219,6 +221,10 @@ $('bStart').onclick = () => startJourney(false);
 $('bContinue').onclick = () => startJourney(true);
 $('bWalk').onclick = () => { journey = false; document.body.classList.remove('journey'); enterWalk('trilha'); };
 $('bExit').onclick = exitWalk;
+// the GM's door: only shown when the page is opened with #mestre
+$('bGM').hidden = location.hash !== '#mestre';
+addEventListener('hashchange', () => { $('bGM').hidden = location.hash !== '#mestre'; });
+$('bGM').onclick = () => world?.gm.toggle();
 $('bFly').onclick = () => setFly(!world.walker.state.flying);
 $('bPlaces').onclick = () => {
   const open = $('places').hidden;
@@ -303,6 +309,7 @@ window.__oliveira = {
   get game() { return world?.game; },
   get hud() { return world?.hud; },
   get combat() { return world?.combat; },
+  get gm() { return world?.gm; },
   layout: { RAMP, GALLERY, BIOMES, TOP_BRIDGES, LOOKOUT, ENTRANCES, APPROACH, ROUTES, DISK_R, rampStart, bridges: BIOMES.map((b) => levelBridges(b.level)), junctions: BIOMES.map((b) => junctionAngle(b.level)) },
   keys: input.keys,
   step(n, dt = 0.05) { for (let i = 0; i < n; i++) world.walker.update(dt, input.read()); },

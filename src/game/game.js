@@ -383,8 +383,9 @@ export function createGame({ scene, biomes, walker, hud }) {
     if (!dialogue) {
       // needs drain on the game clock (survival-crafting: tick with dt, never per frame)
       const k = flying ? NEEDS.flyFactor : running ? NEEDS.runFactor : 1;
-      state.thirst = Math.max(0, state.thirst - NEEDS.thirstPerSec * k * dt);
-      state.hunger = Math.max(0, state.hunger - NEEDS.hungerPerSec * dt);
+      if (cheats.frozenNeeds) { state.thirst = 100; state.hunger = 100; }
+      state.thirst = Math.max(0, state.thirst - (cheats.frozenNeeds ? 0 : NEEDS.thirstPerSec * k * dt));
+      state.hunger = Math.max(0, state.hunger - (cheats.frozenNeeds ? 0 : NEEDS.hungerPerSec * dt));
       if (state.thirst <= 0 || state.hunger <= 0) state.health = Math.max(0, state.health - NEEDS.starvePerSec * dt * ((state.thirst <= 0) + (state.hunger <= 0)));
       else if (state.thirst > 50 && state.hunger > 50) state.health = Math.min(100, state.health + NEEDS.regenPerSec * dt);
       if (state.health <= 0) faint();
@@ -422,7 +423,9 @@ export function createGame({ scene, biomes, walker, hud }) {
 
   // ---- combat hooks ----
   const safeZones = () => [['raizes', npcs.maela.pos], ['deserto', npcs.tarek.pos], ['oceano', npcs.ilian.pos]];
+  const cheats = { invulnerable: false, frozenNeeds: false };
   function hurt(n) {
+    if (cheats.invulnerable) return;
     state.health = Math.max(0, state.health - n);
     hud.hurt();
     if (state.health <= 0) faint();
@@ -491,7 +494,30 @@ export function createGame({ scene, biomes, walker, hud }) {
     get state() { return state; },
     get busy() { return !!dialogue; },
     interact() { if (!dialogue && current) current.use(); },
-    update, drink, useItem, start, hasSave, save, hurt, loot, bossDefeated, lairs,
+    update, drink, useItem, start, hasSave, save, hurt, loot, bossDefeated, lairs, cheats,
+    heal() { state.health = 100; state.thirst = 100; state.hunger = 100; },
+    // GM: jump to any stage with the world made consistent (items and flags that stage assumes)
+    jumpTo(id) {
+      const i = stageIndex(id), past = (sid) => i > stageIndex(sid), from = (sid) => i >= stageIndex(sid);
+      const f = state.flags;
+      f.cantil = past('chegada') || undefined; if (f.cantil) state.flask = FLASK.capacity;
+      f.boss_devorador = past('devorador') || undefined;
+      f.boss_escorpiao = past('nucleo') || undefined;
+      f.santuario = past('nucleo') || undefined;
+      f.agua = past('restaurar') || undefined;
+      for (const n of [1, 2, 3]) f[`sinal_${n}`] = past('sinais') || undefined;
+      for (const k of Object.keys(f)) if (f[k] === undefined) delete f[k];
+      delete state.inv.chave; delete state.inv.nucleo;
+      if (from('comporta') && !past('nucleo')) state.inv.chave = 1;
+      if (id === 'restaurar') state.inv.nucleo = 1;
+      state.stage = id;
+      ended = id === 'concluido';
+      applyWorld();
+      hud.objective(stage().text);
+      hud.inventory(state);
+      save();
+    },
+    reviveBosses() { delete state.flags.boss_devorador; delete state.flags.boss_escorpiao; save(); },
     onFaint: (f) => onFaint.push(f),
     nearSafeZone: (biome, x, z, d) => safeZones().some(([b, p]) => b === biome && Math.hypot(p.x - x, p.z - z) < d) || Math.hypot(x, z) < 15,
     bossShouldWake: (id) => !state.flags[`boss_${id}`] && (id === 'devorador' ? stageIndex(state.stage) >= stageIndex('devorador') : (state.inv.chave > 0 || stageIndex(state.stage) >= stageIndex('nucleo'))),

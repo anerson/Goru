@@ -40,6 +40,7 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
   const legR = limb(root, 0.1, 0.95, 0.9, 0.085, pants);
   const armL = limb(body, -0.27, 0.56, 0.62, 0.065, shirt);
   const armR = limb(body, 0.27, 0.56, 0.62, 0.065, shirt);
+  let staffMesh = null, sceptre = null;
   if (pack) {
     // the explorer's staff, held in the right hand
     const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 1.5, 6), leather);
@@ -50,6 +51,23 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
     const tip = new THREE.Mesh(new THREE.OctahedronGeometry(0.07, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color('#9dffcf').multiplyScalar(1.5) }));
     tip.position.set(0, 0.75, 0);
     staff.add(tip);
+    staffMesh = staff;
+    // the Game Master's Cetro do Coração: gold shaft, a crown of leaves and a living sap crystal
+    sceptre = new THREE.Group();
+    sceptre.position.copy(staff.position);
+    sceptre.rotation.copy(staff.rotation);
+    const gold = new THREE.MeshStandardMaterial({ color: '#d9a531', metalness: 0.9, roughness: 0.25, emissive: '#5a3a08', emissiveIntensity: 0.4 });
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 1.7, 8), gold);
+    const crown = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.03, 6, 14), gold);
+    crown.position.y = 0.85; crown.rotation.x = Math.PI / 2;
+    const heart = new THREE.Mesh(new THREE.OctahedronGeometry(0.16, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color('#9dffcf').multiplyScalar(2.4) }));
+    heart.position.y = 1.02;
+    const aura = new THREE.PointLight('#9dffcf', 12, 8, 2);
+    aura.position.y = 1.05;
+    sceptre.add(shaft, crown, heart, aura);
+    sceptre.visible = false;
+    sceptre.userData.heart = heart;
+    armR.add(sceptre);
   }
 
   // A soft light carried by the explorer, so dark corners stay readable.
@@ -108,5 +126,11 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
     armL.rotation.x = Math.sin(t * 1.1) * 0.05; armR.rotation.x = -armL.rotation.x;
   }
 
-  return { root, update, idle, swing: () => { swingT = 0.3; }, setHeading: (h) => { heading = h; root.rotation.y = h; } };
+  function setWeapon(id) {
+    if (!staffMesh) return;
+    staffMesh.visible = id !== 'cetro';
+    sceptre.visible = id === 'cetro';
+  }
+
+  return { root, update, idle, setWeapon, swing: () => { swingT = 0.3; if (sceptre?.visible) sceptre.userData.heart.rotation.y += 1; }, setHeading: (h) => { heading = h; root.rotation.y = h; } };
 }

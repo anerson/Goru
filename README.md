@@ -27,6 +27,24 @@ aviso a 30%. Com sede ou fome em zero a vida cai devagar; ao desmaiar o explorad
 sem perder nada. Itens: cogumelo, erva medicinal, resina, alga, chave de âmbar, Núcleo de Seiva I.
 O progresso é salvo no navegador.
 
+## Modo Mestre (para o GM)
+
+Abra o jogo com `#mestre` no fim do endereço para ver o botão **Mestre**, ou aperte **Shift+G**
+durante a jornada. O mestre empunha o **Cetro do Coração**, que destrói qualquer criatura com um
+golpe (alcance 6 m, arco largo), e ganha um painel com:
+
+| Poder | Tecla | O que faz |
+|-------|-------|-----------|
+| Onda de Seiva | R | derruba todas as criaturas num raio de 18 m |
+| Acalmar | T | criaturas num raio de 25 m param de caçar por 30 s e voltam para casa |
+| Invocar | V | a criatura ou o chefão escolhido aparece 6 m à frente, no andar atual |
+| Curar | H | vida, sede e fome cheias |
+| Invencível / Sem fome e sede | — | liga e desliga |
+| Remover invocados / Reviver chefões | — | limpa a cena / devolve os chefões aos covis |
+| Pular para a etapa | — | vai a qualquer etapa do Ato I com itens e marcas coerentes |
+
+Chefões invocados pelo mestre não contam para a história. Shift+G desliga o modo e devolve o cajado.
+
 ## Os dez ecossistemas
 
 | Altura | Ecossistema | O que tem |
@@ -97,6 +115,7 @@ src/game/game.js      regras do jogo: sobrevivência, coleta, missões, comporta
 src/game/hud.js       interface do jogo: barras, objetivo com seta, diálogos, mochila, barra do chefão
 src/game/combat.js    combate: cajado, IA das criaturas (máquina de estados), chefões, tremor e pausa no impacto
 src/game/creatures.js modelos e animação das criaturas e chefões; fauna de cada andar
+src/game/gm.js        Modo Mestre: Cetro do Coração e painel do GM
 src/biomes/aetherion.js pântano, cristais, floresta suspensa, corais e flores gigantes
 src/input.js          teclado, mouse, pointer lock e joystick na tela
 tests/smoke.mjs       teste: grafo de rotas, render sem erro e percurso de cada tipo de caminho

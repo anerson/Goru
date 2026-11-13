@@ -161,6 +161,19 @@ body.journey .place { display: none !important; }
 @media (prefers-reduced-motion: reduce) { .hud-hurt.on { animation-duration: 0.2s; } }
 .dmg { position: fixed; left: 0; top: 0; font: 800 18px/1 var(--display); text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8); pointer-events: none; }
 #hudAttack { background: #8a2a1a; border-color: #c9483a; font-weight: 800; }
+/* ---- Game Master panel ---- */
+.gm-panel { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(170px + env(safe-area-inset-top, 0px)); width: min(320px, calc(100vw - 32px)); max-height: calc(100vh - 260px); overflow-y: auto; overflow-x: hidden; box-sizing: border-box; background: rgba(30, 24, 8, 0.94); border: 1px solid #d9a531; border-radius: 10px; padding: 12px; display: grid; gap: 8px; }
+.gm-panel h3 { margin: 0; font-size: 15px; color: #ffd76a; letter-spacing: 0.02em; }
+.gm-panel p { margin: 0; font-size: 12px; color: var(--ink-dim); line-height: 1.4; }
+.gm-panel .gm-weapon b { color: #ffd76a; }
+.gm-panel label { font: 500 11px/1.2 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-dim); }
+.gm-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.gm-panel > * { min-width: 0; }
+.gm-row select { flex: 1 1 100%; width: 100%; min-width: 0; font: 500 12px/1.2 var(--display); color: var(--ink); background: #241d0c; border: 1px solid var(--line); border-radius: 6px; padding: 7px; }
+.gm-panel kbd { font: 700 10px/1 var(--mono); background: rgba(255, 215, 106, 0.2); border-radius: 3px; padding: 2px 4px; margin-left: 4px; }
+.gm-panel button[aria-pressed="true"] { background: rgba(217, 165, 49, 0.35); border-color: #ffd76a; }
+#bGM { border-color: #d9a531; color: #ffd76a; }
+body.gm #bGM { background: rgba(217, 165, 49, 0.3); }
 @media (max-width: 560px) { .hud-quest { top: calc(110px + env(safe-area-inset-top, 0px)); width: calc(100vw - 210px); } .hud-needs { width: 150px; } }
 body:not(.walking) .walk-only { display: none !important; }
 body.walking .orbit-only { display: none !important; }
@@ -200,6 +213,7 @@ body.walking .orbit-only { display: none !important; }
 <div class="walkbar walk-only">
   <button id="bPlaces" type="button" aria-expanded="false" aria-controls="places">Lugares</button>
   <button id="bFly" type="button" aria-pressed="false">Voar (F)</button>
+  <button id="bGM" class="journey-only" type="button" hidden>Mestre</button>
   <span class="spacer"></span>
   <button id="bExit" type="button">Ver de fora</button>
 </div>
@@ -228,6 +242,7 @@ body.walking .orbit-only { display: none !important; }
 <div id="joy" class="joy walk-only" aria-hidden="true"><i id="knob"></i></div>
 
 <div id="hud" class="hud walk-only journey-only"></div>
+<div id="gmPanel" class="gm-panel walk-only journey-only" hidden aria-label="Painel do Mestre do Jogo"></div>
 
 <div id="loading" class="loading">Cultivando o carvalho…</div>
 

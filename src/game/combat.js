@@ -16,7 +16,12 @@ import { BIOMES, DISK_R } from '../tree/layout.js';
 import { CREATURES, FAUNA } from './creatures.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
-const PLAYER = { damage: [18, 26], range: 2.6, cone: Math.cos(THREE.MathUtils.degToRad(60)), cooldown: 0.45 };
+// Weapons. The staff is the explorer's; the Cetro do Coração is the Game Master's (gm.js):
+// it destroys any creature in one blow, reaches further and sweeps a wider arc.
+export const WEAPONS = {
+  cajado: { name: 'Cajado do explorador', damage: [18, 26], range: 2.6, cone: Math.cos(THREE.MathUtils.degToRad(60)), cooldown: 0.45, color: '#fff2c8' },
+  cetro: { name: 'Cetro do Coração', damage: [9999, 9999], range: 6, cone: Math.cos(THREE.MathUtils.degToRad(80)), cooldown: 0.25, color: '#ffd76a' },
+};
 const CHASE_IN = 12, CHASE_OUT = 20, LEASH = 32, BOSS_LEASH = 46;
 
 export function createCombat({ scene, camera, walker, character, biomes, game, hud, reduceMotion }) {
@@ -75,6 +80,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     new THREE.MeshBasicMaterial({ color: '#fff2c8', transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
   scene.add(slash);
   let slashT = 0, attackCd = 0;
+  let weapon = WEAPONS.cajado;
 
   // ---------- feedback: trauma shake, hit-stop, numbers ----------
   let trauma = 0, shakeT = 0, stopUntil = 0;
@@ -113,7 +119,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     lane.visible = ring.visible = false;
     if (m.boss) {
       hud.boss(null);
-      game.bossDefeated(m.boss);
+      if (m.boss !== 'gm') game.bossDefeated(m.boss);   // a boss the GM summoned is not the story's
       feedback('large');
     } else if (rand() < 0.35) {
       game.loot(m.biome);
@@ -127,7 +133,10 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   // ---------- the explorer attacks ----------
   function attack() {
     if (attackCd > 0 || game.busy || walker.state.flying) return;
+    const PLAYER = weapon;
     attackCd = PLAYER.cooldown;
+    slash.material.color.set(PLAYER.color);
+    slash.scale.setScalar(PLAYER.range / 2.6);
     character.swing();
     slashT = 0.18;
     const me = walker.state;
@@ -145,6 +154,67 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
       hurtMob(m, PLAYER.damage[0] + rand() * (PLAYER.damage[1] - PLAYER.damage[0]), from);
     }
   }
+
+  const now = () => performance.now() / 1000;
+
+  // ---------- Game Master powers (used by gm.js) ----------
+  const ringFx = new THREE.Mesh(new THREE.RingGeometry(0.9, 1, 64).rotateX(-Math.PI / 2),
+    new THREE.MeshBasicMaterial({ color: '#ffd76a', transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+  scene.add(ringFx);
+  let ringFxT = 0, ringFxR = 1;
+  function pulse(color, radius) {
+    const me = walker.state;
+    ringFx.material.color.set(color);
+    ringFx.position.set(me.x, me.feet + 0.2, me.z);
+    ringFxT = 0.6; ringFxR = radius;
+  }
+  function nearby(radius) {
+    const me = walker.state;
+    return mobs.filter((m) => m.state !== 'dead' && m.state !== 'dormant' && Math.hypot(m.pos.x - me.x, m.pos.z - me.z) < radius && Math.abs(m.pos.y - me.feet) < 8);
+  }
+  const gm = {
+    setWeapon(id) { weapon = WEAPONS[id]; character.setWeapon(id); },
+    get weapon() { return weapon; },
+    // Onda de Seiva: everything within the radius falls
+    wave(radius = 18) {
+      const me = walker.state, from = V(me.x, me.feet, me.z);
+      const hit = nearby(radius);
+      hit.forEach((m) => hurtMob(m, m.hp + 1, from));
+      pulse('#9dffcf', radius);
+      feedback('large');
+      return hit.length;
+    },
+    // Acalmar: creatures stop hunting and go home for a while (the base of 'negotiate')
+    calm(radius = 25, seconds = 30) {
+      const hit = nearby(radius);
+      for (const m of hit) { m.calmUntil = now() + seconds; if (!m.boss || m.state !== 'lurk') { m.state = 'return'; } }
+      lane.visible = ring.visible = false;
+      hud.boss(null);
+      pulse('#7fd4ff', radius);
+      return hit.length;
+    },
+    // Invocar: any creature or boss, a few metres in front of the explorer, on the current level
+    summon(type) {
+      const me = walker.state, r = Math.hypot(me.x, me.z);
+      const here = levelOf(me.feet, r);
+      if (!here) return null;
+      const heading = character.root.rotation.y;
+      const x = me.x - Math.sin(heading) * 6, z = me.z - Math.cos(heading) * 6;
+      const m = spawn(type, here.id, x, z, { temp: true, boss: CREATURES[type].boss ? 'gm' : undefined, state: 'chase' });
+      m.yaw = heading + Math.PI;
+      if (CREATURES[type].boss) hud.boss(CREATURES[type].name, 1);
+      return m;
+    },
+    reviveBosses() {
+      for (const b of Object.values(bosses)) { b.state = 'dormant'; b.hp = b.def.hp; b.pos.copy(b.home); b.model.root.visible = false; b.model.root.scale.setScalar(1); b.summoned = false; }
+      resetBosses();
+    },
+    clearSummons() {
+      for (let i = mobs.length - 1; i >= 0; i--) if (mobs[i].temp) { scene.remove(mobs[i].model.root); mobs.splice(i, 1); }
+      hud.boss(null);
+    },
+    creatures: Object.entries(CREATURES).map(([id, c]) => ({ id, name: c.name, boss: !!c.boss })),
+  };
 
   // ---------- creature brains ----------
   const toPlayer = new THREE.Vector3();
@@ -181,7 +251,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
         }
         face(m, m.wander.x, m.wander.z, dt, 3);
         speed = move(m, m.wander.x - m.pos.x, m.wander.z - m.pos.z, def.speed * 0.3, dt);
-        if (m.sense && sameLevel && dist < CHASE_IN) { m.state = 'alert'; m.timer = 0.35; }
+        if (m.sense && sameLevel && dist < CHASE_IN && !(m.calmUntil > now())) { m.state = 'alert'; m.timer = 0.35; }
         break;
       }
       case 'alert':
@@ -348,6 +418,9 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     }
     if (fighting) hud.boss(fighting.def.name, Math.max(0, fighting.hp) / fighting.def.hp);
 
+    ringFxT -= dt;
+    if (ringFxT > 0) { const k = 1 - ringFxT / 0.6; ringFx.scale.setScalar(Math.max(0.01, ringFxR * k)); ringFx.material.opacity = 0.8 * (1 - k); }
+    else ringFx.material.opacity = 0;
     // slash fade
     slashT -= dt;
     slash.material.opacity = Math.max(0, slashT / 0.18) * 0.7;
@@ -375,7 +448,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   }
 
   return {
-    update, attack, shake, resetBosses,
+    update, attack, shake, resetBosses, gm,
     debug: {
       mobs, bosses, wake,
       killBoss(id) { const b = bosses[id]; if (b.state === 'dormant') wake(id); b.state = 'chase'; hurtMob(b, b.hp + 1, b.pos.clone().add(V(0, 0, 1))); },
