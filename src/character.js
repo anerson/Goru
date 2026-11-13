@@ -40,6 +40,17 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
   const legR = limb(root, 0.1, 0.95, 0.9, 0.085, pants);
   const armL = limb(body, -0.27, 0.56, 0.62, 0.065, shirt);
   const armR = limb(body, 0.27, 0.56, 0.62, 0.065, shirt);
+  if (pack) {
+    // the explorer's staff, held in the right hand
+    const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 1.5, 6), leather);
+    staff.position.set(0, -0.6, -0.15);
+    staff.rotation.x = 1.2;
+    staff.castShadow = true;
+    armR.add(staff);
+    const tip = new THREE.Mesh(new THREE.OctahedronGeometry(0.07, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color('#9dffcf').multiplyScalar(1.5) }));
+    tip.position.set(0, 0.75, 0);
+    staff.add(tip);
+  }
 
   // A soft light carried by the explorer, so dark corners stay readable.
   if (light) {
@@ -49,7 +60,7 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
   }
   lantern.visible = pack;
 
-  let phase = 0, heading = 0, amount = 0;
+  let phase = 0, heading = 0, amount = 0, swingT = 0;
 
   // speed in m/s on the ground, flying flag, the direction of travel (yaw) and dt
   function update(dt, { x, y, z, speed, flying, moveYaw }) {
@@ -75,6 +86,14 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
       legL.rotation.x = legR.rotation.x = 0.35 + Math.sin(phase * 0.5) * 0.08;
       body.rotation.x = -0.25;
     }
+    if (swingT > 0) {
+      // staff swing: raise, then sweep across (0.3 s)
+      swingT = Math.max(0, swingT - dt);
+      const k = 1 - swingT / 0.3;
+      armR.rotation.x = -2.4 * Math.sin(Math.PI * Math.min(k * 1.4, 1));
+      armR.rotation.z = -0.8 + k * 1.6;
+      body.rotation.y = 0.5 - k;
+    } else body.rotation.y = 0;
     lantern.material.color.setScalar(1.6 + Math.sin(phase * 0.7) * 0.15).multiply(new THREE.Color('#ffd28a'));
   }
 
@@ -89,5 +108,5 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
     armL.rotation.x = Math.sin(t * 1.1) * 0.05; armR.rotation.x = -armL.rotation.x;
   }
 
-  return { root, update, idle, setHeading: (h) => { heading = h; root.rotation.y = h; } };
+  return { root, update, idle, swing: () => { swingT = 0.3; }, setHeading: (h) => { heading = h; root.rotation.y = h; } };
 }

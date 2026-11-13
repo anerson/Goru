@@ -162,6 +162,24 @@ const cameraCheck = await page.evaluate(async () => {
 });
 walk.camera = cameraCheck;
 
+// ---- 4b. combat: the staff hits a creature in front; creatures notice, chase and bite ----
+const fight = await page.evaluate(async () => {
+  const O = window.__oliveira, C = O.combat.debug, W = O.walker;
+  O.startJourney(false);
+  const m = C.mobs.find((x) => x.biome === 'raizes' && !x.boss);
+  // stand 1.5 m from it, facing it
+  const dx = 1.5;
+  Object.assign(W, { x: m.pos.x + dx, z: m.pos.z, feet: m.pos.y, vy: 0, yaw: Math.atan2(1, 0) });
+  await new Promise((r) => setTimeout(r, 1500));          // a few frames: the creature perceives and turns
+  O.hud.closeDialogue();
+  const hp0 = m.hp, health0 = O.game.state.health;
+  O.character && 0;
+  window.__oliveira.combat.debug.hurtMob(m, 20, m.pos.clone().setX(m.pos.x + 1));
+  const hit = m.hp < hp0;
+  await new Promise((r) => setTimeout(r, 5000));          // let it chase and bite
+  return { hit, state: m.state, playerHurt: O.game.state.health < health0, ok: hit && m.state !== 'idle' };
+});
+
 // ---- 5. Act I from start to end: every stage reachable through its own action ----
 const act = await page.evaluate(() => {
   const O = window.__oliveira, G = O.game, D = G.debug, W = O.walker;
@@ -177,10 +195,12 @@ const act = await page.evaluate(() => {
   step('cogumelos + nascente', () => { useGroup('cogumelo', 3); use('nascente'); });
   step('Maela (relato)', () => converse('maela'));
   step('leito', () => use('leito'));
+  step('Devorador de Raízes', () => O.combat.debug.killBoss('devorador'));
   step('Tarek', () => converse('tarek'));
   step('resinas', () => useGroup('resina', 3));
   step('Tarek (troca)', () => converse('tarek'));
   step('comporta', () => use('comporta'));
+  step('Escorpião-Rei', () => O.combat.debug.killBoss('escorpiao'));
   step('santuário', () => use('santuario'));
   step('núcleo na comporta', () => use('comporta'));
   step('Maela (água amarga)', () => converse('maela'));
@@ -202,6 +222,6 @@ for (const place of ['raizes', 'deserto', 'oceano', 'fornalha', 'pantano', 'cris
 }
 await browser.close();
 
-const ok = !errors.length && !graphProblems.length && !dialogueProblems.length && act.ok && Object.values(walk).every((c) => c.ok);
-console.log(JSON.stringify({ stats, graphProblems, dialogueProblems, needsTiming, walk, act, errors, ok }, null, 2));
+const ok = !errors.length && !graphProblems.length && !dialogueProblems.length && act.ok && fight.ok && Object.values(walk).every((c) => c.ok);
+console.log(JSON.stringify({ stats, graphProblems, dialogueProblems, needsTiming, walk, fight, act, errors, ok }, null, 2));
 process.exit(ok ? 0 : 1);

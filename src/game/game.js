@@ -122,6 +122,10 @@ export function createGame({ scene, biomes, walker, hud }) {
   const leitoPos = streamPts[22];
   add({ id: 'leito', kind: 'inspect', pos: leitoPos.clone().setY(leitoPos.y + 1), radius: 5, label: () => 'Examinar o leito do riacho', enabled: () => true, use: () => inspect('leito') });
 
+  // the Devorador's lair: where the dry stream meets the trunk wall
+  const lairs = { devorador: streamPts[6].clone(), escorpiao: null };
+  add({ id: 'devorador', kind: 'marker', pos: lairs.devorador.clone().setY(lairs.devorador.y + 1), radius: 0, label: () => '', enabled: () => false, use: () => {} });
+
   // ---------- Deserto da Casca: caravan, sluice, shrine, oasis ----------
   {
     const L = 'deserto';
@@ -135,6 +139,7 @@ export function createGame({ scene, biomes, walker, hud }) {
   add({ id: 'comporta', kind: 'inspect', pos: comportaPos.clone().setY(comportaPos.y + 1.5), radius: 5.5, label: () => (state.inv.nucleo ? 'Encaixar o Núcleo de Seiva I' : 'Examinar a Comporta Antiga'), use: () => useSluice() });
   const santuarioPos = along('deserto', 4, 0.7, 8);
   const shrine = buildShrine(santuarioPos);
+  lairs.escorpiao = along('deserto', 4, 0.66, 2);
   add({ id: 'santuario', kind: 'inspect', pos: santuarioPos.clone().setY(santuarioPos.y + 1.5), radius: 5, label: () => (state.flags.santuario ? 'Santuário aberto' : 'Abrir o Santuário da Resina'), enabled: () => !state.flags.santuario, use: () => useShrine() });
   const oasisPos = along('deserto', 3, 0.5, 8);
   const oasisDry = new THREE.Mesh(new THREE.CircleGeometry(5, 32), new THREE.MeshStandardMaterial({ color: '#8a6a44', roughness: 1, polygonOffset: true, polygonOffsetFactor: -4 }));
@@ -208,6 +213,7 @@ export function createGame({ scene, biomes, walker, hud }) {
     const n = stage().need;
     if (!n) return false;
     return Object.entries(n).every(([k, v]) => {
+      if (k.startsWith('boss_')) return !!state.flags[k];
       if (k === 'cantil') return state.flags.cantil && state.flask >= v;
       if (k === 'sinal') return [1, 2, 3].filter((i) => state.flags[`sinal_${i}`]).length >= v;
       return (state.inv[k] ?? 0) >= v;
@@ -269,6 +275,7 @@ export function createGame({ scene, biomes, walker, hud }) {
     if (state.stage === 'comporta') advance();
   }
   function useShrine() {
+    if (!state.flags.boss_escorpiao) return hud.message(INSPECT.escorpiao_vivo);
     if (!state.inv.chave) return hud.message(INSPECT.santuario_trancado);
     take('chave', 1);
     give('nucleo', 1);
@@ -411,9 +418,30 @@ export function createGame({ scene, biomes, walker, hud }) {
     if (saveTimer > 15) { saveTimer = 0; save(); }
   }
   let current = null;
+  const onFaint = [];
+
+  // ---- combat hooks ----
+  const safeZones = () => [['raizes', npcs.maela.pos], ['deserto', npcs.tarek.pos], ['oceano', npcs.ilian.pos]];
+  function hurt(n) {
+    state.health = Math.max(0, state.health - n);
+    hud.hurt();
+    if (state.health <= 0) faint();
+  }
+  const LOOT = { raizes: 'cogumelo', deserto: 'resina', oceano: 'alga' };
+  function loot(biome) {
+    const item = LOOT[biome] ?? 'erva';
+    give(item, 1);
+    hud.toast(`A criatura deixou: ${ITEMS[item].name}`);
+  }
+  function bossDefeated(id) {
+    state.flags[`boss_${id}`] = true;
+    hud.message(INSPECT[`${id}_morto`]);
+    save();
+  }
 
   function faint() {
-    hud.message('Você desmaiou de exaustão. Os moradores da Vila das Raízes te encontraram e cuidaram de você.');
+    hud.message('Você desmaiou. Os moradores da Vila das Raízes te encontraram e cuidaram de você.');
+    onFaint.forEach((f) => f());
     state.health = 60; state.thirst = 50; state.hunger = 50;
     spawnAtVillage();
   }
@@ -463,7 +491,11 @@ export function createGame({ scene, biomes, walker, hud }) {
     get state() { return state; },
     get busy() { return !!dialogue; },
     interact() { if (!dialogue && current) current.use(); },
-    update, drink, useItem, start, hasSave, save,
+    update, drink, useItem, start, hasSave, save, hurt, loot, bossDefeated, lairs,
+    onFaint: (f) => onFaint.push(f),
+    nearSafeZone: (biome, x, z, d) => safeZones().some(([b, p]) => b === biome && Math.hypot(p.x - x, p.z - z) < d) || Math.hypot(x, z) < 15,
+    bossShouldWake: (id) => !state.flags[`boss_${id}`] && (id === 'devorador' ? stageIndex(state.stage) >= stageIndex('devorador') : (state.inv.chave > 0 || stageIndex(state.stage) >= stageIndex('nucleo'))),
+    bossAwake: (id) => !state.flags[`boss_${id}`] && (id === 'devorador' ? stageIndex(state.stage) >= stageIndex('devorador') : stageIndex(state.stage) >= stageIndex('nucleo')),
     choose(i) { hud.pick(i); },
     // test hooks
     debug: { items, advance, talk, goto: (n) => goto(n), get dialogue() { return dialogue; }, targetPos, waypoint, setStage: (s) => { state.stage = s; applyWorld(); hud.objective(stage().text); } },

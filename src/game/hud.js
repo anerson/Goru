@@ -20,6 +20,7 @@ export function createHud(root) {
     <div class="hud-prompt" id="hudPrompt" hidden><kbd>E</kbd><span></span></div>
     <div class="hud-actions">
       <button type="button" id="hudUse" hidden>Interagir</button>
+      <button type="button" id="hudAttack">Atacar</button>
       <button type="button" id="hudDrink">Beber (Q)</button>
       <button type="button" id="hudBag" aria-expanded="false">Mochila (I)</button>
     </div>
@@ -30,14 +31,17 @@ export function createHud(root) {
       <div class="choices" id="hudChoices"></div>
     </div>
     <div class="hud-toasts" id="hudToasts" aria-live="polite"></div>
+    <div class="hud-boss" id="hudBoss" hidden><b id="hudBossName"></b><i><span id="hudBossBar"></span></i></div>
+    <div class="hud-hurt" id="hudHurt"></div>
     <div class="hud-end" id="hudEnd" hidden><div><h2>Fim do Ato I</h2><p id="hudEndText"></p><button type="button" id="hudEndOk">Continuar explorando</button></div></div>
   `;
   const $ = (id) => root.querySelector(`#${id}`);
-  let handlers = { interact() {}, drink() {}, useItem() {} };
+  let handlers = { interact() {}, drink() {}, useItem() {}, attack() {} };
   let choices = [];
   let lastState = null;
 
   $('hudUse').onclick = () => handlers.interact();
+  $('hudAttack').onclick = () => handlers.attack();
   $('hudDrink').onclick = () => handlers.drink();
   $('hudBag').onclick = () => toggleBag();
   $('hudEndOk').onclick = () => { $('hudEnd').hidden = true; };
@@ -119,6 +123,18 @@ export function createHud(root) {
     get dialogueOpen() { return !$('hudDialogue').hidden; },
     pick(i) { if (choices[i]) choices[i].pick(); },
     toggleBag,
+    boss(name, frac) {
+      $('hudBoss').hidden = !name;
+      if (!name) return;
+      $('hudBossName').textContent = name;
+      $('hudBossBar').style.width = `${Math.round(frac * 100)}%`;
+    },
+    hurt() {
+      const h = $('hudHurt');
+      h.classList.remove('on');
+      void h.offsetWidth; // restart the fade
+      h.classList.add('on');
+    },
     ending(text) { $('hudEndText').textContent = text; $('hudEnd').hidden = false; },
     reset() { close(); $('hudEnd').hidden = true; toggleBag(false); $('hudToasts').innerHTML = ''; },
   };

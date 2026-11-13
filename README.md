@@ -10,11 +10,17 @@ de cima, coberto de raízes e musgo que brilha).
 Uma seca atinge a Floresta das Raízes. O jogador:
 
 1. conhece a Anciã Maela na Vila das Raízes, ganha um cantil, coleta cogumelos e enche o cantil na nascente;
-2. segue o leito seco do riacho até a parede do tronco;
+2. segue o leito seco do riacho até a parede do tronco e derrota o **Devorador de Raízes**, a criatura que roía as raízes primárias;
 3. sobe ao Deserto da Casca, encontra a caravana de Tarek e troca 3 resinas por uma chave de âmbar;
-4. examina a Comporta Antiga, que desvia a água, e abre o Santuário da Resina para recuperar o Núcleo de Seiva I;
+4. examina a Comporta Antiga, que desvia a água, derrota o **Escorpião-Rei da Casca** e abre o Santuário da Resina para recuperar o Núcleo de Seiva I;
 5. encaixa o núcleo: a água volta ao oásis e ao riacho — amarga e escura;
 6. sobe ao Oceano Interior, fala com a pescadora Ilian e encontra três sinais de contaminação.
+
+Combate: o explorador ataca com um cajado (clique, Espaço ou J). Criaturas de cada andar — lobos,
+aranhas e besouros nas raízes, escorpiões no deserto, salamandras na fornalha, felinos e serpentes na
+selva, larvas no pântano, aranhas de cristal, lobos de Nivéria — percebem, avisam o golpe (se abaixam e
+brilham), mordem e voltam para casa se você fugir. Os chefões têm investida (linha vermelha no chão) e
+pancada em área (anel vermelho); o Devorador chama besouros na metade da vida.
 
 Sobrevivência: sede (10 min de cheia a vazia parado, 1,8× mais rápido correndo), fome (18 min),
 aviso a 30%. Com sede ou fome em zero a vida cai devagar; ao desmaiar o explorador acorda na vila
@@ -55,6 +61,7 @@ Não há etapa de build. O three.js `0.186.1` vem da jsDelivr por import map (`i
 | Ação | Computador | Celular |
 |------|------------|---------|
 | Andar | W A S D ou setas | controle redondo no canto |
+| Atacar | clique, Espaço ou J | botão Atacar |
 | Interagir / falar | E | botão Interagir |
 | Beber do cantil | Q | botão Beber |
 | Mochila | I | botão Mochila |
@@ -87,7 +94,9 @@ src/player.js         movimento, voo e câmera em 3ª pessoa (braço de mola); c
 src/character.js      o explorador e os moradores: modelo e animação
 src/game/data.js      Ato I como dados: itens, necessidades, etapas, diálogos e textos (pt-BR)
 src/game/game.js      regras do jogo: sobrevivência, coleta, missões, comporta, santuário, salvamento
-src/game/hud.js       interface do jogo: barras, objetivo com seta, diálogos, mochila
+src/game/hud.js       interface do jogo: barras, objetivo com seta, diálogos, mochila, barra do chefão
+src/game/combat.js    combate: cajado, IA das criaturas (máquina de estados), chefões, tremor e pausa no impacto
+src/game/creatures.js modelos e animação das criaturas e chefões; fauna de cada andar
 src/biomes/aetherion.js pântano, cristais, floresta suspensa, corais e flores gigantes
 src/input.js          teclado, mouse, pointer lock e joystick na tela
 tests/smoke.mjs       teste: grafo de rotas, render sem erro e percurso de cada tipo de caminho
@@ -116,4 +125,4 @@ resultado não depende da velocidade da máquina.
 
 Feito com o pacote [awesome-gamedev-agent-skills](https://github.com/gamedev-skills/awesome-gamedev-agent-skills)
 (instalado em `.claude/settings.json`): `threejs-scene-setup`, `threejs-materials-lighting`,
-`camera-systems`, `level-design`, `survival-crafting` e `dialogue-systems`.
+`camera-systems`, `level-design`, `survival-crafting`, `dialogue-systems`, `game-ai` e `game-feel`.

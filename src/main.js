@@ -16,6 +16,7 @@ import { createInput } from './input.js';
 import { createCharacter } from './character.js';
 import { createGame } from './game/game.js';
 import { createHud } from './game/hud.js';
+import { createCombat } from './game/combat.js';
 import {
   TRUNK, ringR, strandR, strandTheta,
   RAMP, GALLERY, BIOMES, LOOKOUT, TOP_BRIDGES, ENTRANCES, APPROACH, ROUTES, DISK_R, levelBridges, junctionAngle,
@@ -90,11 +91,13 @@ function buildWorld() {
   scene.add(character.root);
   const hud = createHud($('hud'));
   const game = createGame({ scene, biomes, walker, hud });
+  const combat = createCombat({ scene, camera, walker, character, biomes, game, hud, reduceMotion });
+  game.onFaint(() => combat.resetBosses());
 
   $('sHeight').textContent = `${Math.round(canopy.maxY)} m`;
   $('sCrown').textContent = `${(canopy.crownR * 2 / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`;
   $('sPaths').textContent = `${((paths.totalLength + biomes.trailLength) / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`;
-  return { walker, character, canopy, game, hud, updateParticles, updateBiomes: biomes.update, paths: biomes.paths };
+  return { walker, character, canopy, game, hud, combat, updateParticles, updateBiomes: biomes.update, paths: biomes.paths };
 }
 
 // ---------- places you can jump to ----------
@@ -180,9 +183,21 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyF') setFly(!world.walker.state.flying);
   if (!journey) return;
   if (e.code === 'KeyE') g.interact();
+  if (e.code === 'KeyJ' || (e.code === 'Space' && !world.walker.state.flying)) { world.combat.attack(); e.preventDefault(); }
   if (e.code === 'KeyQ') g.drink();
   if (e.code === 'KeyI') h.toggleBag();
 });
+// a quick click (or tap) without dragging attacks; a drag turns the camera
+{
+  let down = null;
+  renderer.domElement.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+  renderer.domElement.addEventListener('pointerup', (e) => {
+    if (!down || mode !== 'walk' || !journey || !world) return;
+    const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y), held = performance.now() - down.t;
+    if ((moved < 6 && held < 300) || document.pointerLockElement === renderer.domElement) world.combat.attack();
+    down = null;
+  });
+}
 // mouse wheel / trackpad pinch: move the third-person camera closer or further
 renderer.domElement.addEventListener('wheel', (e) => {
   if (mode !== 'walk' || !world) return;
@@ -246,7 +261,11 @@ renderer.setAnimationLoop(() => {
       world.walker.update(dt, busy ? { forward: 0, right: 0, up: 0, run: false } : input.read());
       world.walker.applyToCamera(camera, t, dt);
       const s = world.walker.state;
-      if (journey) world.game.update(dt, t, { running: s.running && s.moving, flying: s.flying, camYaw: s.yaw });
+      if (journey) {
+        world.game.update(dt, t, { running: s.running && s.moving, flying: s.flying, camYaw: s.yaw });
+        world.combat.update(dt, t);
+        world.combat.shake(dt);
+      }
       world.character.update(dt, { x: s.x, y: s.feet, z: s.z, speed: s.speed, flying: s.flying, moveYaw: s.moveYaw });
       env.setShadowFocus(shadowCenter.set(s.x, s.feet, s.z), 220);
     } else {
@@ -264,7 +283,7 @@ requestAnimationFrame(() => setTimeout(() => {
   try {
     world = buildWorld();
     $('loading').hidden = true;
-    world.hud.bind({ interact: () => world.game.interact(), drink: () => world.game.drink(), useItem: (id) => world.game.useItem(id) });
+    world.hud.bind({ interact: () => world.game.interact(), drink: () => world.game.drink(), useItem: (id) => world.game.useItem(id), attack: () => world.combat.attack() });
     $('bContinue').hidden = !world.game.hasSave();
   } catch (err) {
     $('loading').textContent = 'Não foi possível montar a cena. Recarregue a página.';
@@ -283,6 +302,7 @@ window.__oliveira = {
   enterWalk, goTo, setFly, startJourney,
   get game() { return world?.game; },
   get hud() { return world?.hud; },
+  get combat() { return world?.combat; },
   layout: { RAMP, GALLERY, BIOMES, TOP_BRIDGES, LOOKOUT, ENTRANCES, APPROACH, ROUTES, DISK_R, rampStart, bridges: BIOMES.map((b) => levelBridges(b.level)), junctions: BIOMES.map((b) => junctionAngle(b.level)) },
   keys: input.keys,
   step(n, dt = 0.05) { for (let i = 0; i < n; i++) world.walker.update(dt, input.read()); },
