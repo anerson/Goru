@@ -1,0 +1,930 @@
+{
+  "escalaDoJogo": {
+    "vidaCriatura": 0.6,
+    "vidaSubchefe": 0.16666666666666666,
+    "vidaChefe": 0.1,
+    "dano": 0.6
+  },
+  "regioes": [
+    {
+      "id": "raizes",
+      "nome": "Floresta das Raízes",
+      "nivel": "1–5",
+      "fragmento": "Âmbar Vivo",
+      "mobs": [
+        {
+          "id": "besouroRachador",
+          "nome": "Besouro-Rachador",
+          "vida": 35,
+          "ataque": 8,
+          "defesa": 7,
+          "velocidade": 3,
+          "habilidade": "Mandíbula Serrilhada: dano adicional a escudos e estruturas frágeis",
+          "fraqueza": "Abdômen exposto quando tombado; fumaça os dispersa",
+          "model": "besouro",
+          "noJogo": {
+            "hp": 21,
+            "damage": 5,
+            "speed": 3.35,
+            "armor": 0.851,
+            "xp": 12
+          }
+        },
+        {
+          "id": "aranhaMusgo",
+          "nome": "Aranha-de-Musgo",
+          "vida": 24,
+          "ataque": 6,
+          "defesa": 3,
+          "velocidade": 8,
+          "habilidade": "Teia Viscosa: imobiliza um alvo por uma rodada",
+          "fraqueza": "Vibração forte revela sua posição; fogo moderado destrói teias",
+          "model": "aranha",
+          "noJogo": {
+            "hp": 14,
+            "damage": 4,
+            "speed": 5.6,
+            "armor": 0.93,
+            "xp": 8
+          }
+        },
+        {
+          "id": "loboRaiz",
+          "nome": "Lobo de Raiz",
+          "vida": 42,
+          "ataque": 9,
+          "defesa": 5,
+          "velocidade": 9,
+          "habilidade": "Caçada Coordenada: +2 ataque quando outro lobo ameaça o mesmo alvo",
+          "fraqueza": "Isolado perde o bônus de matilha; luz forte pode afastá-lo",
+          "model": "lobo",
+          "noJogo": {
+            "hp": 25,
+            "damage": 5,
+            "speed": 6.05,
+            "armor": 0.889,
+            "xp": 14
+          }
+        }
+      ],
+      "subBoss": {
+        "id": "escavadorAmbar",
+        "nome": "O Escavador de Âmbar",
+        "vida": 450,
+        "ataque": 18,
+        "defesa": 15,
+        "velocidade": 5,
+        "perigo": 6,
+        "mecanica": "Atraí-lo para uma trama de raízes entrelaçadas: ao investir contra a trama fica preso por duas rodadas e expõe o ventre.",
+        "recompensas": "Fragmento de Âmbar Vivo; mapa de galerias; acesso a rotas de água",
+        "noJogo": {
+          "hp": 75,
+          "damage": 11,
+          "speed": 4.25,
+          "armor": 0.727,
+          "xp": 113
+        }
+      },
+      "boss": {
+        "id": "rainhaRaizes",
+        "nome": "A Rainha das Raízes",
+        "vida": 1800,
+        "ataque": 28,
+        "defesa": 22,
+        "velocidade": 4,
+        "perigo": 8,
+        "fraqueza": "Expor o núcleo de âmbar e limpar o canal contaminado. Matar a Rainha sem limpar o canal deixa a região vulnerável.",
+        "recompensas": "Âmbar Vivo; Botas de Raiz; recuperação progressiva de água",
+        "noJogo": {
+          "hp": 180,
+          "damage": 17,
+          "speed": 3.8,
+          "armor": 0.645,
+          "xp": 450
+        }
+      }
+    },
+    {
+      "id": "deserto",
+      "nome": "Deserto da Casca",
+      "nivel": "5–10",
+      "fragmento": "Cristal Solar",
+      "mobs": [
+        {
+          "id": "escorpiaoCasca",
+          "nome": "Escorpião de Casca",
+          "vida": 55,
+          "ataque": 14,
+          "defesa": 8,
+          "velocidade": 7,
+          "habilidade": "Ferrão Secante: dano e reduz resistência por uma rodada",
+          "fraqueza": "Carapaça ventral menos protegida; luz intensa o expõe",
+          "model": "escorpiao",
+          "noJogo": {
+            "hp": 33,
+            "damage": 8,
+            "speed": 5.15,
+            "armor": 0.833,
+            "xp": 18
+          }
+        },
+        {
+          "id": "lagartoSolar",
+          "nome": "Lagarto Solar",
+          "vida": 48,
+          "ataque": 12,
+          "defesa": 9,
+          "velocidade": 8,
+          "habilidade": "Rajada Térmica: libera calor acumulado em cone curto",
+          "fraqueza": "Perde vigor em frio prolongado e sombra profunda",
+          "model": "lagarto",
+          "noJogo": {
+            "hp": 29,
+            "damage": 7,
+            "speed": 5.6,
+            "armor": 0.816,
+            "xp": 16
+          }
+        },
+        {
+          "id": "abutreCasca",
+          "nome": "Abutre de Casca",
+          "vida": 65,
+          "ataque": 16,
+          "defesa": 6,
+          "velocidade": 10,
+          "habilidade": "Mergulho Predatório: bônus de dano se atacar de altitude",
+          "fraqueza": "Asas vulneráveis no solo; correntes de vento previsíveis",
+          "model": null,
+          "noJogo": null
+        }
+      ],
+      "subBoss": {
+        "id": "escorpiaoReiSol",
+        "nome": "Escorpião-Rei do Sol",
+        "vida": 650,
+        "ataque": 24,
+        "defesa": 18,
+        "velocidade": 7,
+        "perigo": 7,
+        "mecanica": "Atrair para uma fenda sombreada e resfriar as placas com água em pulsos curtos.",
+        "recompensas": "Ferrão Solar; acesso a um reservatório antigo",
+        "noJogo": {
+          "hp": 108,
+          "damage": 14,
+          "speed": 5.15,
+          "armor": 0.69,
+          "xp": 163
+        }
+      },
+      "boss": {
+        "id": "colossoCasca",
+        "nome": "Colosso da Casca",
+        "vida": 2400,
+        "ataque": 35,
+        "defesa": 28,
+        "velocidade": 3,
+        "perigo": 9,
+        "fraqueza": "Água aplicada com controle e correntes frias. Água demais causa erosão.",
+        "recompensas": "Cristal Solar; Manto de Casca; oásis reativados",
+        "noJogo": {
+          "hp": 240,
+          "damage": 21,
+          "speed": 3.35,
+          "armor": 0.588,
+          "xp": 600
+        }
+      }
+    },
+    {
+      "id": "oceano",
+      "nome": "Oceano Interior",
+      "nivel": "10–15",
+      "fragmento": "Pérola Abissal",
+      "mobs": [
+        {
+          "id": "piranhaCristal",
+          "nome": "Piranha de Cristal",
+          "vida": 70,
+          "ataque": 18,
+          "defesa": 7,
+          "velocidade": 10,
+          "habilidade": "Mordida em Enxame: dano cresce se três ou mais cercam o alvo",
+          "fraqueza": "Ruídos graves e pulsos de luz desorganizam o cardume",
+          "model": null,
+          "noJogo": null
+        },
+        {
+          "id": "caranguejoFossil",
+          "nome": "Caranguejo de Madeira Fóssil",
+          "vida": 110,
+          "ataque": 20,
+          "defesa": 18,
+          "velocidade": 3,
+          "habilidade": "Pinça de Pressão: prende equipamento ou membro",
+          "fraqueza": "Articulações laterais frágeis; distraído com alimento",
+          "model": null,
+          "noJogo": null
+        },
+        {
+          "id": "serpenteAguaEscura",
+          "nome": "Serpente de Água Escura",
+          "vida": 95,
+          "ataque": 23,
+          "defesa": 10,
+          "velocidade": 9,
+          "habilidade": "Redemoinho: arrasta o alvo para zona funda",
+          "fraqueza": "Luz intensa e corrente contrária quebram a emboscada",
+          "model": null,
+          "noJogo": null
+        }
+      ],
+      "subBoss": {
+        "id": "guardiaoMares",
+        "nome": "Guardião das Marés",
+        "vida": 900,
+        "ataque": 25,
+        "defesa": 30,
+        "velocidade": 3,
+        "perigo": 8,
+        "mecanica": "Três canais alimentam sua barreira; fechá-los na ordem certa reduz a defesa sem destruir o filtro.",
+        "recompensas": "Escama Coralina; respiração aquática temporária",
+        "noJogo": {
+          "hp": 150,
+          "damage": 15,
+          "speed": 3.35,
+          "armor": 0.571,
+          "xp": 225
+        }
+      },
+      "boss": {
+        "id": "leviata",
+        "nome": "Leviatã do Lago Profundo",
+        "vida": 3000,
+        "ataque": 38,
+        "defesa": 20,
+        "velocidade": 9,
+        "perigo": 10,
+        "fraqueza": "Remover o núcleo contaminado da garganta. Matar o Leviatã não resolve a falta de oxigênio.",
+        "recompensas": "Pérola Abissal; Tridente das Correntes; água limpa",
+        "noJogo": {
+          "hp": 300,
+          "damage": 23,
+          "speed": 6.05,
+          "armor": 0.667,
+          "xp": 750
+        }
+      }
+    },
+    {
+      "id": "fornalha",
+      "nome": "Fornalha de Ignar",
+      "nivel": "15–20",
+      "fragmento": "Núcleo Incandescente",
+      "mobs": [
+        {
+          "id": "salamandraMagma",
+          "nome": "Salamandra de Magma",
+          "vida": 100,
+          "ataque": 25,
+          "defesa": 14,
+          "velocidade": 6,
+          "habilidade": "Cuspe Incandescente: projétil de fogo que deixa área quente",
+          "fraqueza": "Água em quantidade controlada resfria placas externas",
+          "model": "salamandra",
+          "noJogo": {
+            "hp": 60,
+            "damage": 15,
+            "speed": 4.7,
+            "armor": 0.741,
+            "xp": 33
+          }
+        },
+        {
+          "id": "besouroObsidiana",
+          "nome": "Besouro de Obsidiana",
+          "vida": 130,
+          "ataque": 22,
+          "defesa": 24,
+          "velocidade": 4,
+          "habilidade": "Carapaça Cortante: dano ao ser atingido corpo a corpo",
+          "fraqueza": "Juntas e ventre não têm placas de obsidiana",
+          "model": "besouroObsidiana",
+          "noJogo": {
+            "hp": 78,
+            "damage": 13,
+            "speed": 3.8,
+            "armor": 0.625,
+            "xp": 43
+          }
+        },
+        {
+          "id": "elementalCinzas",
+          "nome": "Elemental de Cinzas",
+          "vida": 90,
+          "ataque": 28,
+          "defesa": 10,
+          "velocidade": 7,
+          "habilidade": "Nuvem Asfixiante: reduz visão e vigor",
+          "fraqueza": "Ventilação forte dispersa o corpo particulado",
+          "model": "elemental",
+          "noJogo": {
+            "hp": 54,
+            "damage": 17,
+            "speed": 5.15,
+            "armor": 0.8,
+            "xp": 30
+          }
+        }
+      ],
+      "subBoss": {
+        "id": "ferreiro",
+        "nome": "Ferreiro Vulcânico",
+        "vida": 1200,
+        "ataque": 34,
+        "defesa": 25,
+        "velocidade": 4,
+        "perigo": 8,
+        "mecanica": "Três fornalhas alimentam a armadura. Desativá-las em sequência reduz a defesa; todas de uma vez causam sobrepressão.",
+        "recompensas": "Núcleo Incandescente; Martelo de Obsidiana; acesso às chaminés",
+        "noJogo": {
+          "hp": 200,
+          "damage": 20,
+          "speed": 3.8,
+          "armor": 0.615,
+          "xp": 300
+        }
+      },
+      "boss": {
+        "id": "ignar",
+        "nome": "Ignar, o Coração Incandescente",
+        "vida": 3800,
+        "ataque": 42,
+        "defesa": 27,
+        "velocidade": 6,
+        "perigo": 10,
+        "fraqueza": "Regular pressão e ventilação. Fechar todas as chaminés pode causar explosão; abrir demais congela câmaras vizinhas.",
+        "recompensas": "Núcleo Incandescente estabilizado; resistência ao fogo; barreiras reparadas",
+        "noJogo": {
+          "hp": 380,
+          "damage": 25,
+          "speed": 4.7,
+          "armor": 0.597,
+          "xp": 950
+        }
+      }
+    },
+    {
+      "id": "niveria",
+      "nome": "Nivéria, o Reino Congelado",
+      "nivel": "20–25",
+      "fragmento": "Cristal Glacial",
+      "mobs": [
+        {
+          "id": "loboGeada",
+          "nome": "Lobo de Geada",
+          "vida": 120,
+          "ataque": 28,
+          "defesa": 12,
+          "velocidade": 10,
+          "habilidade": "Mordida Congelante: reduz a velocidade do alvo",
+          "fraqueza": "Calor constante e separação da matilha",
+          "model": "loboBranco",
+          "noJogo": {
+            "hp": 72,
+            "damage": 17,
+            "speed": 6.5,
+            "armor": 0.769,
+            "xp": 40
+          }
+        },
+        {
+          "id": "corujaGlacial",
+          "nome": "Coruja Glacial",
+          "vida": 85,
+          "ataque": 30,
+          "defesa": 8,
+          "velocidade": 10,
+          "habilidade": "Visão do Inverno; Mergulho Gelado",
+          "fraqueza": "Frágil se obrigada a pousar em área aberta",
+          "model": null,
+          "noJogo": null
+        },
+        {
+          "id": "golemGelo",
+          "nome": "Golem de Gelo",
+          "vida": 180,
+          "ataque": 25,
+          "defesa": 30,
+          "velocidade": 3,
+          "habilidade": "Prisão Glacial: prende um alvo; Pancada de Geada",
+          "fraqueza": "Calor nas juntas e vibração quebram suas articulações",
+          "model": "golem",
+          "noJogo": {
+            "hp": 108,
+            "damage": 15,
+            "speed": 3.35,
+            "armor": 0.571,
+            "xp": 60
+          }
+        }
+      ],
+      "subBoss": {
+        "id": "matriarca",
+        "nome": "Matriarca Branca",
+        "vida": 1400,
+        "ataque": 36,
+        "defesa": 22,
+        "velocidade": 9,
+        "perigo": 8,
+        "mecanica": "Enquanto há gelo intacto ela convoca reforços. Derreter só as placas que bloqueiam a nascente reduz sua vantagem.",
+        "recompensas": "Cristal Glacial; trilha segura para as torres de circulação",
+        "noJogo": {
+          "hp": 233,
+          "damage": 22,
+          "speed": 6.05,
+          "armor": 0.645,
+          "xp": 350
+        }
+      },
+      "boss": {
+        "id": "reiInverno",
+        "nome": "Rei do Inverno Eterno",
+        "vida": 4000,
+        "ataque": 45,
+        "defesa": 30,
+        "velocidade": 5,
+        "perigo": 10,
+        "fraqueza": "Corrigir o regulador térmico, não destruir o núcleo. Destruição total derrete a reserva e inunda as regiões inferiores.",
+        "recompensas": "Cristal Glacial; Armadura de Geada; canais descongelados",
+        "noJogo": {
+          "hp": 400,
+          "damage": 27,
+          "speed": 4.25,
+          "armor": 0.571,
+          "xp": 1000
+        }
+      }
+    },
+    {
+      "id": "selva",
+      "nome": "Selva dos Gigantes",
+      "nivel": "25–30",
+      "fragmento": "Semente Ancestral",
+      "mobs": [
+        {
+          "id": "panteraCipo",
+          "nome": "Pantera de Cipó",
+          "vida": 150,
+          "ataque": 36,
+          "defesa": 15,
+          "velocidade": 10,
+          "habilidade": "Emboscada Vegetal: dano extra se atacar sem ser detectada",
+          "fraqueza": "Áreas abertas e rastreamento revelam sua posição",
+          "model": "felino",
+          "noJogo": {
+            "hp": 90,
+            "damage": 22,
+            "speed": 6.5,
+            "armor": 0.727,
+            "xp": 50
+          }
+        },
+        {
+          "id": "besouroColossal",
+          "nome": "Besouro Colossal",
+          "vida": 220,
+          "ataque": 30,
+          "defesa": 30,
+          "velocidade": 4,
+          "habilidade": "Aríete Natural: investida que derruba obstáculos",
+          "fraqueza": "Ventre e articulações têm placas mais finas",
+          "model": "besouroColossal",
+          "noJogo": {
+            "hp": 132,
+            "damage": 18,
+            "speed": 3.8,
+            "armor": 0.571,
+            "xp": 73
+          }
+        },
+        {
+          "id": "serpenteFolhagem",
+          "nome": "Serpente de Folhagem",
+          "vida": 170,
+          "ataque": 40,
+          "defesa": 16,
+          "velocidade": 8,
+          "habilidade": "Camuflagem Perfeita; Constrição",
+          "fraqueza": "Vibrações no solo e calor revelam sua presença",
+          "model": "serpente",
+          "noJogo": {
+            "hp": 102,
+            "damage": 24,
+            "speed": 5.6,
+            "armor": 0.714,
+            "xp": 57
+          }
+        }
+      ],
+      "subBoss": {
+        "id": "devoradorTroncos",
+        "nome": "Devorador de Troncos",
+        "vida": 1700,
+        "ataque": 42,
+        "defesa": 28,
+        "velocidade": 3,
+        "perigo": 8,
+        "mecanica": "Cortar suas raízes de alimentação interrompe a regeneração; destruir toda a planta libera esporos. Podar e conter em vez de exterminar.",
+        "recompensas": "Semente Ancestral; caminho até a manada do Rei das Feras",
+        "noJogo": {
+          "hp": 283,
+          "damage": 25,
+          "speed": 3.35,
+          "armor": 0.588,
+          "xp": 425
+        }
+      },
+      "boss": {
+        "id": "reiFeras",
+        "nome": "Rei das Feras Antigas",
+        "vida": 4500,
+        "ataque": 48,
+        "defesa": 32,
+        "velocidade": 7,
+        "perigo": 10,
+        "fraqueza": "Não precisa ser morto. Restaurar a rota migratória e afastar o Devorador reduz a agressividade. Combate letal desequilibra a vegetação.",
+        "recompensas": "Presas Ancestrais; Manto de Camuflagem; aliança com a manada",
+        "noJogo": {
+          "hp": 450,
+          "damage": 29,
+          "speed": 5.15,
+          "armor": 0.556,
+          "xp": 1125
+        }
+      }
+    },
+    {
+      "id": "pantano",
+      "nome": "Pântano da Decomposição",
+      "nivel": "30–35",
+      "fragmento": "Esporo Primordial",
+      "mobs": [
+        {
+          "id": "sanguessugaLodo",
+          "nome": "Sanguessuga de Lodo",
+          "vida": 130,
+          "ataque": 28,
+          "defesa": 10,
+          "velocidade": 5,
+          "habilidade": "Drenagem Vital: recupera vida ao causar dano",
+          "fraqueza": "Sal e calor moderado a fazem soltar o alvo",
+          "model": "sanguessuga",
+          "noJogo": {
+            "hp": 78,
+            "damage": 17,
+            "speed": 4.25,
+            "armor": 0.8,
+            "xp": 43
+          }
+        },
+        {
+          "id": "sapoEsporos",
+          "nome": "Sapo de Esporos",
+          "vida": 150,
+          "ataque": 32,
+          "defesa": 14,
+          "velocidade": 5,
+          "habilidade": "Nuvem de Esporos: área de visão reduzida e irritação",
+          "fraqueza": "Vento forte dispersa a nuvem; máscara protege",
+          "model": "sapo",
+          "noJogo": {
+            "hp": 90,
+            "damage": 19,
+            "speed": 4.25,
+            "armor": 0.741,
+            "xp": 50
+          }
+        },
+        {
+          "id": "carnical",
+          "nome": "Carniçal de Madeira Morta",
+          "vida": 200,
+          "ataque": 36,
+          "defesa": 20,
+          "velocidade": 4,
+          "habilidade": "Regeneração Fúngica: recupera vida se os focos não forem removidos",
+          "fraqueza": "Remover os fungos expõe o corpo; fogo descontrolado prejudica o ecossistema",
+          "model": "golem",
+          "noJogo": {
+            "hp": 120,
+            "damage": 22,
+            "speed": 3.8,
+            "armor": 0.667,
+            "xp": 67
+          }
+        }
+      ],
+      "subBoss": {
+        "id": "pastorFungos",
+        "nome": "Pastor dos Fungos",
+        "vida": 1900,
+        "ataque": 38,
+        "defesa": 25,
+        "velocidade": 5,
+        "perigo": 8,
+        "mecanica": "Localizar e drenar três focos fúngicos. Queimar todos os focos espalha esporos e destrói decompositores úteis.",
+        "recompensas": "Esporo Primordial; Máscara de Filtragem",
+        "noJogo": {
+          "hp": 317,
+          "damage": 23,
+          "speed": 4.25,
+          "armor": 0.615,
+          "xp": 475
+        }
+      },
+      "boss": {
+        "id": "maeDecomposicao",
+        "nome": "Mãe da Decomposição",
+        "vida": 5000,
+        "ataque": 50,
+        "defesa": 35,
+        "velocidade": 3,
+        "perigo": 10,
+        "fraqueza": "Drenagem, ventilação e remoção seletiva de focos. Eliminar todos os fungos interrompe a reciclagem.",
+        "recompensas": "Esporo Primordial; Cajado dos Esporos; canais de drenagem restaurados",
+        "noJogo": {
+          "hp": 500,
+          "damage": 30,
+          "speed": 3.35,
+          "armor": 0.533,
+          "xp": 1250
+        }
+      }
+    },
+    {
+      "id": "cristais",
+      "nome": "Reino dos Cristais",
+      "nivel": "35–40",
+      "fragmento": "Prisma Antigo",
+      "mobs": [
+        {
+          "id": "aranhaQuartzo",
+          "nome": "Aranha de Quartzo",
+          "vida": 200,
+          "ataque": 40,
+          "defesa": 28,
+          "velocidade": 8,
+          "habilidade": "Teia Cristalina: prende e pode refletir magia fraca",
+          "fraqueza": "Vibrações sonoras quebram a teia; juntas frágeis",
+          "model": "cristalino",
+          "noJogo": {
+            "hp": 120,
+            "damage": 24,
+            "speed": 5.6,
+            "armor": 0.588,
+            "xp": 67
+          }
+        },
+        {
+          "id": "morcegoPrismatico",
+          "nome": "Morcego Prismático",
+          "vida": 150,
+          "ataque": 38,
+          "defesa": 12,
+          "velocidade": 10,
+          "habilidade": "Eco Prismático: desorienta; Mergulho Sônico",
+          "fraqueza": "Silêncio controlado e superfícies absorventes",
+          "model": null,
+          "noJogo": null
+        },
+        {
+          "id": "lagartoMineral",
+          "nome": "Lagarto Mineral",
+          "vida": 240,
+          "ataque": 42,
+          "defesa": 32,
+          "velocidade": 4,
+          "habilidade": "Armadura Mineral; Cauda de Quartzo",
+          "fraqueza": "Calor moderado fragiliza placas; articulações expostas",
+          "model": "lagarto",
+          "noJogo": {
+            "hp": 144,
+            "damage": 25,
+            "speed": 3.8,
+            "armor": 0.556,
+            "xp": 80
+          }
+        }
+      ],
+      "subBoss": {
+        "id": "cavaleiroAmetista",
+        "nome": "Cavaleiro de Ametista",
+        "vida": 2300,
+        "ataque": 45,
+        "defesa": 38,
+        "velocidade": 5,
+        "perigo": 9,
+        "mecanica": "O cristal frontal reflete magia. Ativar refletores laterais em sequência divide a energia e expõe o núcleo.",
+        "recompensas": "Prisma Antigo; chave das galerias",
+        "noJogo": {
+          "hp": 383,
+          "damage": 27,
+          "speed": 4.25,
+          "armor": 0.513,
+          "xp": 575
+        }
+      },
+      "boss": {
+        "id": "arquiteto",
+        "nome": "Arquiteto Prismático",
+        "vida": 5500,
+        "ataque": 55,
+        "defesa": 42,
+        "velocidade": 6,
+        "perigo": 10,
+        "fraqueza": "Frequência original do carvalho. Força bruta quebra cristais condutores.",
+        "recompensas": "Prisma Antigo; Espada Prismática; comunicação mágica reativada",
+        "noJogo": {
+          "hp": 550,
+          "damage": 33,
+          "speed": 4.7,
+          "armor": 0.488,
+          "xp": 1375
+        }
+      }
+    },
+    {
+      "id": "suspensa",
+      "nome": "Floresta Suspensa",
+      "nivel": "40–45",
+      "fragmento": "Pena dos Sete Galhos",
+      "mobs": [
+        {
+          "id": "aguiaGalho",
+          "nome": "Águia de Galho",
+          "vida": 230,
+          "ataque": 48,
+          "defesa": 18,
+          "velocidade": 10,
+          "habilidade": "Mergulho Aéreo: bônus se atacar de altura",
+          "fraqueza": "Espaços fechados e redes impedem voo",
+          "model": null,
+          "noJogo": null
+        },
+        {
+          "id": "serpentePlanadora",
+          "nome": "Serpente Planadora",
+          "vida": 260,
+          "ataque": 50,
+          "defesa": 22,
+          "velocidade": 9,
+          "habilidade": "Queda Silenciosa; Constrição",
+          "fraqueza": "Superfícies sem vegetação reduzem camuflagem",
+          "model": "serpente",
+          "noJogo": {
+            "hp": 156,
+            "damage": 30,
+            "speed": 6.05,
+            "armor": 0.645,
+            "xp": 87
+          }
+        },
+        {
+          "id": "vespaSeiva",
+          "nome": "Vespa de Seiva",
+          "vida": 180,
+          "ataque": 42,
+          "defesa": 15,
+          "velocidade": 10,
+          "habilidade": "Ferrão Paralisante; Enxame",
+          "fraqueza": "Fumaça fria e proteção de resina afastam o enxame",
+          "model": null,
+          "noJogo": null
+        }
+      ],
+      "subBoss": {
+        "id": "guardiaVentos",
+        "nome": "Guardiã dos Ventos",
+        "vida": 2600,
+        "ataque": 50,
+        "defesa": 28,
+        "velocidade": 10,
+        "perigo": 9,
+        "mecanica": "Usar velas, pontes e correntes para obrigá-la a pousar. Destruir ninhos elimina a chance de aliança.",
+        "recompensas": "Pena dos Sete Galhos; rotas de vento mapeadas",
+        "noJogo": {
+          "hp": 433,
+          "damage": 30,
+          "speed": 6.5,
+          "armor": 0.588,
+          "xp": 650
+        }
+      },
+      "boss": {
+        "id": "dragaoSeteGalhos",
+        "nome": "Dragão dos Sete Galhos",
+        "vida": 6000,
+        "ataque": 60,
+        "defesa": 42,
+        "velocidade": 9,
+        "perigo": 10,
+        "fraqueza": "Reparar a conexão e libertar o dragão da dor. Cortá-la sem escoramento derruba plataformas.",
+        "recompensas": "Pena dos Sete Galhos; Arco dos Sete Galhos; montaria aliada",
+        "noJogo": {
+          "hp": 600,
+          "damage": 36,
+          "speed": 6.05,
+          "armor": 0.488,
+          "xp": 1500
+        }
+      }
+    },
+    {
+      "id": "copa",
+      "nome": "Jardim da Copa",
+      "nivel": "45–50",
+      "fragmento": "Pólen Dourado",
+      "mobs": [
+        {
+          "id": "fenixMenor",
+          "nome": "Fênix Menor",
+          "vida": 260,
+          "ataque": 52,
+          "defesa": 20,
+          "velocidade": 10,
+          "habilidade": "Chama Renovadora; Pluma Ardente",
+          "fraqueza": "Água e frio reduzem a regeneração (não congelar ninhos)",
+          "model": null,
+          "noJogo": null
+        },
+        {
+          "id": "guardiaoFloral",
+          "nome": "Guardião Floral",
+          "vida": 320,
+          "ataque": 48,
+          "defesa": 35,
+          "velocidade": 4,
+          "habilidade": "Espinhos de Luz; Raiz Defensiva",
+          "fraqueza": "Raízes expostas podem ser contidas sem destruir a planta",
+          "model": "golem",
+          "noJogo": {
+            "hp": 192,
+            "damage": 29,
+            "speed": 3.8,
+            "armor": 0.533,
+            "xp": 107
+          }
+        },
+        {
+          "id": "borboletaLuz",
+          "nome": "Borboleta de Luz",
+          "vida": 190,
+          "ataque": 40,
+          "defesa": 10,
+          "velocidade": 10,
+          "habilidade": "Ilusão Solar; Pólen Cegante",
+          "fraqueza": "Escuridão total interrompe a orientação; não é necessário matá-la",
+          "model": null,
+          "noJogo": null
+        }
+      ],
+      "subBoss": {
+        "id": "sacerdotisa",
+        "nome": "Sacerdotisa das Flores",
+        "vida": 3000,
+        "ataque": 52,
+        "defesa": 32,
+        "velocidade": 7,
+        "perigo": 9,
+        "mecanica": "Proteger três áreas de reprodução e provar que as flores não serão destruídas.",
+        "recompensas": "Pólen Dourado; acesso ao coração mágico",
+        "noJogo": {
+          "hp": 500,
+          "damage": 31,
+          "speed": 5.15,
+          "armor": 0.556,
+          "xp": 750
+        }
+      },
+      "boss": {
+        "id": "devoradorSeiva",
+        "nome": "Devorador de Seiva",
+        "vida": 8000,
+        "ataque": 65,
+        "defesa": 50,
+        "velocidade": 5,
+        "perigo": 10,
+        "fraqueza": "Restaurar os dez reguladores e interromper o ciclo de absorção. Derrotá-lo sem estabilizar o coração pode matar a árvore.",
+        "recompensas": "Coroa do Carvalho; Coração de Seiva; final escolhido pelo grupo",
+        "noJogo": {
+          "hp": 800,
+          "damage": 39,
+          "speed": 4.25,
+          "armor": 0.444,
+          "xp": 2000
+        }
+      }
+    }
+  ]
+}

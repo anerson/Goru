@@ -11,9 +11,10 @@ export function createHud(root) {
       <div class="bar" data-k="thirst"><span>Sede</span><i><b></b></i></div>
       <div class="bar" data-k="hunger"><span>Fome</span><i><b></b></i></div>
       <div class="flask" id="hudFlask"></div>
+      <div class="lvl"><span id="hudLevel">Nível 1</span><i><b id="hudXp"></b></i></div>
     </div>
     <div class="hud-quest" aria-live="polite">
-      <small>Ato I · Descoberta e sobrevivência</small>
+      <small id="hudAct">Ato I · Descoberta e sobrevivência</small>
       <strong id="hudObjective"></strong>
       <div class="guide" id="hudGuide"><span class="arrow" id="hudArrow">▲</span><span id="hudDist"></span><em id="hudHint"></em></div>
     </div>
@@ -34,7 +35,7 @@ export function createHud(root) {
     <div class="hud-boss" id="hudBoss" hidden><b id="hudBossName"></b><i><span id="hudBossBar"></span></i></div>
     <div class="hud-hurt" id="hudHurt"></div>
     <div class="hud-aim" id="hudAim" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b><span id="hudAimLabel"></span></div>
-    <div class="hud-end" id="hudEnd" hidden><div><h2>Fim do Ato I</h2><p id="hudEndText"></p><button type="button" id="hudEndOk">Continuar explorando</button></div></div>
+    <div class="hud-end" id="hudEnd" hidden><div><h2 id="hudEndTitle">Fim do Ato I</h2><p id="hudEndText"></p><div class="row"><button type="button" id="hudEndNext" hidden></button><button type="button" id="hudEndOk">Continuar explorando</button></div></div></div>
   `;
   const $ = (id) => root.querySelector(`#${id}`);
   let handlers = { interact() {}, drink() {}, useItem() {}, attack() {} };
@@ -57,7 +58,8 @@ export function createHud(root) {
     const rows = Object.entries(state.inv).filter(([, n]) => n > 0).map(([id, n]) => {
       const it = ITEMS[id];
       const btn = it.use ? `<button type="button" data-use="${id}">${it.verb}</button>` : '';
-      return `<li><span>${it.name}</span><b>× ${n}</b>${btn}</li>`;
+      const tag = it.fragment ? `<small>fragmento · ${it.fragment}</small>` : it.note ? `<small>${it.note}</small>` : '';
+      return `<li><span>${it.name}${tag}</span><b>× ${n}</b>${btn}</li>`;
     });
     const flask = state.flags.cantil ? `<li><span>Cantil</span><b>${state.flask}/${FLASK.capacity} goles</b><button type="button" data-drink>Beber</button></li>` : '';
     $('hudBagPanel').innerHTML = `<h3>Mochila</h3><ul>${flask}${rows.join('') || (flask ? '' : '<li class="empty">Vazia. Colete cogumelos, ervas, resina e algas pelo caminho.</li>')}</ul>`;
@@ -69,14 +71,19 @@ export function createHud(root) {
 
   const hud = {
     bind(h) { handlers = h; },
-    objective(text) { $('hudObjective').textContent = text; },
-    needs(state) {
+    objective(text, act = 1) {
+      $('hudObjective').textContent = text;
+      $('hudAct').textContent = act === 2 ? 'Ato II · Calor, gelo e cadeia alimentar' : 'Ato I · Descoberta e sobrevivência';
+    },
+    needs(state, { maxHealth = 100, xpFrac = 0 } = {}) {
       for (const k of ['health', 'thirst', 'hunger']) {
         const el = root.querySelector(`.bar[data-k="${k}"]`);
-        const v = Math.round(state[k]);
+        const v = Math.round((state[k] / (k === 'health' ? maxHealth : 100)) * 100);
         el.querySelector('b').style.width = `${v}%`;
         el.classList.toggle('low', v <= NEEDS.warnAt);
       }
+      $('hudLevel').textContent = `Nível ${state.level ?? 1} · ${Math.round(state.health)}/${maxHealth}`;
+      $('hudXp').style.width = `${Math.round(Math.min(1, xpFrac) * 100)}%`;
       $('hudFlask').textContent = state.flags.cantil ? `Cantil ${state.flask}/${FLASK.capacity}` : '';
     },
     inventory(state) { lastState = state; if (!$('hudBagPanel').hidden) renderBag(state); },
@@ -143,7 +150,15 @@ export function createHud(root) {
       void h.offsetWidth; // restart the fade
       h.classList.add('on');
     },
-    ending(text) { $('hudEndText').textContent = text; $('hudEnd').hidden = false; },
+    // end of an act: a title, the summary and, when there is a next act, a button to begin it
+    ending(title, text, next) {
+      $('hudEndTitle').textContent = title;
+      $('hudEndText').textContent = text;
+      const b = $('hudEndNext');
+      b.hidden = !next;
+      if (next) { b.textContent = next.label; b.onclick = () => { $('hudEnd').hidden = true; next.run(); }; }
+      $('hudEnd').hidden = false;
+    },
     reset() { close(); $('hudEnd').hidden = true; toggleBag(false); $('hudToasts').innerHTML = ''; },
   };
   return hud;

@@ -1,12 +1,15 @@
-// Act I gameplay: survival needs, inventory and flask, resource nodes, villagers and their
-// conversations, the quest chain, the sluice and shrine, the water that comes back, the
-// contamination signs, guidance toward the next objective, and saving.
+// The game rules: survival needs, inventory and flask, resource nodes, villagers and their
+// conversations, the quest chain (Act I here, Act II in act2.js), the sluice and shrine, the water
+// that comes back, the contamination signs, levels and gear, boss outcomes and rewards, guidance
+// toward the next objective, and saving.
 // Game state lives in one plain object (`state`); meshes only show it.
 import * as THREE from 'three';
 import { mulberry32 } from '../noise.js';
 import { BIOMES, DISK_R, ENTRANCES, junctionAngle } from '../tree/layout.js';
 import { createCharacter } from '../character.js';
-import { NEEDS, ITEMS, FLASK, RESOURCES, STAGES, stageIndex, DIALOGUES, dialogueFor, SPEAKERS, STRINGS, INSPECT } from './data.js';
+import { NEEDS, ITEMS, FLASK, RESOURCES, STAGES, stageIndex, DIALOGUES, dialogueFor, SPEAKERS, STRINGS, INSPECT, REWARDS2 } from './data.js';
+import { buildAct2 } from './act2.js';
+import { CREATURES } from './creatures.js';
 
 const SAVE_KEY = 'aetherion-ato1-v1';
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -19,6 +22,8 @@ function freshState() {
     flask: 0,                // sips left (0..FLASK.capacity)
     flags: {},               // cantil, sinal_1.., nucleo_colocado, ...
     health: 100, thirst: 100, hunger: 100,
+    count: {},               // quest counters: resgate, ruptura, torre, pegada, bloqueio, ...
+    xp: 0, level: 1,
     pos: null,               // { x, z, feet, yaw } when saved
   };
 }
@@ -172,6 +177,7 @@ export function createGame({ scene, biomes, walker, hud }) {
     cogumelo: () => { const g = new THREE.Group(); const st = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 0.35, 8), new THREE.MeshStandardMaterial({ color: '#efe6d0' })); st.position.y = 0.17; const cap = new THREE.Mesh(new THREE.SphereGeometry(0.28, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#e8d6b0', emissive: '#6a5a30', emissiveIntensity: 0.4 })); cap.position.y = 0.35; g.add(st, cap); return g; },
     erva: () => { const m = new THREE.Mesh(new THREE.ConeGeometry(0.35, 0.7, 6), new THREE.MeshStandardMaterial({ color: '#7fd16a', emissive: '#2a6a1a', emissiveIntensity: 0.5 })); m.position.y = 0.35; return m; },
     resina: () => { const m = new THREE.Mesh(new THREE.SphereGeometry(0.35, 12, 10), glowMat('#ffb347', 1.3)); m.scale.set(1, 1.4, 1); m.position.y = 0.4; return m; },
+    mineral: () => { const m = new THREE.Mesh(new THREE.DodecahedronGeometry(0.45, 0), new THREE.MeshStandardMaterial({ color: '#5a3a2a', emissive: '#ff6a1a', emissiveIntensity: 0.7, flatShading: true })); m.position.y = 0.4; return m; },
     alga: () => { const m = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.9, 5), new THREE.MeshStandardMaterial({ color: '#3fae7a', emissive: '#155a3a', emissiveIntensity: 0.6 })); m.position.y = 0.45; return m; },
   };
   const nodes = [];
@@ -200,22 +206,62 @@ export function createGame({ scene, biomes, walker, hud }) {
   beacon.add(beam, ring);
   scene.add(beacon);
 
+  // ---------- Act II (act2.js) builds on the same helpers ----------
+  const rules = {};
+  const kit = {
+    scene, along, villager, add, tent, fire, flames, glowMat, rand, hud, npcs, rules, INSPECT,
+    h: (id, x, z) => h(id, x, z),
+    get state() { return state; },
+    give: (i, n) => give(i, n), advance: () => advance(), hurt: (n) => hurt(n), gainXp: (n) => gainXp(n),
+    drain: (n) => { state.health = Math.max(0, state.health - n); if (state.health <= 0) faint(); },
+    get cheats() { return cheats; },
+  };
+  const act2 = buildAct2(kit);
+  // every boss in the story: where it waits and the stage that wakes it
+  const bossList = [
+    { id: 'devorador', type: 'devorador', biome: 'raizes', lair: lairs.devorador, wakeFrom: 'devorador', act: 1 },
+    { id: 'escorpiao', type: 'escorpiaoRei', biome: 'deserto', lair: lairs.escorpiao, wakeFrom: 'nucleo', act: 1 },
+    ...act2.bosses,
+  ];
+  const bossName = (id) => CREATURES[bossList.find((b) => b.id === id)?.type]?.name ?? id;
+
+  // ---------- levels and gear ----------
+  const xpNeed = (L) => Math.round(60 * L ** 1.35);
+  const gearSum = (k) => Object.keys(state.inv).reduce((a, id) => a + (ITEMS[id]?.gear?.[k] ?? 0), 0);
+  const maxHealth = () => 100 + 10 * (state.level - 1);
+  const power = () => (1 + 0.07 * (state.level - 1)) * (1 + gearSum('power'));
+  function gainXp(n) {
+    state.xp += Math.round(n);
+    while (state.xp >= xpNeed(state.level)) {
+      state.xp -= xpNeed(state.level);
+      state.level++;
+      state.health = maxHealth();
+      hud.toast(`Nível ${state.level}! Vida máxima ${maxHealth()}, dano +${Math.round((power() - 1) * 100)}%`);
+    }
+  }
+
   // =================== rules ===================
   const stage = () => STAGES[stageIndex(state.stage)];
   function advance() {
     const i = stageIndex(state.stage);
     if (i < STAGES.length - 1) state.stage = STAGES[i + 1].id;
-    hud.objective(stage().text);
+    hud.objective(stage().text, stage().act ?? 1);
     hud.toast('Novo objetivo');
     applyWorld();
     save();
-    if (state.stage === 'concluido') { ended = true; hud.ending(STRINGS.FIM_ATO + choicesSummary()); }
+    if (state.stage === 'concluido') { ended = true; hud.ending('Fim do Ato I', STRINGS.FIM_ATO + choicesSummary(1), { label: STRINGS.ATO2_INICIO, run: beginAct2 }); }
+    if (state.stage === 'ato2_concluido') { ended = true; hud.ending('Fim do Ato II', STRINGS.FIM_ATO2 + choicesSummary(2)); }
+  }
+  function beginAct2() {
+    ended = false;
+    advance();
   }
   function needsMet() {
     const n = stage().need;
     if (!n) return false;
     return Object.entries(n).every(([k, v]) => {
       if (k.startsWith('boss_')) return !!state.flags[k];
+      if (state.count?.[k] >= v) return true;
       if (k === 'cantil') return state.flags.cantil && state.flask >= v;
       if (k === 'sinal') return [1, 2, 3].filter((i) => state.flags[`sinal_${i}`]).length >= v;
       return (state.inv[k] ?? 0) >= v;
@@ -249,7 +295,7 @@ export function createGame({ scene, biomes, walker, hud }) {
     if (!it?.use || !state.inv[id]) return;
     take(id, 1);
     if (it.use.hunger) state.hunger = Math.min(100, state.hunger + it.use.hunger);
-    if (it.use.health) state.health = Math.min(100, state.health + it.use.health);
+    if (it.use.health) state.health = Math.min(maxHealth(), state.health + it.use.health);
     hud.toast(`${it.verb}: ${it.name}`);
   }
   function inspect(what) {
@@ -313,6 +359,7 @@ export function createGame({ scene, biomes, walker, hud }) {
 
   // ---- what the world shows for the current state ----
   function applyWorld() {
+    act2?.applyWorld();
     const restored = !!state.flags.agua;
     flow.visible = restored;
     oasisWet.visible = restored;
@@ -348,6 +395,12 @@ export function createGame({ scene, biomes, walker, hud }) {
       for (const it of items) if (it.group === 'resina' && it.enabled()) { const d = Math.hypot(it.pos.x - me.x, it.pos.z - me.z); if (d < bd) { bd = d; best = it; } }
       if (best) return best.pos;
     }
+    // a group target (the 3 ruptures, the towers...) or 'node:<item>': point at the nearest one still open
+    const me = walker.state;
+    const group = st.target.startsWith('node:') ? st.target.slice(5) : st.target;
+    let best = null, bd = Infinity;
+    for (const it of items) if (it.group === group && it.enabled()) { const d = Math.hypot(it.pos.x - me.x, it.pos.z - me.z); if (d < bd) { bd = d; best = it; } }
+    if (best) return best.pos;
     return items.find((i) => i.id === st.target)?.pos ?? null;
   }
   const way = new THREE.Vector3();
@@ -391,7 +444,9 @@ export function createGame({ scene, biomes, walker, hud }) {
       state.thirst = Math.max(0, state.thirst - (cheats.frozenNeeds ? 0 : NEEDS.thirstPerSec * k * dt));
       state.hunger = Math.max(0, state.hunger - (cheats.frozenNeeds ? 0 : NEEDS.hungerPerSec * dt));
       if (state.thirst <= 0 || state.hunger <= 0) state.health = Math.max(0, state.health - NEEDS.starvePerSec * dt * ((state.thirst <= 0) + (state.hunger <= 0)));
-      else if (state.thirst > 50 && state.hunger > 50) state.health = Math.min(100, state.health + NEEDS.regenPerSec * dt);
+      else if (state.thirst > 50 && state.hunger > 50) state.health = Math.min(maxHealth(), state.health + NEEDS.regenPerSec * dt);
+      const r = Math.hypot(walker.state.x, walker.state.z);
+      act2.update(dt, levelOf(walker.state.feet, r)?.id ?? null);
       if (state.health <= 0) faint();
       if (needsMet()) advance();
     }
@@ -417,7 +472,7 @@ export function createGame({ scene, biomes, walker, hud }) {
       const bearing = Math.atan2(-dx, -dz) - camYaw; // 0 = straight ahead
       hud.guide(Math.hypot(dx, dz, (wp.pos.y || me.feet) - me.feet), bearing, wp.hint);
     } else hud.guide(null);
-    hud.needs(state);
+    hud.needs(state, { maxHealth: maxHealth(), xpFrac: state.xp / xpNeed(state.level) });
 
     saveTimer += dt;
     if (saveTimer > 15) { saveTimer = 0; save(); }
@@ -426,15 +481,15 @@ export function createGame({ scene, biomes, walker, hud }) {
   const onFaint = [];
 
   // ---- combat hooks ----
-  const safeZones = () => [['raizes', npcs.maela.pos], ['deserto', npcs.tarek.pos], ['oceano', npcs.ilian.pos]];
+  const safeZones = () => [['raizes', npcs.maela.pos], ['deserto', npcs.tarek.pos], ['oceano', npcs.ilian.pos], ...act2.safeZones()];
   const cheats = { invulnerable: false, frozenNeeds: false };
   function hurt(n) {
     if (cheats.invulnerable) return;
-    state.health = Math.max(0, state.health - n);
+    state.health = Math.max(0, state.health - n * (1 - Math.min(0.6, gearSum('guard'))));
     hud.hurt();
     if (state.health <= 0) faint();
   }
-  const LOOT = { raizes: 'cogumelo', deserto: 'resina', oceano: 'alga' };
+  const LOOT = { raizes: 'cogumelo', deserto: 'resina', oceano: 'alga', fornalha: 'mineral' };
   function loot(biome) {
     const item = LOOT[biome] ?? 'erva';
     give(item, 1);
@@ -445,7 +500,8 @@ export function createGame({ scene, biomes, walker, hud }) {
     if (state.flags[`boss_${id}`]) return;
     state.flags[`boss_${id}`] = true;
     state.flags[`escolha_${id}`] = state.flags[`escolha_${id}`] ?? 'destruir';
-    hud.message(INSPECT[`${id}_morto`]);
+    hud.message(INSPECT[`${id}_morto`] ?? `${bossName(id)} caiu.`);
+    reward(id, 'destruir');
     save();
   }
   // the boss yields at 25%: the player decides its fate in a conversation
@@ -458,11 +514,20 @@ export function createGame({ scene, biomes, walker, hud }) {
     state.flags[`boss_${id}`] = true;
     state.flags[`escolha_${id}`] = how;
     outcomeHooks.forEach((f) => f(id, how));
+    reward(id, how);
     save();
   }
+  // what a guardian leaves for the explorer (data_act2 REWARDS2), once per guardian
+  function reward(id, how) {
+    if (state.flags[`recompensa_${id}`]) return;
+    state.flags[`recompensa_${id}`] = true;
+    const r = REWARDS2[id];
+    const got = { ...(r?.any ?? {}), ...(r?.[how] ?? {}) };
+    for (const [item, n] of Object.entries(got)) { give(item, n); hud.toast(`Recebido: ${ITEMS[item].name}${ITEMS[item].note ? ` (${ITEMS[item].note})` : ''}`); }
+  }
   const CHOICE_NAMES = { destruir: 'destruído', poupar: 'poupado', restaurar: 'restaurado', negociar: 'negociado' };
-  function choicesSummary() {
-    const rows = [['devorador', 'Devorador de Raízes'], ['escorpiao', 'Escorpião-Rei da Casca']]
+  function choicesSummary(act) {
+    const rows = bossList.filter((b) => b.act === act).map((b) => [b.id, bossName(b.id)])
       .filter(([id]) => state.flags[`escolha_${id}`])
       .map(([id, name]) => `${name}: ${CHOICE_NAMES[state.flags[`escolha_${id}`]]}`);
     return rows.length ? ` ${STRINGS.ESCOLHAS} ${rows.join(' · ')}.` : '';
@@ -471,7 +536,7 @@ export function createGame({ scene, biomes, walker, hud }) {
   function faint() {
     hud.message('Você desmaiou. Os moradores da Vila das Raízes te encontraram e cuidaram de você.');
     onFaint.forEach((f) => f());
-    state.health = 60; state.thirst = 50; state.hunger = 50;
+    state.health = Math.round(maxHealth() * 0.6); state.thirst = 50; state.hunger = 50;
     spawnAtVillage();
   }
   function spawnAtVillage() {
@@ -506,12 +571,13 @@ export function createGame({ scene, biomes, walker, hud }) {
       try { localStorage.removeItem(SAVE_KEY); } catch { /* ignore */ }
     }
     applyWorld();
-    hud.objective(stage().text);
+    hud.objective(stage().text, stage().act ?? 1);
     hud.inventory(state);
     hud.closeDialogue();
     if (continueGame && state.pos) walker.teleport({ x: state.pos.x, z: state.pos.z, feet: state.pos.feet, yaw: state.pos.yaw, pitch: -0.15 });
     else spawnAtVillage();
-    if (state.stage === 'concluido') { ended = true; hud.ending(STRINGS.FIM_ATO + choicesSummary()); }
+    if (state.stage === 'concluido') { ended = true; hud.ending('Fim do Ato I', STRINGS.FIM_ATO + choicesSummary(1), { label: STRINGS.ATO2_INICIO, run: beginAct2 }); }
+    if (state.stage === 'ato2_concluido') { ended = true; hud.ending('Fim do Ato II', STRINGS.FIM_ATO2 + choicesSummary(2)); }
   }
 
   applyWorld();
@@ -520,10 +586,12 @@ export function createGame({ scene, biomes, walker, hud }) {
     get state() { return state; },
     get busy() { return !!dialogue; },
     interact() { if (!dialogue && current) current.use(); },
-    update, drink, useItem, start, hasSave, save, hurt, loot, bossDefeated, bossYield, lairs, cheats,
+    update, drink, useItem, start, hasSave, save, hurt, loot, bossDefeated, bossYield, lairs, cheats, gainXp, bossList, beginAct2,
+    power, maxHealth,
+    bossRules: (id) => rules[id]?.() ?? {},
     onBossOutcome: (f) => outcomeHooks.push(f),
     bossChoice: (id) => state.flags[`escolha_${id}`] ?? null,
-    heal() { state.health = 100; state.thirst = 100; state.hunger = 100; },
+    heal() { state.health = maxHealth(); state.thirst = 100; state.hunger = 100; },
     // GM: jump to any stage with the world made consistent (items and flags that stage assumes)
     jumpTo(id) {
       const i = stageIndex(id), past = (sid) => i > stageIndex(sid), from = (sid) => i >= stageIndex(sid);
@@ -535,24 +603,37 @@ export function createGame({ scene, biomes, walker, hud }) {
       f.agua = past('restaurar') || undefined;
       for (const n of [1, 2, 3]) f[`sinal_${n}`] = past('sinais') || undefined;
       for (const k of Object.keys(f)) if (f[k] === undefined) delete f[k];
+      // Act II: whatever the stages before this one needed (counters, items, bosses resolved)
+      state.count = {};
+      for (const st of STAGES.slice(0, i)) for (const [k, v] of Object.entries(st.need ?? {})) {
+        if (st.act !== 2) continue;
+        if (k.startsWith('boss_')) { f[k] = true; f[`escolha_${k.slice(5)}`] = f[`escolha_${k.slice(5)}`] ?? 'restaurar'; }
+        else if (ITEMS[k]) state.inv[k] = Math.max(state.inv[k] ?? 0, v);
+        else state.count[k] = v;
+      }
       delete state.inv.chave; delete state.inv.nucleo;
       if (from('comporta') && !past('nucleo')) state.inv.chave = 1;
       if (id === 'restaurar') state.inv.nucleo = 1;
       state.stage = id;
       ended = id === 'concluido';
       applyWorld();
-      hud.objective(stage().text);
+      hud.objective(stage().text, stage().act ?? 1);
       hud.inventory(state);
       save();
     },
-    reviveBosses() { for (const k of ['boss_devorador', 'boss_escorpiao', 'escolha_devorador', 'escolha_escorpiao']) delete state.flags[k]; save(); },
+    reviveBosses() { for (const b of bossList) { delete state.flags[`boss_${b.id}`]; delete state.flags[`escolha_${b.id}`]; } save(); },
     onFaint: (f) => onFaint.push(f),
     nearSafeZone: (biome, x, z, d) => safeZones().some(([b, p]) => b === biome && Math.hypot(p.x - x, p.z - z) < d) || Math.hypot(x, z) < 15,
-    bossShouldWake: (id) => !state.flags[`boss_${id}`] && (id === 'devorador' ? stageIndex(state.stage) >= stageIndex('devorador') : (state.inv.chave > 0 || stageIndex(state.stage) >= stageIndex('nucleo'))),
-    bossAwake: (id) => !state.flags[`boss_${id}`] && (id === 'devorador' ? stageIndex(state.stage) >= stageIndex('devorador') : stageIndex(state.stage) >= stageIndex('nucleo')),
+    bossShouldWake: (id) => {
+      const b = bossList.find((x) => x.id === id);
+      if (!b || state.flags[`boss_${id}`]) return false;
+      if (id === 'escorpiao' && state.inv.chave > 0) return true;
+      return stageIndex(state.stage) >= stageIndex(b.wakeFrom);
+    },
+    bossAwake: (id) => { const b = bossList.find((x) => x.id === id); return !!b && !state.flags[`boss_${id}`] && stageIndex(state.stage) >= stageIndex(b.wakeFrom); },
     choose(i) { hud.pick(i); },
     // test hooks
-    debug: { items, advance, talk, goto: (n) => goto(n), get dialogue() { return dialogue; }, targetPos, waypoint, setStage: (s) => { state.stage = s; applyWorld(); hud.objective(stage().text); } },
+    debug: { items, advance, talk, goto: (n) => goto(n), get dialogue() { return dialogue; }, targetPos, waypoint, setStage: (s) => { state.stage = s; applyWorld(); hud.objective(stage().text, stage().act ?? 1); } },
   };
 
   // ---------- builders for the two ancient structures ----------

@@ -34,6 +34,28 @@ aviso a 30%. Com sede ou fome em zero a vida cai devagar; ao desmaiar o explorad
 sem perder nada. Itens: cogumelo, erva medicinal, resina, alga, chave de âmbar, Núcleo de Seiva I.
 O progresso é salvo no navegador.
 
+## Ato II — Calor, gelo e cadeia alimentar (regiões 4–6 do manual)
+
+Começa no fim do Ato I (botão **Começar o Ato II**). Segue as missões do *Manual de Campanha*:
+
+| Região | Missão | Subchefe (mecânica) | Chefe (escolha) | Fragmento / recompensa |
+|--------|--------|---------------------|-----------------|------------------------|
+| Fornalha de Ignar (100 m) | O Calor que Consome: resgatar 3 mineiros, mapear 3 rupturas, coletar 3 minerais, ler o instrumento e regular as chaminés na ordem (leste, norte, oeste) | Ferreiro Vulcânico: desligar as fornalhas I, II, III em sequência reduz a armadura; fora de ordem = sobrepressão | Ignar: apagar ou estabilizar o núcleo | Martelo de Obsidiana (+30% dano), Núcleo Incandescente |
+| Nivéria (133 m) | O Inverno que Não Termina: achar a expedição, recuperar as roupas térmicas (sem elas o frio machuca), desobstruir 3 torres | Matriarca Branca: enquanto as 3 placas de gelo existem ela chama lobos; poupar ou destruir | Rei do Inverno Eterno: destruir o núcleo (inunda) ou recalibrar | Cristal Glacial, Armadura de Geada (−25% dano recebido) |
+| Selva dos Gigantes (167 m) | O Silêncio da Selva: 3 trilhas de pegadas, restos de predação, reabrir a rota (3 bloqueios) | Devorador de Troncos: não anda; regenera enquanto as 3 raízes de alimentação existem; podar ou exterminar | Rei das Feras Antigas: com a rota aberta e o Devorador contido ele se rende quase de imediato | Semente Ancestral, Presas Ancestrais (+20% dano) |
+
+Níveis: criaturas e chefes dão experiência; cada nível dá +10 de vida máxima e +7% de dano. As
+criaturas usam os números do manual convertidos (`src/game/bestiary.js`): vida da criatura = Vida
+× 0,6, subchefe = Vida ÷ 6, chefe = Vida ÷ 10, dano = Ataque × 0,6, a Defesa vira armadura.
+
+**Bestiário para a mesa:** `docs/bestiario.json` traz as 10 regiões com as 30 criaturas, os 10
+subchefes e os 10 chefes do manual, com os valores originais e os do jogo lado a lado.
+
+**Divergência com o manual:** os chefões do Ato I (Devorador de Raízes, Escorpião-Rei da Casca) foram
+criados antes do manual. No manual, as Raízes têm o Escavador de Âmbar e a Rainha das Raízes, e a
+Casca tem o Escorpião-Rei do Sol e o Colosso da Casca. Criaturas voadoras e aquáticas do manual
+ainda não estão no jogo.
+
 ## Modo Mestre (para o GM)
 
 Abra o jogo com `#mestre` no fim do endereço para ver o botão **Mestre**, ou aperte **Shift+G**
@@ -128,6 +150,10 @@ src/game/hud.js       interface do jogo: barras, objetivo com seta, diálogos, m
 src/game/combat.js    combate: cajado, IA das criaturas (máquina de estados), chefões, tremor e pausa no impacto
 src/game/creatures.js modelos e animação das criaturas e chefões; fauna de cada andar
 src/game/gm.js        Modo Mestre: Cajado do GM e painel do GM
+src/game/bestiary.js  bestiário do manual (10 regiões) e a conversão para o jogo
+src/game/data_act2.js Ato II como dados: etapas, diálogos, textos, recompensas
+src/game/act2.js      Ato II no mundo: acampamentos, objetos e mecânicas dos chefes
+docs/bestiario.json   bestiário completo em JSON para a mesa
 src/biomes/aetherion.js pântano, cristais, floresta suspensa, corais e flores gigantes
 src/input.js          teclado, mouse, pointer lock e joystick na tela
 tests/smoke.mjs       teste: grafo de rotas, render sem erro e percurso de cada tipo de caminho

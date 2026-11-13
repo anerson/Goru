@@ -62,8 +62,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     }
   }
   // bosses wait buried at their lairs until the story wakes them
-  for (const [id, type, biome] of [['devorador', 'devorador', 'raizes'], ['escorpiao', 'escorpiaoRei', 'deserto']]) {
-    const lair = game.lairs[id];
+  for (const { id, type, biome, lair } of game.bossList) {
     const b = spawn(type, biome, lair.x, lair.z, { boss: id, state: 'dormant' });
     b.model.root.visible = false;
     bosses[id] = b;
@@ -105,6 +104,8 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   // ---------- damage ----------
   function hurtMob(m, amount, from) {
     if (m.state === 'dead' || m.state === 'dormant' || !(amount > 0)) return;
+    // armour from the bestiary's Defesa (and a boss's own mechanics); the GM's staff ignores it
+    if (amount < 1e6) amount *= (m.def.armor ?? 1) * (rulesOf(m).armorMul ?? 1);
     m.hp -= amount;
     m.flash = 0.12;
     const away = m.pos.clone().sub(from).setY(0).normalize();
@@ -115,7 +116,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     if (m.state === 'idle' || m.state === 'alert' || m.state === 'return') { m.state = 'chase'; m.timer = 0; }
     if (m.hp <= 0) { die(m); return; }
     // a story boss at a quarter of its health yields instead of fighting on: the player chooses
-    if (m.boss && m.boss !== 'gm' && !m.yielded && m.hp <= m.def.hp * 0.25) {
+    if (m.boss && m.boss !== 'gm' && !m.yielded && m.hp <= m.def.hp * (rulesOf(m).yieldAt ?? 0.25)) {
       m.yielded = true;
       m.state = 'yield';
       m.knock.set(0, 0, 0);
@@ -128,6 +129,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     m.state = 'dead';
     m.timer = 0;
     lane.visible = ring.visible = false;
+    if (m.boss !== 'gm' && !m.temp) game.gainXp(m.def.xp ?? 10);
     if (m.boss) {
       hud.boss(null);
       if (m.boss !== 'gm') game.bossDefeated(m.boss);   // a boss the GM summoned is not the story's
@@ -188,6 +190,9 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   // a roll between the weapon's min and max (Infinity - Infinity would be NaN, so fixed values skip it)
   const rollDamage = (w) => (w.damage[0] === w.damage[1] ? w.damage[0] : w.damage[0] + rand() * (w.damage[1] - w.damage[0]));
 
+  // a story boss's special rules from the game (armour multiplier, regeneration, summons...)
+  const rulesOf = (m) => (m.boss && m.boss !== 'gm' ? game.bossRules(m.boss) : {});
+
   // ---------- the explorer attacks ----------
   function attack() {
     if (attackCd > 0 || game.busy || walker.state.flying) return;
@@ -208,7 +213,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
       const end = target ? V(target.pos.x, target.pos.y + target.model.height * 0.5, target.pos.z) : camera.position.clone().addScaledVector(camDir, PLAYER.reach);
       fireBeam(tip, end);
       if (target && target.pos.distanceTo(V(me.x, me.feet, me.z)) > PLAYER.range + target.model.radius) {
-        hurtMob(target, rollDamage(PLAYER), V(me.x, me.feet, me.z));
+        hurtMob(target, rollDamage(PLAYER) * (PLAYER.reach ? 1 : game.power()), V(me.x, me.feet, me.z));
         return;
       }
     }
@@ -223,7 +228,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
       const dist = d.length();
       if (dist > PLAYER.range + m.model.radius || Math.abs(m.pos.y - me.feet) > 3) continue;
       if (dist > 0.6 && d.normalize().dot(fwd) < PLAYER.cone) continue;
-      hurtMob(m, rollDamage(PLAYER), from);
+      hurtMob(m, rollDamage(PLAYER) * (PLAYER.reach ? 1 : game.power()), from);
     }
   }
 
@@ -336,16 +341,28 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
         const reach = def.range + m.model.radius * 0.5;
         if (m.boss && m.specialCd <= 0) {
           if (m.hp < def.hp * 0.5 && rand() < 0.5) { m.state = 'slamWind'; m.timer = 1.2; ring.visible = true; m.specialCd = 7; break; }
-          if (dist > 5 && dist < 18) { m.state = 'chargeWind'; m.timer = 0.9; m.lock = V(dx / dist, 0, dz / dist); lane.visible = true; m.specialCd = 6; break; }
+          if (dist > 5 && dist < 18 && !rulesOf(m).stationary) { m.state = 'chargeWind'; m.timer = 0.9; m.lock = V(dx / dist, 0, dz / dist); lane.visible = true; m.specialCd = 6; break; }
         }
         if (m.boss === 'devorador' && !m.summoned && m.hp < def.hp * 0.5) {
           m.summoned = true;
-          for (let k = 0; k < 2; k++) { const s = spawn('besouro', m.biome, m.pos.x + (k ? 3 : -3), m.pos.z + 2); s.state = 'chase'; s.sense = true; s.temp = true; }
+          for (let k = 0; k < 2; k++) { const s = spawn('besouroRachador', m.biome, m.pos.x + (k ? 3 : -3), m.pos.z + 2); s.state = 'chase'; s.sense = true; s.temp = true; }
           hud.toast('O Devorador chama sua prole!');
+        }
+        // reinforcements while the boss's mechanic allows (the Matriarca's pack while the ice stands)
+        const sm = rulesOf(m).summon;
+        if (sm) {
+          m.summonT = (m.summonT ?? 4) - dt;
+          const alive = mobs.filter((x) => x.temp && x.callerId === m.boss && x.state !== 'dead').length;
+          if (m.summonT <= 0 && alive < sm.max) {
+            m.summonT = sm.every;
+            const s2 = spawn(sm.type, m.biome, m.pos.x + (rand() - 0.5) * 8, m.pos.z + (rand() - 0.5) * 8, { temp: true, callerId: m.boss, state: 'chase' });
+            s2.sense = true;
+            hud.toast(`${def.name} chama reforços!`);
+          }
         }
         if (dist < reach && m.cooldown <= 0) { m.state = 'windup'; m.timer = m.boss ? 0.7 : 0.5; break; }
         const stop = def.range * 0.8 + m.model.radius * 0.5;
-        if (dist > stop) speed = move(m, dx, dz, def.speed, dt);
+        if (dist > stop && !rulesOf(m).stationary) speed = move(m, dx, dz, def.speed, dt);
         break;
       }
       case 'windup':
@@ -412,6 +429,8 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
         break;
       default: break;
     }
+    const regen = rulesOf(m).regen;
+    if (regen && m.state !== 'yield' && m.state !== 'dead') m.hp = Math.min(def.hp, m.hp + def.hp * regen * dt);
     // knockback (eased out), separation from the explorer
     if (m.knock.lengthSq() > 0.01) {
       move(m, m.knock.x, m.knock.z, m.knock.length(), dt);

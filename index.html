@@ -121,6 +121,12 @@ body:not(.journey) .journey-only { display: none !important; }
 @keyframes pulse { 50% { opacity: 0.55; } }
 @media (prefers-reduced-motion: reduce) { .bar.low i { animation: none; } }
 .flask { font: 500 11px/1 var(--mono); color: var(--ink-dim); }
+.lvl { display: grid; gap: 3px; font: 500 11px/1 var(--mono); color: var(--accent); }
+.lvl i { display: block; height: 4px; border-radius: 2px; background: rgba(244, 236, 218, 0.15); overflow: hidden; }
+.lvl b { display: block; height: 100%; background: var(--accent); transition: width 0.3s; }
+.hud-bag li small { display: block; font: 500 10.5px/1.3 var(--mono); color: var(--ink-dim); }
+.hud-end .row { justify-content: center; }
+#hudEndNext { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 800; }
 .hud-quest { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(62px + env(safe-area-inset-top, 0px)); width: min(320px, calc(100vw - 220px)); min-width: 180px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 4px; }
 .hud-quest small { font: 500 10px/1.2 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
 .hud-quest strong { font-size: 13.5px; line-height: 1.3; }
@@ -234,16 +240,16 @@ body.walking .orbit-only { display: none !important; }
 <nav id="places" class="places walk-only" hidden aria-label="Lugares">
   <button type="button" data-go="trilha">Trilha de chegada</button>
   <button type="button" data-go="entrada">Entrada entre as raízes</button>
-  <button type="button" data-go="floresta">0 m · Floresta das Raízes</button>
-  <button type="button" data-go="lago">33 m · Lago Suspenso</button>
-  <button type="button" data-go="canion">67 m · Cânion Vermelho</button>
-  <button type="button" data-go="selva">100 m · Selva Tropical</button>
-  <button type="button" data-go="savana">133 m · Savana Dourada</button>
-  <button type="button" data-go="vulcao">167 m · Vale do Vulcão</button>
-  <button type="button" data-go="recife">200 m · Recife de Coral</button>
-  <button type="button" data-go="gelo">233 m · Caverna de Gelo</button>
-  <button type="button" data-go="outono">267 m · Bosque de Outono</button>
-  <button type="button" data-go="prado">300 m · Prado do Céu</button>
+  <button type="button" data-go="raizes">0 m · Floresta das Raízes</button>
+  <button type="button" data-go="deserto">33 m · Deserto da Casca</button>
+  <button type="button" data-go="oceano">67 m · Oceano Interior</button>
+  <button type="button" data-go="fornalha">100 m · Fornalha de Ignar</button>
+  <button type="button" data-go="niveria">133 m · Nivéria</button>
+  <button type="button" data-go="selva">167 m · Selva dos Gigantes</button>
+  <button type="button" data-go="pantano">200 m · Pântano da Decomposição</button>
+  <button type="button" data-go="cristais">233 m · Reino dos Cristais</button>
+  <button type="button" data-go="suspensa">267 m · Floresta Suspensa</button>
+  <button type="button" data-go="copa">300 m · Jardim da Copa</button>
   <button type="button" data-go="rampa">Rampa espiral</button>
   <button type="button" data-go="mirante">Mirante fora do tronco</button>
 </nav>

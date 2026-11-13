@@ -2,6 +2,7 @@
 // legs swing with movement, the body dips for a wind-up, and every material can flash.
 // Every creature faces -z, like the explorer, so the same yaw convention applies.
 import * as THREE from 'three';
+import { REGIONS, gameStats } from './bestiary.js';
 
 const mat = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.75, ...o });
 
@@ -131,32 +132,161 @@ function arthropod({ color, shell, size = 1, legs: nLegs = 6, pincers = false, s
   });
 }
 
-export const CREATURES = {
-  lobo: { name: 'Lobo das raízes', hp: 40, damage: 8, speed: 5.2, range: 1.6, build: () => quadruped({ color: '#6b6258', belly: '#a89c8a' }) },
-  aranha: { name: 'Aranha de raiz', hp: 26, damage: 6, speed: 4.6, range: 1.4, build: () => arthropod({ color: '#2a2420', shell: '#3a2a22', legs: 8, mandibles: true, size: 0.8 }) },
-  besouro: { name: 'Besouro escavador', hp: 60, damage: 10, speed: 3.2, range: 1.6, build: () => arthropod({ color: '#2a3a2a', shell: '#3f6a5a', mandibles: true }) },
-  escorpiao: { name: 'Escorpião da casca', hp: 50, damage: 11, speed: 4.2, range: 1.8, build: () => arthropod({ color: '#7a4a22', shell: '#a8642a', legs: 8, pincers: true, stinger: true, size: 0.9 }) },
-  salamandra: { name: 'Salamandra de Ignar', hp: 45, damage: 12, speed: 4.4, range: 1.6, build: () => quadruped({ color: '#a8301a', belly: '#ff9a3c', size: 0.8, snout: true }) },
-  felino: { name: 'Felino da selva', hp: 55, damage: 13, speed: 6.4, range: 1.8, build: () => quadruped({ color: '#c99a3a', belly: '#e8d3a0', size: 1.15 }) },
-  sanguessuga: { name: 'Larva do pântano', hp: 35, damage: 7, speed: 3, range: 1.3, build: () => arthropod({ color: '#3a4a22', shell: '#5a6a2a', legs: 0, long: 1.6, size: 0.8 }) },
-  cristalino: { name: 'Aranha de cristal', hp: 50, damage: 11, speed: 4.8, range: 1.5, build: () => arthropod({ color: '#5a4a7a', shell: '#c59bff', legs: 8, mandibles: true, size: 0.9 }) },
-  loboBranco: { name: 'Lobo de Nivéria', hp: 60, damage: 12, speed: 5.6, range: 1.7, build: () => quadruped({ color: '#e8eef5', belly: '#ffffff', size: 1.2 }) },
-  serpente: { name: 'Serpente planadora', hp: 40, damage: 10, speed: 5, range: 1.6, build: () => arthropod({ color: '#3f7a3a', shell: '#6aa04a', legs: 0, long: 2, size: 0.6 }) },
-  // bosses
-  devorador: { name: 'Devorador de Raízes', boss: true, hp: 420, damage: 16, speed: 3.6, range: 3.2, build: () => arthropod({ color: '#4a3a28', shell: '#6a4a2a', legs: 6, mandibles: true, size: 3.2, long: 1.4 }) },
-  escorpiaoRei: { name: 'Escorpião-Rei da Casca', boss: true, hp: 520, damage: 14, speed: 4, range: 3.4, build: () => arthropod({ color: '#5a2a12', shell: '#c9702a', legs: 8, pincers: true, stinger: true, size: 3 }) },
+// golems: stacked blocks of ice, stone or dead wood
+function golem({ color, accent, size = 1, glow = null }) {
+  const root = new THREE.Group();
+  const stone = mat(color, { flatShading: true, emissive: '#ffffff', emissiveIntensity: 0 });
+  const trim = mat(accent, { flatShading: true, emissive: glow ?? '#ffffff', emissiveIntensity: glow ? 0.8 : 0 });
+  const body = new THREE.Group();
+  body.position.y = 1.1 * size;
+  root.add(body);
+  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.9 * size, 0.9 * size, 0.6 * size), stone);
+  torso.castShadow = true;
+  const head = new THREE.Mesh(new THREE.BoxGeometry(0.45 * size, 0.4 * size, 0.4 * size), trim);
+  head.position.set(0, 0.62 * size, -0.05 * size);
+  body.add(torso, head);
+  const arms = [-1, 1].map((s) => {
+    const p = new THREE.Group();
+    p.position.set(s * 0.62 * size, 0.3 * size, 0);
+    const a = new THREE.Mesh(new THREE.BoxGeometry(0.3 * size, 0.95 * size, 0.3 * size), stone);
+    a.position.y = -0.45 * size;
+    a.castShadow = true;
+    const fist = new THREE.Mesh(new THREE.BoxGeometry(0.38 * size, 0.32 * size, 0.38 * size), trim);
+    fist.position.y = -0.95 * size;
+    p.add(a, fist);
+    body.add(p);
+    return p;
+  });
+  const legs = [-1, 1].map((s) => legPivot(root, s * 0.25 * size, 0.75 * size, 0, 0.75 * size, 0.16 * size, stone));
+  return rig(root, body, legs, [stone, trim], {
+    radius: 0.7 * size, height: 1.9 * size,
+    extra: { onAnimate(phase, windup) { arms.forEach((a, i) => { a.rotation.x = (i ? 1 : -1) * Math.sin(phase) * 0.4 - windup * 1.6; }); } },
+  });
+}
+
+// ash and fire elementals: a core with orbiting embers
+function elemental({ color, core, size = 1 }) {
+  const root = new THREE.Group();
+  const smoke = mat(color, { transparent: true, opacity: 0.75, emissive: '#ffffff', emissiveIntensity: 0 });
+  const heart = new THREE.MeshBasicMaterial({ color: new THREE.Color(core).multiplyScalar(1.8) });
+  const body = new THREE.Group();
+  body.position.y = 1.1 * size;
+  root.add(body);
+  const puffs = [];
+  for (let k = 0; k < 7; k++) {
+    const p = new THREE.Mesh(new THREE.IcosahedronGeometry((0.35 + (k % 3) * 0.08) * size, 0), smoke);
+    body.add(p);
+    puffs.push(p);
+  }
+  const c = new THREE.Mesh(new THREE.OctahedronGeometry(0.28 * size, 0), heart);
+  body.add(c);
+  return rig(root, body, [], [smoke], {
+    radius: 0.6 * size, height: 1.6 * size,
+    extra: {
+      onAnimate(phase, windup) {
+        puffs.forEach((p, k) => { const a = phase * 0.5 + (k / puffs.length) * Math.PI * 2; const r = (0.45 + windup * 0.3) * size; p.position.set(Math.cos(a) * r, Math.sin(a * 2) * 0.25 * size, Math.sin(a) * r); });
+        c.rotation.y = phase;
+        c.scale.setScalar(1 + windup * 0.6);
+      },
+    },
+  });
+}
+
+// a carnivorous plant that does not walk: thick stem, jaws, feeding roots
+function plant({ size = 1 }) {
+  const root = new THREE.Group();
+  const green = mat('#3f6a2a', { emissive: '#ffffff', emissiveIntensity: 0 });
+  const jaw = mat('#8a2a3a', { emissive: '#ffffff', emissiveIntensity: 0 });
+  const body = new THREE.Group();
+  body.position.y = 0.2;
+  root.add(body);
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.5 * size, 0.9 * size, 3.5 * size, 10), green);
+  stem.position.y = 1.75 * size;
+  stem.castShadow = true;
+  const head = new THREE.Group();
+  head.position.set(0, 3.6 * size, -0.3 * size);
+  const upper = new THREE.Mesh(new THREE.SphereGeometry(1.2 * size, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), jaw);
+  const lower = upper.clone();
+  lower.rotation.x = Math.PI;
+  head.add(upper, lower);
+  body.add(stem, head);
+  for (let k = 0; k < 6; k++) {
+    const leaf = new THREE.Mesh(new THREE.ConeGeometry(0.5 * size, 2.5 * size, 4), green);
+    const a = (k / 6) * Math.PI * 2;
+    leaf.position.set(Math.cos(a) * 1.2 * size, 0.5 * size, Math.sin(a) * 1.2 * size);
+    leaf.rotation.set(Math.sin(a) * 1.1, 0, -Math.cos(a) * 1.1);
+    body.add(leaf);
+  }
+  return rig(root, body, [], [green, jaw], {
+    radius: 1.6 * size, height: 4.5 * size,
+    extra: { onAnimate(phase, windup) { upper.rotation.x = -0.3 - windup * 0.6 - Math.abs(Math.sin(phase)) * 0.2; lower.rotation.x = Math.PI + 0.3 + windup * 0.6; head.rotation.x = windup * 0.5; } },
+  });
+}
+
+// add horns or tusks, and wings, to a quadruped (beast king, winter dragon)
+function decorate(model, { horns = null, wings = null, size = 1 }) {
+  const body = model.root.children[0];
+  if (horns) for (const s of [-1, 1]) {
+    const h = new THREE.Mesh(new THREE.ConeGeometry(0.06 * size, 0.5 * size, 6), mat(horns));
+    h.position.set(s * 0.15 * size, 0.38 * size, -0.62 * size);
+    h.rotation.set(-0.6, 0, s * 0.5);
+    body.add(h);
+  }
+  if (wings) for (const s of [-1, 1]) {
+    const w = new THREE.Mesh(new THREE.PlaneGeometry(1.2 * size, 0.6 * size), mat(wings, { side: THREE.DoubleSide, transparent: true, opacity: 0.85 }));
+    w.position.set(s * 0.65 * size, 0.25 * size, 0);
+    w.rotation.set(-Math.PI / 2, 0, s * 0.35);
+    body.add(w);
+  }
+  return model;
+}
+
+// in-game body for each bestiary model name
+const BODIES = {
+  besouro: () => arthropod({ color: '#2a3a2a', shell: '#3f6a5a', mandibles: true }),
+  aranha: () => arthropod({ color: '#2a2420', shell: '#3a4a2a', legs: 8, mandibles: true, size: 0.8 }),
+  lobo: () => quadruped({ color: '#6b6258', belly: '#a89c8a' }),
+  escorpiao: () => arthropod({ color: '#7a4a22', shell: '#a8642a', legs: 8, pincers: true, stinger: true, size: 0.9 }),
+  lagarto: () => quadruped({ color: '#a8642a', belly: '#e0b070', size: 0.9, tail: true }),
+  salamandra: () => quadruped({ color: '#a8301a', belly: '#ff9a3c', size: 0.9 }),
+  besouroObsidiana: () => arthropod({ color: '#151218', shell: '#2a2238', mandibles: true, size: 1.2 }),
+  elemental: () => elemental({ color: '#4a4440', core: '#ff7a2a' }),
+  loboBranco: () => quadruped({ color: '#e8eef5', belly: '#ffffff', size: 1.2 }),
+  golem: () => golem({ color: '#b9d6ea', accent: '#e8f4ff', size: 1.1 }),
+  felino: () => quadruped({ color: '#4f6a2a', belly: '#c9b870', size: 1.2 }),
+  besouroColossal: () => arthropod({ color: '#2a3a1a', shell: '#5a7a2a', mandibles: true, size: 1.9 }),
+  serpente: () => arthropod({ color: '#3f7a3a', shell: '#6aa04a', legs: 0, long: 2, size: 0.7 }),
+  sanguessuga: () => arthropod({ color: '#3a4a22', shell: '#5a6a2a', legs: 0, long: 1.6, size: 0.8 }),
+  sapo: () => quadruped({ color: '#5a6a2a', belly: '#c9c08a', size: 0.9, snout: false, tail: false }),
+  cristalino: () => arthropod({ color: '#5a4a7a', shell: '#c59bff', legs: 8, mandibles: true, size: 0.9 }),
 };
 
-// which creatures live on each level (the design document's fauna, as far as primitives allow)
-export const FAUNA = {
-  raizes: [['lobo', 4], ['aranha', 4], ['besouro', 2]],
-  deserto: [['escorpiao', 5], ['besouro', 2]],
-  oceano: [],
-  fornalha: [['salamandra', 6]],
-  selva: [['felino', 4], ['serpente', 3]],
-  pantano: [['sanguessuga', 6], ['aranha', 2]],
-  cristais: [['cristalino', 6]],
-  niveria: [['loboBranco', 5]],
-  suspensa: [['serpente', 5]],
-  copa: [],
+const mob = (region, entry) => {
+  const g = gameStats(entry, 'mob');
+  return { name: entry.nome, region, hp: g.hp, damage: g.damage, speed: g.speed, armor: g.armor, xp: g.xp, range: 1.6, build: BODIES[entry.model] };
 };
+const bossOf = (region, entry, kind, build, range = 3.4) => {
+  const g = gameStats(entry, kind);
+  return { name: entry.nome, boss: true, region, hp: g.hp, damage: g.damage, speed: g.speed, armor: g.armor, xp: g.xp, range, build };
+};
+
+export const CREATURES = {};
+for (const r of REGIONS) for (const e of r.mobs) if (e.model) CREATURES[e.id] = mob(r.id, e);
+const R = Object.fromEntries(REGIONS.map((r) => [r.id, r]));
+Object.assign(CREATURES, {
+  // Act I bosses (created before the manual; see README)
+  devorador: { name: 'Devorador de Raízes', boss: true, region: 'raizes', hp: 420, damage: 16, speed: 3.6, armor: 1, xp: 200, range: 3.2, build: () => arthropod({ color: '#4a3a28', shell: '#6a4a2a', legs: 6, mandibles: true, size: 3.2, long: 1.4 }) },
+  escorpiaoRei: { name: 'Escorpião-Rei da Casca', boss: true, region: 'deserto', hp: 520, damage: 14, speed: 4, armor: 1, xp: 260, range: 3.4, build: () => arthropod({ color: '#5a2a12', shell: '#c9702a', legs: 8, pincers: true, stinger: true, size: 3 }) },
+  // Act II: the manual's sub-bosses and bosses of regions 4-6
+  ferreiro: bossOf('fornalha', R.fornalha.subBoss, 'subBoss', () => golem({ color: '#3a3330', accent: '#ff7a2a', glow: '#ff5a10', size: 2.4 })),
+  ignar: bossOf('fornalha', R.fornalha.boss, 'boss', () => elemental({ color: '#7a2a10', core: '#ffcf4a', size: 3.4 }), 4.2),
+  matriarca: bossOf('niveria', R.niveria.subBoss, 'subBoss', () => quadruped({ color: '#f4f8ff', belly: '#ffffff', size: 2.6 })),
+  reiInverno: bossOf('niveria', R.niveria.boss, 'boss', () => decorate(quadruped({ color: '#9fd2ff', belly: '#e8f4ff', size: 3.6 }), { horns: '#e8f4ff', wings: '#b9e3ff', size: 3.6 }), 4.2),
+  devoradorTroncos: bossOf('selva', R.selva.subBoss, 'subBoss', () => plant({ size: 1.4 }), 5),
+  reiFeras: bossOf('selva', R.selva.boss, 'boss', () => decorate(quadruped({ color: '#7a5a3a', belly: '#c9a87a', size: 4 }), { horns: '#efe6d0', size: 4 }), 4.4),
+});
+
+// which creatures live on each level, from the manual (flyers and swimmers not in the game yet)
+const COUNTS = { raizes: 3, deserto: 3, fornalha: 3, niveria: 3, selva: 3, pantano: 2, cristais: 3, suspensa: 4, copa: 2 };
+export const FAUNA = Object.fromEntries(REGIONS.map((r) => [r.id, r.mobs.filter((e) => e.model).map((e) => [e.id, COUNTS[r.id] ?? 0])]));
+FAUNA.oceano = [];

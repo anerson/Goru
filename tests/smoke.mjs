@@ -200,7 +200,8 @@ const act = await page.evaluate(() => {
     const b = O.combat.debug.bosses[id];
     O.combat.debug.wake(id);
     b.state = 'chase';
-    O.combat.debug.hurtMob(b, b.hp * 0.8, b.pos.clone().setX(b.pos.x + 1));
+    b.hp = b.def.hp * 0.3;                         // bring it close to its yield point, then strike
+    O.combat.debug.hurtMob(b, 60, b.pos.clone().setX(b.pos.x + 1));
     const yielded = b.state === 'yield' && !!D.dialogue;
     O.hud.pick(0);                               // continue past the first line
     O.hud.pick(choice);                          // the decision
@@ -222,6 +223,7 @@ const act = await page.evaluate(() => {
   step('Ilian', () => converse('ilian'));
   step('sinais', () => { use('sinal_1'); use('sinal_2'); use('sinal_3'); });
   step('Ilian (fim)', () => converse('ilian'));
+  const act1Stage = G.state.stage;
   // every quest object stands on ground the walker can reach (not floating, not buried)
   // (contamination signs float on the water: they must be within reach of a boardwalk instead)
   const boardwalk = O.paths.oceano.flat();
@@ -231,13 +233,42 @@ const act = await page.evaluate(() => {
     return !(f > i.pos.y - 4 && f < i.pos.y + 1);
   }).map((i) => i.id);
   const ending = document.getElementById('hudEndText').textContent;
+  const act1Done = act1Stage === 'concluido';
   const choicesOk = devorador.yielded && devorador.choice === 'poupar' && ['retreat', 'gone'].includes(devorador.outcome)
     && escorpiao.yielded && escorpiao.choice === 'destruir' && escorpiao.outcome === 'dead'
     && ending.includes('Devorador de Raízes: poupado') && ending.includes('Escorpião-Rei da Casca: destruído');
-  return { log, final: G.state.stage, misplaced, devorador, escorpiao, ending, ok: G.state.stage === 'concluido' && misplaced.length === 0 && choicesOk };
+
+  // ---- Act II (manual regions 4-6): restore every guardian ----
+  const act2 = {};
+  step('Começar o Ato II', () => G.beginAct2());
+  step('Kaela', () => converse('kaela'));
+  step('mineiros', () => useGroup('mineiro', 3));
+  step('rupturas', () => useGroup('ruptura', 3));
+  step('minerais', () => useGroup('mineral', 3));
+  step('instrumento + chaminés (leste, norte, oeste)', () => { use('instrumento'); use('chamine_leste'); use('chamine_norte'); use('chamine_oeste'); });
+  step('fornalhas I, II, III', () => { use('forja_0'); use('forja_1'); use('forja_2'); });
+  step('Ferreiro Vulcânico (restaurar)', () => { act2.ferreiro = yieldThenChoose('ferreiro', 1); });
+  step('Ignar (estabilizar)', () => { act2.ignar = yieldThenChoose('ignar', 1); });
+  step('Sora', () => converse('sora'));
+  step('estação', () => use('estacao'));
+  step('torres', () => useGroup('torre', 3));
+  step('placas + Matriarca (poupar)', () => { useGroup('placa', 3); act2.matriarca = yieldThenChoose('matriarca', 1); });
+  step('Rei do Inverno (recalibrar)', () => { act2.reiInverno = yieldThenChoose('reiInverno', 1); });
+  step('Yara', () => converse('yara'));
+  step('pegadas', () => useGroup('pegada', 3));
+  step('restos', () => use('restos'));
+  step('raízes + Devorador de Troncos (podar)', () => { useGroup('raiz', 3); act2.devoradorTroncos = yieldThenChoose('devoradorTroncos', 1); });
+  step('bloqueios', () => useGroup('bloqueio', 3));
+  step('Rei das Feras (manada)', () => { act2.reiFeras = yieldThenChoose('reiFeras', 1); });
+  step('Yara (fim)', () => converse('yara'));
+  const inv = G.state.inv;
+  const rewards = ['martelo_obsidiana', 'nucleo_incandescente', 'cristal_glacial', 'armadura_geada', 'semente_ancestral', 'presas_ancestrais'].filter((k) => !inv[k]);
+  const ending2 = document.getElementById('hudEndText').textContent;
+  const act2Ok = G.state.stage === 'ato2_concluido' && rewards.length === 0 && Object.values(act2).every((r) => r.yielded) && ending2.includes('Ignar, o Coração Incandescente: restaurado');
+  return { log, act1Done, misplaced, devorador, escorpiao, ending, act2, missingRewards: rewards, ending2, level: G.state.level, ok: act1Done && misplaced.length === 0 && choicesOk && act2Ok };
 });
 
-for (const place of ['raizes', 'deserto', 'oceano', 'fornalha', 'pantano', 'cristais']) {
+for (const place of ['raizes', 'fornalha', 'niveria', 'selva']) {
   await page.evaluate((p) => window.__oliveira.goTo(p), place);
   await page.waitForTimeout(3000);
   await page.screenshot({ path: `tests/smoke-${place}.png`, timeout: 240000 });

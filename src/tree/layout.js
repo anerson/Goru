@@ -47,14 +47,15 @@ export const DISK_R = RAMP.rin;   // 66 m: biome floors stop where the ramp begi
 export const SLAB = 6;            // m: thickness of each floor (27 m of headroom per level)
 const B = (id, name, k, color, light) => ({ id, name, level: +(k * LEVEL_STEP).toFixed(3), color, light });
 export const BIOMES = [
+  // order and names from the Aetherion campaign manual (section 5, regional progression)
   B('raizes', 'Floresta das Raízes', 0, '#a6e07e', '#ffd9a0'),
   B('deserto', 'Deserto da Casca', 1, '#ffb070', '#ffc58a'),
   B('oceano', 'Oceano Interior', 2, '#6fd6e3', '#c4f1ff'),
   B('fornalha', 'Fornalha de Ignar', 3, '#ff5a36', '#ff8a5c'),
-  B('selva', 'Selva dos Gigantes', 4, '#4fd18b', '#d9ffb8'),
-  B('pantano', 'Pântano da Decomposição', 5, '#9bbf4a', '#cfe08a'),
-  B('cristais', 'Reino dos Cristais', 6, '#c59bff', '#d8c4ff'),
-  B('niveria', 'Nivéria', 7, '#9fd2ff', '#d6e9ff'),
+  B('niveria', 'Nivéria, o Reino Congelado', 4, '#9fd2ff', '#d6e9ff'),
+  B('selva', 'Selva dos Gigantes', 5, '#4fd18b', '#d9ffb8'),
+  B('pantano', 'Pântano da Decomposição', 6, '#9bbf4a', '#cfe08a'),
+  B('cristais', 'Reino dos Cristais', 7, '#c59bff', '#d8c4ff'),
   B('suspensa', 'Floresta Suspensa', 8, '#7fe08a', '#e8ffd0'),
   B('copa', 'Jardim da Copa', 9, '#ffd76a', null), // open to the sky
 ];

@@ -1,3 +1,6 @@
+import { ITEMS2, RESOURCES2, STAGES2, DIALOGUES2, dialogueFor2, SPEAKERS2, STRINGS2, INSPECT2, REWARDS2 } from './data_act2.js';
+export { REWARDS2 };
+
 // Act I of the Aetherion campaign as data: items, needs, quest stages, dialogue graphs and
 // the pt-BR string table. Pure JavaScript (no three.js), so tests can load and validate it.
 //
@@ -28,6 +31,7 @@ export const ITEMS = {
   alga: { name: 'Alga medicinal', use: { hunger: 12, health: 10 }, verb: 'Comer' },
   chave: { name: 'Chave de âmbar', use: null },
   nucleo: { name: 'Núcleo de Seiva I', use: null },
+  ...ITEMS2,
 };
 export const FLASK = { capacity: 3, sip: 35 }; // cantil: 3 goles, cada um +35 de sede
 
@@ -37,6 +41,7 @@ export const RESOURCES = [
   { biome: 'raizes', item: 'erva', count: 6, respawn: 180 },
   { biome: 'deserto', item: 'resina', count: 8, respawn: 150 },
   { biome: 'oceano', item: 'alga', count: 6, respawn: 150 },
+  ...RESOURCES2,
 ];
 
 // ---- quest stages, in order. `target` names an interactable (see game.js) the HUD points at.
@@ -58,7 +63,8 @@ export const STAGES = [
   { id: 'oceano', text: 'Suba ao Oceano Interior e fale com a pescadora Ilian', target: 'ilian' },
   { id: 'sinais', text: 'Investigue 3 sinais de contaminação no Oceano Interior', target: 'sinal', need: { sinal: 3 } },
   { id: 'fim', text: 'Fale com Ilian sobre o que você encontrou', target: 'ilian' },
-  { id: 'concluido', text: 'Ato I concluído', target: null },
+  { id: 'concluido', text: 'Ato I concluído — comece o Ato II', target: null },
+  ...STAGES2,
 ];
 export const stageIndex = (id) => STAGES.findIndex((s) => s.id === id);
 
@@ -180,6 +186,7 @@ export const DIALOGUES = {
       fim: { end: true },
     },
   },
+  ...DIALOGUES2,
 };
 
 // Which conversation an NPC starts, given the current stage.
@@ -205,10 +212,10 @@ export function dialogueFor(npc, stage) {
     if (at('fim')) return 'ilian_fim';
     return 'ilian_geral';
   }
-  return null;
+  return dialogueFor2(npc, stage, at);
 }
 
-export const SPEAKERS = { maela: 'Anciã Maela', brin: 'Brin, o coletor', tarek: 'Tarek da caravana', ilian: 'Ilian, a pescadora', narrador: '' };
+export const SPEAKERS = { maela: 'Anciã Maela', brin: 'Brin, o coletor', tarek: 'Tarek da caravana', ilian: 'Ilian, a pescadora', narrador: '', ...SPEAKERS2 };
 
 export const STRINGS = {
   MAELA_01: 'Viajante… você chega num tempo ruim. Há três luas o riacho das raízes vem secando, e os cervos já desceram para fora do tronco.',
@@ -265,6 +272,7 @@ export const STRINGS = {
   ESCOLHAS: 'Suas escolhas:',
   FIM_ATO: 'Fim do Ato I — Descoberta e sobrevivência. O primeiro núcleo foi recuperado e a água voltou às raízes, mas o Oceano Interior está contaminado. A origem está acima.',
   ILIAN_GERAL: 'O Oceano dá peixe e água para três andares. Se ele adoecer, a árvore inteira sente.',
+  ...STRINGS2,
 };
 
 // Inspections and interactions that are not conversations.
@@ -283,6 +291,7 @@ export const INSPECT = {
   sinal_1: 'Uma mancha escura cobre a água. Cheira a folha podre.',
   sinal_2: 'Peixes mortos boiam junto às algas.',
   sinal_3: 'Um lodo grosso desce por um canal que vem de cima do Oceano.',
+  ...INSPECT2,
 };
 
 // Validation (dialogue-systems skill): every target exists, every node has an exit, every
@@ -316,7 +325,7 @@ export function validateDialogues() {
   // every stage that a conversation must advance has a conversation that does
   for (const st of STAGES) {
     if (st.need || st.id === 'concluido' || !st.target) continue;
-    const npc = ['maela', 'tarek', 'ilian'].includes(st.target) ? st.target : null;
+    const npc = ['maela', 'tarek', 'ilian', 'kaela', 'sora', 'yara'].includes(st.target) ? st.target : null;
     if (npc) {
       const dlg = DIALOGUES[dialogueFor(npc, st.id)];
       const advances = Object.values(dlg.nodes).some((n) => n.do?.advance || n.choices?.some((c) => c.do?.advance));
