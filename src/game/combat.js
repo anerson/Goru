@@ -549,9 +549,10 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
       m.model.root.position.copy(m.pos);
       m.model.root.rotation.y = m.yaw;
       m.model.animate(sim, speed, windup);
-      if (m.boss && m.state !== 'lurk' && m.state !== 'return') fighting = m;
+      if (m.boss && !m.ally && !m.yielded && m.state !== 'lurk' && m.state !== 'return') fighting = m;
     }
     if (fighting) hud.boss(fighting.def.name, Math.max(0, fighting.hp) / fighting.def.hp);
+    else if (!game.busy) hud.boss(null);
 
     ringFxT -= dt;
     if (ringFxT > 0) { const k = 1 - ringFxT / 0.6; ringFx.scale.setScalar(Math.max(0.01, ringFxR * k)); ringFx.material.opacity = 0.8 * (1 - k); }
