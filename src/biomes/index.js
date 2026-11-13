@@ -1,38 +1,44 @@
-// The five ecosystems stacked inside the trunk, bottom to top:
-//   0 m   Floresta das Raízes  glowing mushrooms, ferns, small trees, fireflies
-//   75 m  Lago Suspenso        lakes crossed by boardwalks, reeds, lily pads, willows, mist
-//   150 m Cânion Vermelho      dunes, red mesas, cacti, a stone arch, blowing dust
-//   225 m Caverna de Gelo      snow, frosted pines, ice crystals, a frozen pond, snowfall
-//   300 m Prado do Céu         flower meadow under the open sky, exits to the lookouts
+// The ten ecosystems stacked inside the trunk, one every 33.3 m, bottom to top:
+//   Floresta das Raízes  glowing mushrooms, ferns, small trees, fireflies
+//   Lago Suspenso        lakes crossed by boardwalks, reeds, lily pads, willows, mist
+//   Cânion Vermelho      dunes, red mesas, cacti, a stone arch, blowing dust
+//   Selva Tropical       palms, giant leaves, hanging vines, a stepped temple
+//   Savana Dourada       tall gold grass, flat-topped acacias, termite mounds, a baobab
+//   Vale do Vulcão       black rock, rivers of lava (no-go), basalt columns, rising embers
+//   Recife de Coral      coral gardens, sea fans, kelp, a giant clam, rising bubbles
+//   Caverna de Gelo      snow, frosted pines, ice crystals, a frozen pond, snowfall
+//   Bosque de Outono     red and gold trees, leaf litter, falling leaves, a great maple
+//   Prado do Céu         flower meadow under the open sky, exits to the lookouts
 // Each one is a terrain disk you can walk anywhere on, with marked trails from every entry
 // (ramp junction, level bridges, trunk entrances) to a landmark in the middle.
 import * as THREE from 'three';
 import { mulberry32 } from '../noise.js';
-import { SEED, BIOMES, ENTRANCES, rampStart, DISK_R } from '../tree/layout.js';
+import { SEED, BIOMES, ENTRANCES, DISK_R, SLAB, LEVEL_STEP, junctionAngle } from '../tree/layout.js';
 import { V, polar, instances, label } from '../geom.js';
-import { makeTerrain, makeTrails, scatter, ceiling, noise2, entryAngles } from './common.js';
+import { makeTerrain, makeTrails, scatter, ceiling, noise2, entryAngles, drift, fernGeometry, lerpColor, std } from './common.js';
+import { jungle, savanna, volcano, reef, autumn } from './more.js';
 
-const lerpColor = (c, a, b, t) => c.set(a).lerp(new THREE.Color(b), Math.min(1, Math.max(0, t)));
-const std = (o) => new THREE.MeshStandardMaterial({ roughness: 0.9, ...o });
 
 export function buildBiomes(scene, mats) {
   const walkables = [];
   const updates = [];
   const noGo = [];
+  const paths = {};
   let trailLength = 0;
-  const builders = [forest, lake, canyon, ice, meadow];
+  const builders = { floresta: forest, lago: lake, canion: canyon, selva: jungle, savana: savanna, vulcao: volcano, recife: reef, gelo: ice, outono: autumn, prado: meadow };
   BIOMES.forEach((b, i) => {
     const rand = mulberry32(SEED + 100 + i);
-    const out = builders[i]({ scene, mats, rand, b });
+    const out = builders[b.id]({ scene, mats, rand, b });
     walkables.push(...out.walkables);
     if (out.update) updates.push(out.update);
     if (out.noGo) noGo.push(out.noGo);
     trailLength += out.trailLength;
+    paths[b.id] = out.trails.lines.map((l) => l.map((p) => ({ x: p.x, z: p.z })));
     out.trails.meshes.forEach((m) => scene.add(m));
     if (i < BIOMES.length - 1) ceiling(scene, { rand, top: BIOMES[i + 1].level, below: b, mats });
-    scene.add(label(b.name, b.color, polar(DISK_R - 8, rampStart, b.level + 7), 24));
+    scene.add(label(b.name, b.color, polar(DISK_R - 8, junctionAngle(b.level), b.level + 6), 22));
   });
-  return { walkables, trailLength, noGo, update: (dt, t) => updates.forEach((u) => u(dt, t)) };
+  return { walkables, trailLength, noGo, paths, update: (dt, t) => updates.forEach((u) => u(dt, t)) };
 }
 
 // ---------------------------------------------------------------------------
@@ -45,7 +51,7 @@ function forest({ scene, mats, rand, b }) {
     material: mats.terrain,
   });
   scene.add(terrain.mesh);
-  const trails = makeTrails({ rand, h: terrain.h, entries: [rampStart], entryR: 62, loopR: 42, material: mats.trailDirt });
+  const trails = makeTrails({ rand, h: terrain.h, entries: [junctionAngle(0)], entryR: 62, loopR: 42, material: mats.trailDirt });
   // spokes to every trunk entrance as well
   const more = makeTrails({ rand, h: terrain.h, entries: ENTRANCES, entryR: 98, loopR: 30, material: mats.trailDirt, withPlaza: false });
   trails.meshes.push(...more.meshes);
@@ -57,11 +63,11 @@ function forest({ scene, mats, rand, b }) {
 
   const trees = scatter(rand, 42, 15, 96, (x, z) => free(x, z, 6));
   scene.add(instances(new THREE.CylinderGeometry(0.35, 0.6, 1, 8).translate(0, 0.5, 0), mats.barkStatic,
-    trees.map(([x, z]) => ({ p: V(x, terrain.h(x, z), z), s: V(1.2, 9 + rand() * 7, 1.2) }))));
+    trees.map(([x, z]) => ({ p: V(x, terrain.h(x, z), z), s: V(1.2, 6 + rand() * 4, 1.2) }))));
   const crowns = [];
   trees.forEach(([x, z]) => {
-    const top = terrain.h(x, z) + 9;
-    for (let k = 0; k < 4; k++) crowns.push({ p: V(x + (rand() - 0.5) * 5, top + rand() * 6, z + (rand() - 0.5) * 5), s: 3 + rand() * 2.5, color: ['#3f6b2a', '#4f7d30', '#2f5a24'][k % 3] });
+    const top = terrain.h(x, z) + 7;
+    for (let k = 0; k < 4; k++) crowns.push({ p: V(x + (rand() - 0.5) * 5, top + rand() * 4, z + (rand() - 0.5) * 5), s: 3 + rand() * 2.5, color: ['#3f6b2a', '#4f7d30', '#2f5a24'][k % 3] });
   });
   scene.add(instances(new THREE.IcosahedronGeometry(1, 1), std({ flatShading: true, roughness: 0.8 }), crowns));
 
@@ -79,8 +85,8 @@ function forest({ scene, mats, rand, b }) {
     caps.push({ p: V(x, y + h, z), s: V(cap, cap * 0.55, cap), color: new THREE.Color(capColors[(rand() * 4) | 0]).multiplyScalar(1.6) });
   });
   // the landmark: one giant mushroom in the middle
-  stems.push({ p: V(0, terrain.h(0, 0), 0), s: V(1.6, 15, 1.6), color: '#efe6d0' });
-  caps.push({ p: V(0, terrain.h(0, 0) + 15, 0), s: V(11, 5, 11), color: new THREE.Color('#4ff0ff').multiplyScalar(1.3) });
+  stems.push({ p: V(0, terrain.h(0, 0), 0), s: V(1.6, 13, 1.6), color: '#efe6d0' });
+  caps.push({ p: V(0, terrain.h(0, 0) + 13, 0), s: V(11, 5, 11), color: new THREE.Color('#4ff0ff').multiplyScalar(1.3) });
   scene.add(instances(new THREE.CylinderGeometry(1, 1.2, 1, 10).translate(0, 0.5, 0), std({ roughness: 0.6 }), stems));
   scene.add(instances(new THREE.SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffffff' }), caps));
   const glow = new THREE.PointLight('#7ff6ff', 1800, 0, 2);
@@ -189,7 +195,7 @@ function canyon({ scene, mats, rand, b }) {
   const rock = std({ flatShading: true, roughness: 0.95 });
   const mesas = [];
   scatter(rand, 26, 18, 60, (x, z) => free(x, z, 9)).forEach(([x, z]) => {
-    const r = 3 + rand() * 6, h = 6 + Math.pow(rand(), 1.5) * 20, y = terrain.h(x, z) - 0.5;
+    const r = 3 + rand() * 6, h = 5 + Math.pow(rand(), 1.5) * 12, y = terrain.h(x, z) - 0.5;
     const tone = ['#9e4a2a', '#b85a32', '#c97a45'][(rand() * 3) | 0];
     mesas.push({ p: V(x, y, z), s: V(r, h, r), rot: [0, rand() * 6, 0], color: tone });
     if (rand() < 0.6) mesas.push({ p: V(x, y + h, z), s: V(r * 0.7, h * 0.35, r * 0.7), rot: [0, rand() * 6, 0], color: '#d08a50' });
@@ -220,11 +226,11 @@ function canyon({ scene, mats, rand, b }) {
   // landmark: a stone arch over the middle
   const arch = new THREE.Mesh(new THREE.TorusGeometry(11, 2, 12, 48, Math.PI), std({ color: '#b5552e', flatShading: true }));
   arch.position.set(0, terrain.h(0, 0) - 1, 0);
-  arch.rotation.y = rampStart;
+  arch.rotation.y = junctionAngle(L);
   arch.castShadow = arch.receiveShadow = true;
   scene.add(arch);
 
-  const dust = drift(scene, rand, { count: 500, rMax: 62, y0: L, y1: L + 25, color: '#ffc89a', size: 0.18, speed: 2.5, opacity: 0.5 });
+  const dust = drift(scene, rand, { count: 500, rMax: 62, y0: L, y1: L + 20, color: '#ffc89a', size: 0.18, speed: 2.5, opacity: 0.5 });
   return { walkables: [terrain.mesh], trails, trailLength: trails.length, update: (dt, t) => dust(dt, t, 1) };
 }
 
@@ -269,10 +275,10 @@ function ice({ scene, mats, rand, b }) {
     p: V(x, terrain.h(x, z), z), s: V(0.6 + rand(), 2 + rand() * 6, 0.6 + rand()), rot: [(rand() - 0.5) * 0.7, rand() * 6, (rand() - 0.5) * 0.7],
   }));
   // landmark: a cluster of huge crystals at the edge of the pond
-  for (let k = 0; k < 9; k++) crystals.push({ p: polar(14 + rand() * 2, (k / 9) * Math.PI * 2, L), s: V(2 + rand() * 1.5, 10 + rand() * 12, 2 + rand() * 1.5), rot: [(rand() - 0.5) * 0.5, rand() * 6, (rand() - 0.5) * 0.5] });
+  for (let k = 0; k < 9; k++) crystals.push({ p: polar(14 + rand() * 2, (k / 9) * Math.PI * 2, L), s: V(2 + rand() * 1.5, 7 + rand() * 7, 2 + rand() * 1.5), rot: [(rand() - 0.5) * 0.5, rand() * 6, (rand() - 0.5) * 0.5] });
   scene.add(instances(new THREE.OctahedronGeometry(1, 0), crystalMat, crystals));
 
-  const snowfall = drift(scene, rand, { count: 1600, rMax: 64, y0: L, y1: L + 62, color: '#ffffff', size: 0.16, speed: 0, fall: 2.2, opacity: 0.9 });
+  const snowfall = drift(scene, rand, { count: 1600, rMax: 64, y0: L, y1: L + LEVEL_STEP - SLAB, color: '#ffffff', size: 0.16, speed: 0, fall: 2.2, opacity: 0.9 });
   return { walkables: [terrain.mesh], trails, trailLength: trails.length, update: (dt, t) => snowfall(dt, t, 1) };
 }
 
@@ -307,48 +313,4 @@ function meadow({ scene, mats, rand, b }) {
   scene.add(instances(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), std({ flatShading: true }), stones));
 
   return { walkables: [terrain.mesh], trails, trailLength: trails.length };
-}
-
-// ---------------------------------------------------------------------------
-function fernGeometry() {
-  const pos = [];
-  for (let k = 0; k < 7; k++) {
-    const a = (k / 7) * Math.PI * 2, c = Math.cos(a), s = Math.sin(a);
-    const tip = [c * 1.1, 0.55, s * 1.1], mid = [c * 0.55, 0.55, s * 0.55];
-    const w = 0.18, nx = -s * w, nz = c * w;
-    pos.push(0, 0.05, 0, mid[0] + nx, mid[1], mid[2] + nz, ...tip);
-    pos.push(0, 0.05, 0, ...tip, mid[0] - nx, mid[1], mid[2] - nz);
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.computeVertexNormals();
-  return g;
-}
-
-// Floating particles in a cylinder: fireflies, mist, dust or (with `fall`) snow.
-function drift(scene, rand, { count, rMax, y0, y1, color, size, speed, fall = 0, opacity = 0.85 }) {
-  const geo = new THREE.BufferGeometry();
-  const arr = new Float32Array(count * 3), base = [];
-  for (let i = 0; i < count; i++) {
-    const a = rand() * Math.PI * 2, r = Math.sqrt(rand()) * rMax;
-    base.push([Math.cos(a) * r, y0 + rand() * (y1 - y0), Math.sin(a) * r, rand() * 10]);
-  }
-  geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
-  const mat = new THREE.PointsMaterial({ color, size, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false });
-  const pts = new THREE.Points(geo, mat);
-  pts.frustumCulled = false;
-  scene.add(pts);
-  const span = y1 - y0;
-  return (dt, t, pulse) => {
-    for (let i = 0; i < count; i++) {
-      const b = base[i];
-      let y = b[1];
-      if (fall) { y = y0 + ((((b[1] - y0) - t * fall * (0.7 + (b[3] % 1) * 0.6)) % span) + span) % span; }
-      arr[i * 3] = b[0] + Math.sin(t * 0.3 * (speed + 0.2) + b[3]) * (1 + speed * 2);
-      arr[i * 3 + 1] = y + (fall ? 0 : Math.sin(t * 0.25 + b[3] * 2) * 1.2);
-      arr[i * 3 + 2] = b[2] + Math.cos(t * 0.27 * (speed + 0.2) + b[3]) * (1 + speed * 2);
-    }
-    geo.attributes.position.needsUpdate = true;
-    mat.opacity = opacity * pulse;
-  };
 }

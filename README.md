@@ -1,21 +1,27 @@
 # Goru · Oliveira Colossal
 
-Uma oliveira de ~900 m em three.js, para explorar a pé ou voando. Nove troncos torcidos formam
-um tronco oco de 180 m de largura, e dentro dele há um mundo inteiro: cinco ecossistemas
-empilhados, cada um com o próprio sol pendurado no teto (o fundo do andar de cima).
+Uma oliveira de ~900 m em three.js, para explorar em terceira pessoa, a pé ou voando. Nove
+troncos torcidos formam um tronco oco de 180 m de largura, e dentro dele há um mundo inteiro:
+dez ecossistemas empilhados, um a cada 33 m, cada um com o próprio sol pendurado no teto (o
+fundo do andar de cima, coberto de raízes e musgo que brilha).
 
 | Altura | Ecossistema | O que tem |
 |--------|-------------|-----------|
 | 0 m | Floresta das Raízes | cogumelos que brilham, samambaias, árvores pequenas, vaga-lumes |
-| 75 m | Lago Suspenso | lagos com passarelas de madeira, juncos, vitórias-régias, salgueiros, névoa |
-| 150 m | Cânion Vermelho | dunas, mesas de rocha, cactos, marcos de pedra, um arco, poeira |
-| 225 m | Caverna de Gelo | neve caindo, pinheiros nevados, cristais, lago congelado |
+| 33 m | Lago Suspenso | lagos com passarelas de madeira, juncos, vitórias-régias, salgueiros, névoa |
+| 67 m | Cânion Vermelho | dunas, mesas de rocha, cactos, marcos de pedra, um arco, poeira |
+| 100 m | Selva Tropical | palmeiras, folhas gigantes, cipós pendurados, templo de degraus |
+| 133 m | Savana Dourada | capim alto, acácias, cupinzeiros, um baobá |
+| 167 m | Vale do Vulcão | rocha negra, rios de lava (não dá para pisar), colunas de basalto, brasas subindo |
+| 200 m | Recife de Coral | corais, leques-do-mar, algas, anêmonas que brilham, uma concha gigante com pérola |
+| 233 m | Caverna de Gelo | neve caindo, pinheiros nevados, cristais, lago congelado |
+| 267 m | Bosque de Outono | árvores vermelhas e douradas, folhas caindo, um bordo gigante |
 | 300 m | Prado do Céu | flores, oliveiras jovens, círculo de pedras, aberto para o céu |
 
-Caminhos (~13 km):
+Caminhos:
 
 - 9 entradas entre as raízes, ligadas por trilhas a um anel em volta da árvore e a uma trilha de chegada;
-- uma rampa espiral de 4 voltas pela parede interna, que chega a cada andar no mesmo ponto;
+- uma rampa espiral de 4 voltas pela parede interna que passa por todos os andares;
 - em cada andar: uma galeria circular, 3 pontes curtas até o ecossistema, trilhas de cada
   entrada até o marco central e uma trilha em anel;
 - 3 pontes do topo que saem pelas frestas do tronco até mirantes do lado de fora.
@@ -33,7 +39,8 @@ Não há etapa de build. O three.js `0.186.1` vem da jsDelivr por import map (`i
 | Ação | Computador | Celular |
 |------|------------|---------|
 | Andar | W A S D ou setas | controle redondo no canto |
-| Olhar | arrastar o mouse (ou clicar para travar o cursor) | arrastar a tela |
+| Girar a câmera | arrastar o mouse (ou clicar para travar o cursor) | arrastar a tela |
+| Aproximar a câmera | roda do mouse | — |
 | Correr | Shift | empurrar o controle até a borda |
 | Voar | F (Espaço sobe, C desce) | botão Voar e setas ▲▼ |
 | Pular para um lugar | menu Lugares | igual |
@@ -50,12 +57,14 @@ src/tree/layout.js    a planta: troncos, rampa, galerias, pontes, trilhas e o gr
 src/tree/trunk.js     troncos torcidos, galhos principais e raízes (tubos com ruído)
 src/tree/canopy.js    galhos recursivos, ~70 mil raminhos de folhas e azeitonas (InstancedMesh)
 src/walkways.js       rampa, galerias, pontes de cada andar, mirantes, trilhas de fora
-src/biomes/index.js   os cinco ecossistemas
+src/biomes/index.js   floresta, lago, cânion, gelo, prado
+src/biomes/more.js    selva, savana, vulcão, recife, outono
 src/biomes/common.js  terreno, trilhas, teto de cada andar (raízes, musgo, sol)
 src/geom.js           faixas, placas e instâncias usadas em todo lugar
 src/landscape.js      chão, grama, oliveiras normais e pessoas para dar escala
 src/particles.js      folhas caindo da copa
-src/player.js         primeira pessoa e voo: colisão com troncos, raízes, pisos e água; piso por raycast
+src/player.js         movimento, voo e câmera em 3ª pessoa (braço de mola); colisão com troncos, raízes, pisos, água e lava
+src/character.js      o explorador: modelo e animação de andar, correr e voar
 src/input.js          teclado, mouse, pointer lock e joystick na tela
 tests/smoke.mjs       teste: grafo de rotas, render sem erro e percurso de cada tipo de caminho
 ```
@@ -73,8 +82,9 @@ node tests/smoke.mjs http://localhost:5173
 
 O teste falha se a página registrar erro, se algum lugar do grafo de rotas virar beco sem saída,
 ou se o jogador não conseguir: entrar pelo vão das raízes, subir a rampa inteira, chegar ao
-centro de cada ecossistema pela ponte do andar, atravessar a ponte do topo até o mirante.
-Também confere que a água do lago bloqueia e que voando não se atravessa o piso entre andares. Os passos são simulados direto no código, então o
+centro de cada um dos dez ecossistemas seguindo a trilha da ponte, atravessar a ponte do topo
+até o mirante. Também confere que a água bloqueia, que voando não se atravessa o piso entre
+andares e que a câmera em terceira pessoa não entra na madeira do tronco. Os passos são simulados direto no código, então o
 resultado não depende da velocidade da máquina.
 
 ## Skills usadas

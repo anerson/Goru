@@ -6,8 +6,8 @@
 import * as THREE from 'three';
 import { mulberry32 } from './noise.js';
 import {
-  SEED, TAU, TRUNK, RAMP, GALLERY, TOP_BRIDGES, LOOKOUT, LEVEL_COLORS, LEVEL_BRIDGES, DISK_R,
-  ENTRANCES, LOOP_R, APPROACH, ringR, strandR, strandTheta, rampAt, rampStart,
+  SEED, TAU, TRUNK, RAMP, GALLERY, TOP_BRIDGES, LOOKOUT, LEVEL_COLORS, DISK_R, junctionAngle, levelBridges,
+  ENTRANCES, LOOP_R, APPROACH, ringR, strandR, strandTheta, rampAt,
 } from './tree/layout.js';
 import { V, angDist, polar, ribbon, offsetLine, label } from './geom.js';
 
@@ -59,7 +59,7 @@ export function buildWalkways(scene, mats) {
   };
   const atJunction = (p) => {
     const a = Math.atan2(p.z, p.x);
-    return angDist(a, rampStart) < 0.11 && GALLERY.levels.some((L) => Math.abs(p.y - L) < 2);
+    return GALLERY.levels.some((L) => Math.abs(p.y - L) < 2 && angDist(a, junctionAngle(L)) < 0.11);
   };
 
   // ---- spiral ramp -------------------------------------------------------
@@ -107,10 +107,10 @@ export function buildWalkways(scene, mats) {
   const gMid = (GALLERY.rin + GALLERY.rout) / 2;
   for (const level of GALLERY.levels) {
     floor(ribbon(circle(gMid, level, GN), GALLERY.rout - GALLERY.rin, true), mats.planks, `gallery-${level}`);
-    const mouths = LEVEL_BRIDGES;
-    const outerMouths = level === GALLERY.levels[3] ? TOP_BRIDGES : [];
+    const mouths = levelBridges(level), junction = junctionAngle(level);
+    const outerMouths = level === RAMP.top ? TOP_BRIDGES : [];
     const inner = circle(GALLERY.rin + 0.15, level, GN), outer = circle(GALLERY.rout - 0.15, level, GN);
-    const innerOpen = (p) => { const a = Math.atan2(p.z, p.x); return angDist(a, rampStart) < 0.11 || mouths.some((m) => angDist(a, m) < 0.03); };
+    const innerOpen = (p) => { const a = Math.atan2(p.z, p.x); return angDist(a, junction) < 0.11 || mouths.some((m) => angDist(a, m) < 0.03); };
     const outerOpen = (p) => { const a = Math.atan2(p.z, p.x); return outerMouths.some((m) => angDist(a, m) < 0.025); };
     postsAlong(inner.concat([inner[0]]), 4, innerOpen);
     postsAlong(outer.concat([outer[0]]), 4, outerOpen);
@@ -125,7 +125,7 @@ export function buildWalkways(scene, mats) {
     }
 
     // short bridges across the ramp gap onto the ecosystem, and a rail round the floor's edge
-    for (const ang of LEVEL_BRIDGES) {
+    for (const ang of mouths) {
       const line = Array.from({ length: 9 }, (_, i) => polar(DISK_R - 1 + (i / 8) * (GALLERY.rin - DISK_R + 1.4), ang, level));
       floor(ribbon(line, 3.2), mats.planks, 'level-bridge');
       for (const s of [-1, 1]) {
@@ -135,13 +135,13 @@ export function buildWalkways(scene, mats) {
       }
     }
     const edge = circle(DISK_R - 0.2, level, 360);
-    const edgeOpen = (p) => { const a = Math.atan2(p.z, p.x); return angDist(a, rampStart) < 0.11 || LEVEL_BRIDGES.some((m) => angDist(a, m) < 0.035); };
+    const edgeOpen = (p) => { const a = Math.atan2(p.z, p.x); return angDist(a, junction) < 0.11 || mouths.some((m) => angDist(a, m) < 0.035); };
     postsAlong(edge.concat([edge[0]]), 4, edgeOpen);
     for (const run of runs(edge.concat([edge[0]]), (p) => !edgeOpen(p))) rail(run);
   }
 
   // ---- top bridges and lookouts --------------------------------------------
-  const top = GALLERY.levels[3];
+  const top = RAMP.top;
   const lookoutCentres = [];
   for (const ang of TOP_BRIDGES) {
     const from = polar(GALLERY.rout - 0.2, ang, top), to = polar(LOOKOUT.centre - LOOKOUT.radius + 0.5, ang, top);

@@ -97,6 +97,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   margin-left: max(16px, env(safe-area-inset-left, 0px)); margin-right: max(16px, env(safe-area-inset-right, 0px));
   width: min(300px, calc(100vw - 32px)); box-sizing: border-box;
   display: grid; gap: 4px; padding: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+  max-height: calc(100vh - 140px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); overflow-y: auto;
 }
 .places button { text-align: left; border-color: transparent; padding: 10px 10px; }
 .places button:hover { border-color: var(--accent); }
@@ -132,7 +133,7 @@ body.walking .orbit-only { display: none !important; }
     <button id="bWind" type="button" aria-pressed="true">Vento</button>
     <button id="bQuality" type="button">Qualidade</button>
   </div>
-  <p class="note">Dentro do tronco há cinco ecossistemas empilhados, cada um com seu próprio sol: floresta de cogumelos, lago com passarelas, cânion vermelho, caverna de gelo e um prado aberto para o céu. Uma rampa em espiral liga todos; cada andar tem suas trilhas. As pessoas na base têm 1,8 m.</p>
+  <p class="note">Dentro do tronco há dez ecossistemas empilhados, um a cada 33 m, cada um com seu próprio sol: floresta, lago, cânion, selva, savana, vulcão, recife, gelo, outono e um prado aberto para o céu. Uma rampa em espiral liga todos; cada andar tem suas trilhas.</p>
 </div>
 
 <div class="walkbar walk-only">
@@ -145,9 +146,14 @@ body.walking .orbit-only { display: none !important; }
   <button type="button" data-go="trilha">Trilha de chegada</button>
   <button type="button" data-go="entrada">Entrada entre as raízes</button>
   <button type="button" data-go="floresta">0 m · Floresta das Raízes</button>
-  <button type="button" data-go="lago">75 m · Lago Suspenso</button>
-  <button type="button" data-go="canion">150 m · Cânion Vermelho</button>
-  <button type="button" data-go="gelo">225 m · Caverna de Gelo</button>
+  <button type="button" data-go="lago">33 m · Lago Suspenso</button>
+  <button type="button" data-go="canion">67 m · Cânion Vermelho</button>
+  <button type="button" data-go="selva">100 m · Selva Tropical</button>
+  <button type="button" data-go="savana">133 m · Savana Dourada</button>
+  <button type="button" data-go="vulcao">167 m · Vale do Vulcão</button>
+  <button type="button" data-go="recife">200 m · Recife de Coral</button>
+  <button type="button" data-go="gelo">233 m · Caverna de Gelo</button>
+  <button type="button" data-go="outono">267 m · Bosque de Outono</button>
   <button type="button" data-go="prado">300 m · Prado do Céu</button>
   <button type="button" data-go="rampa">Rampa espiral</button>
   <button type="button" data-go="mirante">Mirante fora do tronco</button>
@@ -157,7 +163,7 @@ body.walking .orbit-only { display: none !important; }
   <button id="bDown" type="button" aria-label="Descer">▼</button>
 </div>
 <div id="place" class="place walk-only">Trilha</div>
-<div class="hint walk-only">W A S D andar · mouse olhar · Shift correr · F voar (Espaço sobe, C desce)</div>
+<div class="hint walk-only">W A S D andar · mouse gira a câmera · roda aproxima · Shift correr · F voar (Espaço sobe, C desce)</div>
 <div id="joy" class="joy walk-only" aria-hidden="true"><i id="knob"></i></div>
 
 <div id="loading" class="loading">Cultivando a oliveira…</div>

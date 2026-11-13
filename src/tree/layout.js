@@ -38,31 +38,41 @@ export const rampAt = (f) => ({ a: rampStart + f * RAMP.turns * TAU, y: f * RAMP
 // metres of height per radian of ramp
 export const RAMP_RISE = RAMP.top / (RAMP.turns * TAU);
 
-// Circular galleries just outside the ramp. One ramp turn = 75 m, so the ramp meets every
-// level at the same angle (rampStart): a vertical "junction" you can always find again.
-export const GALLERY = { rin: RAMP.rout, rout: 82, levels: [75, 150, 225, 300] };
-
 // ---- the ecosystems -------------------------------------------------------
-// Each level inside the trunk is its own world: a terrain disk inside the ramp, lit by its
-// own "sun" hanging from the floor above. The floor of each level is a 6 m slab whose
-// underside (roots, glowing moss) is the sky of the level below.
+// Ten levels inside the trunk, one every 33.3 m, each its own world: a terrain disk inside
+// the ramp, lit by its own "sun" hanging from the floor above. The floor of each level is a
+// 6 m slab whose underside (roots, glowing moss) is the sky of the level below.
+export const LEVEL_STEP = RAMP.top / 9;
 export const DISK_R = RAMP.rin;   // 66 m: biome floors stop where the ramp begins
-export const SLAB = 6;            // m: thickness of each floor
+export const SLAB = 6;            // m: thickness of each floor (27 m of headroom per level)
+const B = (id, name, k, color, light) => ({ id, name, level: +(k * LEVEL_STEP).toFixed(3), color, light });
 export const BIOMES = [
-  { id: 'floresta', name: 'Floresta das Raízes', level: 0, color: '#a6e07e', light: '#ffd9a0' },
-  { id: 'lago', name: 'Lago Suspenso', level: 75, color: '#6fe3d2', light: '#c4f1ff' },
-  { id: 'canion', name: 'Cânion Vermelho', level: 150, color: '#ff9a5c', light: '#ffb070' },
-  { id: 'gelo', name: 'Caverna de Gelo', level: 225, color: '#9fd2ff', light: '#d6e9ff' },
-  { id: 'prado', name: 'Prado do Céu', level: 300, color: '#ffd76a', light: null }, // open to the sky
+  B('floresta', 'Floresta das Raízes', 0, '#a6e07e', '#ffd9a0'),
+  B('lago', 'Lago Suspenso', 1, '#6fe3d2', '#c4f1ff'),
+  B('canion', 'Cânion Vermelho', 2, '#ff9a5c', '#ffb070'),
+  B('selva', 'Selva Tropical', 3, '#4fd18b', '#d9ffb8'),
+  B('savana', 'Savana Dourada', 4, '#f2c14e', '#ffe0a0'),
+  B('vulcao', 'Vale do Vulcão', 5, '#ff5a36', '#ff8a5c'),
+  B('recife', 'Recife de Coral', 6, '#5ab8ff', '#9fdcff'),
+  B('gelo', 'Caverna de Gelo', 7, '#9fd2ff', '#d6e9ff'),
+  B('outono', 'Bosque de Outono', 8, '#ff9f43', '#ffcf8a'),
+  B('prado', 'Prado do Céu', 9, '#ffd76a', null), // open to the sky
 ];
 export const LEVEL_COLORS = Object.fromEntries(BIOMES.map((b) => [b.level, b.color]));
+
+// Circular gallery just outside the ramp at every level above the ground.
+export const GALLERY = { rin: RAMP.rout, rout: 82, levels: BIOMES.slice(1).map((b) => b.level) };
+
+// The ramp reaches each level at one angle: the junction where ramp, gallery and floor meet.
+export const junctionAngle = (level) => rampStart + level / RAMP_RISE;
 // Three short bridges per level cross the ramp gap from the biome floor to its gallery.
-// At these angles the ramp is 19-56 m above or below, so nothing collides.
-export const LEVEL_BRIDGES = [1, 2, 3].map((k) => rampStart + (k * Math.PI) / 2);
+// A quarter, half and three-quarter turn from the junction the ramp is 19-56 m away
+// vertically, so nothing collides.
+export const levelBridges = (level) => [1, 2, 3].map((k) => junctionAngle(level) + (k * Math.PI) / 2);
 
 // From the top gallery, three bridges leave through openings to lookouts outside the trunk.
 export const TOP_BRIDGES = (() => {
-  const gaps = gapAngles(GALLERY.levels[3]);
+  const gaps = gapAngles(RAMP.top);
   return [gaps[0], gaps[3], gaps[6]];
 })();
 export const LOOKOUT = { centre: 230, radius: 12, width: 3 };
@@ -74,22 +84,23 @@ export const LOOP_R = 340;
 export const APPROACH = { angle: ENTRANCES[0], from: LOOP_R, to: 1100 };
 
 // Route graph (level-design skill): every place and the places you can walk to from it.
-// Edges are written in both directions where the path is two-way. tests/smoke.mjs checks
-// that every place can reach every other one, so nothing is a dead end.
-export const ROUTES = {
-  trilha: ['anel_externo'],
-  anel_externo: ['trilha', 'entradas'],
-  entradas: ['anel_externo', 'floresta'],
-  floresta: ['entradas', 'rampa'],
-  rampa: ['floresta', 'galeria75', 'galeria150', 'galeria225', 'galeria300', 'lago', 'canion', 'gelo', 'prado'],
-  galeria75: ['rampa', 'lago'],
-  lago: ['galeria75', 'rampa'],
-  galeria150: ['rampa', 'canion'],
-  canion: ['galeria150', 'rampa'],
-  galeria225: ['rampa', 'gelo'],
-  gelo: ['galeria225', 'rampa'],
-  galeria300: ['rampa', 'prado', 'pontes_topo'],
-  prado: ['galeria300', 'rampa'],
-  pontes_topo: ['galeria300', 'mirantes'],
-  mirantes: ['pontes_topo'],
-};
+// Edges are two-way. tests/smoke.mjs checks that every place can reach every other one.
+export const ROUTES = (() => {
+  const g = {
+    trilha: ['anel_externo'],
+    anel_externo: ['trilha', 'entradas'],
+    entradas: ['anel_externo', 'floresta'],
+    floresta: ['entradas', 'rampa'],
+    rampa: ['floresta'],
+    pontes_topo: ['galeria_prado', 'mirantes'],
+    mirantes: ['pontes_topo'],
+  };
+  for (const b of BIOMES.slice(1)) {
+    const gal = `galeria_${b.id}`;
+    g.rampa.push(gal, b.id);
+    g[gal] = ['rampa', b.id];
+    g[b.id] = [gal, 'rampa'];
+  }
+  g.galeria_prado.push('pontes_topo');
+  return g;
+})();

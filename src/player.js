@@ -1,5 +1,11 @@
-// First-person walker (and flyer). Movement is resolved against analytic shapes (trunk
-// strands, roots, the floors between levels) and a downward ray onto walkable meshes.
+// The explorer's movement (walking and flying) and the third-person camera that follows it.
+// Movement is resolved against analytic shapes (trunk strands, roots, the floors between
+// levels) and a downward ray onto walkable meshes.
+//
+// Camera (camera-systems skill): yaw and pitch orbit a pivot at the explorer's shoulders,
+// pitch is clamped (-80° to +50°), a spring arm pulls the camera in when the line from the
+// pivot hits a trunk strand, a floor or a ceiling, and every follow uses 1 - exp(-rate * dt)
+// so it feels the same at any frame rate.
 //
 // Player metrics (level-design skill: size the world from these, not from guesses):
 //   step-up 0.9 m · edge guard 0.7 m · body radius 0.3 m · eye 1.65 m
@@ -10,12 +16,15 @@ import * as THREE from 'three';
 import { TRUNK, BIOMES, DISK_R, SLAB, ringR, strandR, strandTheta } from './tree/layout.js';
 
 export const METRICS = { eye: 1.65, step: 0.9, edgeDrop: 0.7, body: 0.3, walk: 6, run: 18, fly: 40, flyFast: 140 };
-const PITCH_LIMIT = THREE.MathUtils.degToRad(80);
+const PITCH_MIN = THREE.MathUtils.degToRad(-80), PITCH_MAX = THREE.MathUtils.degToRad(50);
+const ZOOM = { min: 2, max: 16, start: 6 };
+const PIVOT = 1.55; // m above the feet: shoulder height
 const GRAVITY = 22;
 const WORLD_RADIUS = 3000;
 
 export function createWalker({ walkables, rootMeshes, rootSegs, noGo = [] }) {
-  const state = { x: 0, z: 0, feet: 0, vy: 0, yaw: 0, pitch: 0, moving: false, running: false, flying: false };
+  const state = { x: 0, z: 0, feet: 0, vy: 0, yaw: 0, pitch: 0, moving: false, running: false, flying: false, speed: 0, moveYaw: null, zoom: ZOOM.start };
+  const cam = { pivot: new THREE.Vector3(), dist: ZOOM.start, ready: false };
   const ray = new THREE.Raycaster();
   ray.ray.direction.set(0, -1, 0);
   ray.far = 400;
@@ -62,11 +71,16 @@ export function createWalker({ walkables, rootMeshes, rootSegs, noGo = [] }) {
 
   function teleport(spot) {
     Object.assign(state, { x: spot.x, z: spot.z, feet: spot.feet, vy: 0, yaw: spot.yaw, pitch: spot.pitch });
+    cam.ready = false; // hard cut: no smoothing across the map
+  }
+
+  function zoom(delta) {
+    state.zoom = THREE.MathUtils.clamp(state.zoom * Math.exp(delta), ZOOM.min, ZOOM.max);
   }
 
   function look(dx, dy) {
     state.yaw -= dx;
-    state.pitch = THREE.MathUtils.clamp(state.pitch - dy, -PITCH_LIMIT, PITCH_LIMIT);
+    state.pitch = THREE.MathUtils.clamp(state.pitch - dy, PITCH_MIN, PITCH_MAX);
   }
 
   function setFlying(on) {
@@ -76,6 +90,7 @@ export function createWalker({ walkables, rootMeshes, rootSegs, noGo = [] }) {
 
   // input: { forward, right, up, run }, each axis in [-1, 1]
   function update(dt, input) {
+    const x0 = state.x, z0 = state.z;
     let f = input.forward, r = input.right;
     const mag = Math.hypot(f, r);
     if (mag > 1) { f /= mag; r /= mag; }
@@ -120,13 +135,53 @@ export function createWalker({ walkables, rootMeshes, rootSegs, noGo = [] }) {
     const d = Math.hypot(state.x, state.z);
     if (d > WORLD_RADIUS) { state.x *= WORLD_RADIUS / d; state.z *= WORLD_RADIUS / d; }
     state.feet = Math.min(state.feet, 1500);
+    // what the character animation needs: how fast and which way it actually moved
+    const mx = state.x - x0, mz = state.z - z0, moved = Math.hypot(mx, mz);
+    state.speed = dt > 0 ? moved / dt : 0;
+    state.moveYaw = moved > 1e-4 ? Math.atan2(-mx, -mz) : null;
   }
 
-  function applyToCamera(camera, time) {
-    const bob = !state.flying && state.moving && state.vy === 0 ? Math.sin(time * (state.running ? 13 : 9)) * 0.035 : 0;
-    camera.position.set(state.x, state.feet + METRICS.eye + bob, state.z);
+  // Is this camera point inside something solid?
+  function blocked(p, pivotY) {
+    const r = Math.hypot(p.x, p.z);
+    if (p.y < TRUNK.top + 5) {
+      for (let i = 0; i < TRUNK.strands; i++) {
+        const th = strandTheta(i, p.y), R = ringR(p.y);
+        if (Math.hypot(p.x - Math.cos(th) * R, p.z - Math.sin(th) * R) < strandR(p.y) * 1.04 + 0.3) return true;
+      }
+    }
+    if (r < DISK_R + 1) {
+      for (const b of BIOMES) {
+        if (b.level === 0) continue;
+        const under = b.level - SLAB;
+        if (pivotY < under && p.y > under - 0.4) return true;              // ceiling of this level
+        if (pivotY >= b.level && p.y < b.level + 0.2) return true;          // below this floor
+      }
+    }
+    return p.y < floorAt(p.x, p.z, pivotY - METRICS.step) + 0.35;
+  }
+
+  const look3 = new THREE.Vector3(), want = new THREE.Vector3(), probe = new THREE.Vector3();
+  function applyToCamera(camera, time, dt) {
+    const target = want.set(state.x, state.feet + PIVOT, state.z);
+    if (!cam.ready) { cam.pivot.copy(target); cam.dist = state.zoom; cam.ready = true; }
+    cam.pivot.lerp(target, 1 - Math.exp(-14 * dt)); // soften steps and ramps
+    // view direction from yaw/pitch (the same convention as movement)
+    const cp = Math.cos(state.pitch);
+    look3.set(-Math.sin(state.yaw) * cp, Math.sin(state.pitch), -Math.cos(state.yaw) * cp);
+    // spring arm: walk out from the pivot and stop before the first solid sample
+    let free = state.zoom;
+    const N = 8;
+    for (let k = 1; k <= N; k++) {
+      const d = (k / N) * state.zoom;
+      probe.copy(cam.pivot).addScaledVector(look3, -d);
+      if (blocked(probe, cam.pivot.y)) { free = Math.max(0.5, d - state.zoom / N); break; }
+    }
+    // pull in at once when blocked, ease back out when clear
+    cam.dist = free < cam.dist ? free : cam.dist + (free - cam.dist) * (1 - Math.exp(-4 * dt));
+    camera.position.copy(cam.pivot).addScaledVector(look3, -cam.dist);
     camera.rotation.set(state.pitch, state.yaw, 0, 'YXZ');
   }
 
-  return { state, update, teleport, look, setFlying, applyToCamera, floorAt };
+  return { state, update, teleport, look, zoom, setFlying, applyToCamera, floorAt };
 }

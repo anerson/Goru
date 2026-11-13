@@ -77,17 +77,23 @@ const walk = await page.evaluate(() => {
   }
   out.rampToTop = { feet: +w().feet.toFixed(1), ok: w().feet > L.RAMP.top - 1 };
 
-  // every level: from its gallery across a short bridge onto the ecosystem, then to the middle
+  // every level: from its gallery across a short bridge, then along that bridge's trail
+  // (steering point to point like a player would) to the landmark in the middle
   out.levels = {};
-  for (const b of L.BIOMES.slice(1)) {
-    const a = L.LEVEL_BRIDGES[1];
+  L.BIOMES.forEach((b, bi) => {
+    if (b.level === 0) return;
+    const a = L.bridges[bi][0];
     Object.assign(w(), { x: Math.cos(a) * 78, z: Math.sin(a) * 78, feet: b.level, vy: 0 });
-    face(-Math.cos(a), -Math.sin(a));
-    O.keys.clear(); O.keys.add('KeyW'); O.keys.add('ShiftLeft');
-    O.step(72);                                    // ~65 m at run speed: bridge + most of the way in
+    O.keys.clear(); O.keys.add('KeyW');
+    const goal = (px, pz, max) => {
+      for (let n = 0; n < max && Math.hypot(w().x - px, w().z - pz) > 1.2; n++) { face(px - w().x, pz - w().z); O.step(1); }
+    };
+    goal(Math.cos(a) * 62, Math.sin(a) * 62, 400);
+    const line = O.paths[b.id][1];                 // spoke from the first bridge to the plaza
+    for (const p of line) goal(p.x, p.z, 60);
     out.levels[b.id] = { r: +r().toFixed(1), height: +(w().feet - b.level).toFixed(1) };
-    out.levels[b.id].ok = r() < 30 && Math.abs(w().feet - b.level) < 6;
-  }
+    out.levels[b.id].ok = r() < 16 && Math.abs(w().feet - b.level) < 6;
+  });
   out.levels.ok = Object.values(out.levels).every((v) => v.ok);
 
   // the lake's water is a barrier: walking straight off the shore into it is refused
@@ -112,7 +118,7 @@ const walk = await page.evaluate(() => {
 
   // top gallery -> bridge out through the trunk -> far edge of a lookout (no falling off)
   const ta = L.TOP_BRIDGES[0];
-  Object.assign(w(), { x: Math.cos(ta) * 78, z: Math.sin(ta) * 78, feet: L.GALLERY.levels[3], vy: 0 });
+  Object.assign(w(), { x: Math.cos(ta) * 78, z: Math.sin(ta) * 78, feet: L.RAMP.top, vy: 0 });
   face(Math.cos(ta), Math.sin(ta));
   O.keys.clear(); O.keys.add('KeyW'); O.keys.add('ShiftLeft');
   O.step(400);
@@ -128,7 +134,24 @@ const walk = await page.evaluate(() => {
   return out;
 });
 
-for (const place of ['floresta', 'lago', 'canion', 'gelo', 'prado']) {
+// ---- 4. third-person camera: standing with your back to a trunk strand, the spring arm
+// pulls the camera in instead of putting it inside the wood ----
+const cameraCheck = await page.evaluate(async () => {
+  const O = window.__oliveira, w = O.walker, y = O.layout.BIOMES[4].level;
+  const s = O.strands(y + 1.5)[0];
+  const ux = s.x / Math.hypot(s.x, s.z), uz = s.z / Math.hypot(s.x, s.z);
+  // on the gallery right in front of the strand, looking toward the centre
+  O.goTo('savana');
+  Object.assign(w, { x: ux * 79, z: uz * 79, feet: y, yaw: Math.atan2(ux, uz), pitch: 0 });
+  await new Promise((res) => setTimeout(res, 2500));
+  const c = O.camera;
+  const inside = O.strands(c.y).some((t) => Math.hypot(c.x - t.x, c.z - t.z) < t.r * 0.98);
+  const dist = Math.hypot(c.x - w.x, c.z - w.z);
+  return { inside, dist: +dist.toFixed(2), ok: !inside && dist > 0.4 };
+});
+walk.camera = cameraCheck;
+
+for (const place of ['floresta', 'lago', 'selva', 'vulcao', 'recife', 'outono']) {
   await page.evaluate((p) => window.__oliveira.goTo(p), place);
   await page.waitForTimeout(3000);
   await page.screenshot({ path: `tests/smoke-${place}.png`, timeout: 240000 });

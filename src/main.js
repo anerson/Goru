@@ -13,8 +13,10 @@ import { buildBiomes } from './biomes/index.js';
 import { createParticles } from './particles.js';
 import { createWalker } from './player.js';
 import { createInput } from './input.js';
+import { createCharacter } from './character.js';
 import {
-  RAMP, GALLERY, BIOMES, LOOKOUT, TOP_BRIDGES, ENTRANCES, APPROACH, ROUTES, LEVEL_BRIDGES, DISK_R,
+  TRUNK, ringR, strandR, strandTheta,
+  RAMP, GALLERY, BIOMES, LOOKOUT, TOP_BRIDGES, ENTRANCES, APPROACH, ROUTES, DISK_R, levelBridges, junctionAngle,
   rampAt, rampStart,
 } from './tree/layout.js';
 
@@ -65,6 +67,7 @@ function buildWorld() {
     terrain: new THREE.MeshStandardMaterial({ vertexColors: true, map: tex.terrainDetail, roughness: 0.95 }),
     slabUnder: new THREE.MeshStandardMaterial({ color: '#3a3326', map: tex.bark, roughness: 1, side: THREE.DoubleSide }),
     stone: new THREE.MeshStandardMaterial({ color: '#9b958a', roughness: 0.9 }),
+    basalt: new THREE.MeshStandardMaterial({ color: '#3a3330', roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -3 }),
     ground: new THREE.MeshStandardMaterial({ vertexColors: true, map: tex.groundDetail, roughness: 1 }),
   };
   tex.groundDetail.repeat.set(1400, 1400);
@@ -80,36 +83,37 @@ function buildWorld() {
   const biomes = buildBiomes(scene, mats);
   const updateParticles = createParticles(scene, singleLeafGeometry(), mats.leaf, canopy.tipPoints);
   const walker = createWalker({ walkables: paths.walkables.concat(biomes.walkables), rootMeshes: trunk.rootMeshes, rootSegs: trunk.rootSegs, noGo: biomes.noGo });
+  const character = createCharacter();
+  character.root.visible = false;
+  scene.add(character.root);
 
   $('sHeight').textContent = `${Math.round(canopy.maxY)} m`;
   $('sCrown').textContent = `${(canopy.crownR * 2 / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`;
   $('sPaths').textContent = `${((paths.totalLength + biomes.trailLength) / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`;
-  return { walker, canopy, updateParticles, updateBiomes: biomes.update };
+  return { walker, character, canopy, updateParticles, updateBiomes: biomes.update, paths: biomes.paths };
 }
 
 // ---------- places you can jump to ----------
 const yawToward = (dx, dz) => Math.atan2(-dx, -dz);
 const at = (r, a) => ({ x: Math.cos(a) * r, z: Math.sin(a) * r });
 // arriving on a level: just inside its first bridge, looking toward the middle
-const onLevel = (b, label, pitch = 0.08) => () => {
-  const a = b.level === 0 ? ENTRANCES[0] : LEVEL_BRIDGES[0];
-  const p = at(b.level === 0 ? 90 : DISK_R - 4, a);
-  return { ...p, feet: b.level + 0.5, yaw: yawToward(-p.x, -p.z), pitch, label };
+// arriving on a level: just inside its first bridge (or a trunk entrance on the ground),
+// with the camera behind the explorer looking toward the landmark in the middle
+const onLevel = (b) => () => {
+  const a = b.level === 0 ? ENTRANCES[0] : levelBridges(b.level)[0];
+  const p = at(b.level === 0 ? 88 : DISK_R - 6, a);
+  return { ...p, feet: b.level + 0.5, yaw: yawToward(-p.x, -p.z), pitch: -0.18, label: `${Math.round(b.level)} m · ${b.name}` };
 };
 const PLACES = {
   trilha() {
     const p = at(700, APPROACH.angle);
-    return { ...p, feet: 0, yaw: yawToward(-p.x, -p.z), pitch: 0.28, label: 'Trilha de chegada' };
+    return { ...p, feet: 0, yaw: yawToward(-p.x, -p.z), pitch: 0.2, label: 'Trilha de chegada' };
   },
   entrada() {
     const p = at(230, ENTRANCES[0]);
-    return { ...p, feet: 0, yaw: yawToward(-p.x, -p.z), pitch: 0.1, label: 'Entrada entre as raízes' };
+    return { ...p, feet: 0, yaw: yawToward(-p.x, -p.z), pitch: 0.05, label: 'Entrada entre as raízes' };
   },
-  floresta: onLevel(BIOMES[0], `0 m · ${BIOMES[0].name}`, 0.12),
-  lago: onLevel(BIOMES[1], `75 m · ${BIOMES[1].name}`),
-  canion: onLevel(BIOMES[2], `150 m · ${BIOMES[2].name}`),
-  gelo: onLevel(BIOMES[3], `225 m · ${BIOMES[3].name}`),
-  prado: onLevel(BIOMES[4], `300 m · ${BIOMES[4].name}`),
+  ...Object.fromEntries(BIOMES.map((b) => [b.id, onLevel(b)])),
   rampa() {
     const { a, y } = rampAt(0.62);
     const p = at(70, a);
@@ -132,6 +136,7 @@ function enterWalk(name = 'trilha') {
   if (!world) return;
   mode = 'walk';
   orbit.enabled = false;
+  world.character.root.visible = true;
   document.body.classList.add('walking');
   goTo(name);
 }
@@ -141,6 +146,7 @@ function exitWalk() {
   camera.position.copy(ORBIT_HOME.pos);
   orbit.target.copy(ORBIT_HOME.target);
   document.body.classList.remove('walking');
+  if (world) world.character.root.visible = false;
   input.releaseLock();
   setFly(false);
 }
@@ -158,6 +164,12 @@ const input = createInput(renderer.domElement, $('joy'), $('knob'), {
 addEventListener('keydown', (e) => {
   if (mode === 'walk' && e.code === 'KeyF' && !e.repeat) setFly(!world.walker.state.flying);
 });
+// mouse wheel / trackpad pinch: move the third-person camera closer or further
+renderer.domElement.addEventListener('wheel', (e) => {
+  if (mode !== 'walk' || !world) return;
+  e.preventDefault();
+  world.walker.zoom(e.deltaY * 0.0015);
+}, { passive: false });
 
 // ---------- UI ----------
 $('bWalk').onclick = () => enterWalk('trilha');
@@ -200,8 +212,9 @@ renderer.setAnimationLoop(() => {
   if (world) {
     if (mode === 'walk') {
       world.walker.update(dt, input.read());
-      world.walker.applyToCamera(camera, t);
+      world.walker.applyToCamera(camera, t, dt);
       const s = world.walker.state;
+      world.character.update(dt, { x: s.x, y: s.feet, z: s.z, speed: s.speed, flying: s.flying, moveYaw: s.moveYaw });
       env.setShadowFocus(shadowCenter.set(s.x, s.feet, s.z), 220);
     } else {
       env.setShadowFocus(shadowCenter.set(0, 300, 0), 1100);
@@ -229,8 +242,11 @@ window.__oliveira = {
   get ready() { return !!world; },
   get walker() { return world?.walker.state; },
   floorAt: (x, z, feet) => world?.walker.floorAt(x, z, feet),
+  get paths() { return world?.paths; },
+  get camera() { return camera.position.clone(); },
+  strands: (y) => Array.from({ length: TRUNK.strands }, (_, i) => ({ x: Math.cos(strandTheta(i, y)) * ringR(y), z: Math.sin(strandTheta(i, y)) * ringR(y), r: strandR(y) })),
   enterWalk, goTo, setFly,
-  layout: { RAMP, GALLERY, BIOMES, TOP_BRIDGES, LOOKOUT, ENTRANCES, APPROACH, ROUTES, LEVEL_BRIDGES, DISK_R, rampStart },
+  layout: { RAMP, GALLERY, BIOMES, TOP_BRIDGES, LOOKOUT, ENTRANCES, APPROACH, ROUTES, DISK_R, rampStart, bridges: BIOMES.map((b) => levelBridges(b.level)), junctions: BIOMES.map((b) => junctionAngle(b.level)) },
   keys: input.keys,
   step(n, dt = 0.05) { for (let i = 0; i < n; i++) world.walker.update(dt, input.read()); },
 };
