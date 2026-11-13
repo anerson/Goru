@@ -236,9 +236,8 @@ const act = await page.evaluate(() => {
         b.hp = b.def.hp; b.state = 'dormant'; b.model.root.visible = false;
         checks.gateWeak = +weak.toFixed(2);
         // craft through the real workbench panel: open it, click Criar
-        for (const out of outs) gather(region, recipe(out));
         use('bancada_raizes');
-        for (const out of outs) document.querySelector(`#hudBench [data-craft="${out}"]`)?.click();
+        for (const out of outs) { gather(region, recipe(out)); G.debug.openBench('raizes'); document.querySelector(`#hudBench [data-craft="${out}"]`)?.click(); }
         checks.benchShown = !document.getElementById('hudBench').hidden;
         C.wake('escavadorAmbar'); b.state = 'chase';
         const hp1 = b.hp; C.hurtMob(b, 40, b.pos.clone().setX(b.pos.x + 1)); checks.gateStrong = +(hp1 - b.hp).toFixed(2);
