@@ -152,7 +152,7 @@ const cameraCheck = await page.evaluate(async () => {
   const s = O.strands(y + 1.5)[0];
   const ux = s.x / Math.hypot(s.x, s.z), uz = s.z / Math.hypot(s.x, s.z);
   // on the gallery right in front of the strand, looking toward the centre
-  O.goTo('savana');
+  O.goTo(O.layout.BIOMES[4].id);
   Object.assign(w, { x: ux * 79, z: uz * 79, feet: y, yaw: Math.atan2(ux, uz), pitch: 0 });
   await new Promise((res) => setTimeout(res, 2500));
   const c = O.camera;
