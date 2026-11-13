@@ -5,6 +5,7 @@
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { ROUTES } from '../src/tree/layout.js';
+import { validateDialogues, NEEDS, STAGES } from '../src/game/data.js';
 
 // ---- 1. route graph: every place reaches every other place, and edges are two-way ----
 const graphProblems = [];
@@ -18,6 +19,16 @@ for (const [from, tos] of Object.entries(ROUTES)) {
   const missing = Object.keys(ROUTES).filter((k) => !seen.has(k));
   if (missing.length) graphProblems.push(`${from} cannot reach ${missing.join(', ')}`);
 }
+
+// ---- 1b. dialogue graphs are valid (dialogue-systems skill) ----
+const dialogueProblems = validateDialogues();
+
+// ---- 1c. needs timing (survival-crafting skill): minutes from full to warning and to empty ----
+const minutes = (perSec, k) => ({ warn: +((100 - NEEDS.warnAt) / (perSec * k) / 60).toFixed(1), empty: +(100 / (perSec * k) / 60).toFixed(1) });
+const needsTiming = {
+  thirstIdle: minutes(NEEDS.thirstPerSec, 1), thirstRunning: minutes(NEEDS.thirstPerSec, NEEDS.runFactor),
+  hungerIdle: minutes(NEEDS.hungerPerSec, 1),
+};
 
 // ---- 2. the page renders without errors ----
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -98,7 +109,7 @@ const walk = await page.evaluate(() => {
 
   // the lake's water is a barrier: walking straight off the shore into it is refused
   {
-    const lago = L.BIOMES[1];
+    const lago = L.BIOMES.find((b) => b.id === 'oceano');
     let probe = null;
     for (let r = 20; r < 62 && !probe; r += 0.5) for (let k = 0; k < 64 && !probe; k++) {
       const a = (k / 64) * Math.PI * 2, x = Math.cos(a) * r, z = Math.sin(a) * r;
@@ -151,13 +162,46 @@ const cameraCheck = await page.evaluate(async () => {
 });
 walk.camera = cameraCheck;
 
-for (const place of ['floresta', 'lago', 'selva', 'vulcao', 'recife', 'outono']) {
+// ---- 5. Act I from start to end: every stage reachable through its own action ----
+const act = await page.evaluate(() => {
+  const O = window.__oliveira, G = O.game, D = G.debug, W = O.walker;
+  O.startJourney(false);
+  const log = [];
+  const use = (id) => { const it = D.items.find((i) => i.id === id); if (!it) throw new Error('missing ' + id); if (!it.enabled()) throw new Error('disabled ' + id); it.use(); };
+  const useGroup = (g, n) => { for (const it of D.items.filter((i) => i.group === g && i.enabled()).slice(0, n)) it.use(); };
+  // walk the conversation picking the first choice each time, the way a player clicking through would
+  const converse = (npc) => { use(npc); for (let k = 0; k < 20 && D.dialogue; k++) O.hud.pick(0); O.hud.closeDialogue(); };
+  const tick = () => G.update(0.05, 0, { running: false, flying: false, camYaw: 0 });
+  const step = (label, fn) => { const before = G.state.stage; fn(); tick(); log.push(`${label}: ${before} -> ${G.state.stage}`); };
+  step('Maela', () => converse('maela'));
+  step('cogumelos + nascente', () => { useGroup('cogumelo', 3); use('nascente'); });
+  step('Maela (relato)', () => converse('maela'));
+  step('leito', () => use('leito'));
+  step('Tarek', () => converse('tarek'));
+  step('resinas', () => useGroup('resina', 3));
+  step('Tarek (troca)', () => converse('tarek'));
+  step('comporta', () => use('comporta'));
+  step('santuário', () => use('santuario'));
+  step('núcleo na comporta', () => use('comporta'));
+  step('Maela (água amarga)', () => converse('maela'));
+  step('Ilian', () => converse('ilian'));
+  step('sinais', () => { use('sinal_1'); use('sinal_2'); use('sinal_3'); });
+  step('Ilian (fim)', () => converse('ilian'));
+  // every quest object stands on ground the walker can reach (not floating, not buried)
+  const misplaced = D.items.filter((i) => i.kind !== 'resource' || true).filter((i) => {
+    const f = O.floorAt(i.pos.x, i.pos.z, i.pos.y);
+    return !(f > i.pos.y - 4 && f < i.pos.y + 1);
+  }).map((i) => i.id);
+  return { log, final: G.state.stage, misplaced, ok: G.state.stage === 'concluido' && misplaced.length === 0 };
+});
+
+for (const place of ['raizes', 'deserto', 'oceano', 'fornalha', 'pantano', 'cristais']) {
   await page.evaluate((p) => window.__oliveira.goTo(p), place);
   await page.waitForTimeout(3000);
   await page.screenshot({ path: `tests/smoke-${place}.png`, timeout: 240000 });
 }
 await browser.close();
 
-const ok = !errors.length && !graphProblems.length && Object.values(walk).every((c) => c.ok);
-console.log(JSON.stringify({ stats, graphProblems, walk, errors, ok }, null, 2));
+const ok = !errors.length && !graphProblems.length && !dialogueProblems.length && act.ok && Object.values(walk).every((c) => c.ok);
+console.log(JSON.stringify({ stats, graphProblems, dialogueProblems, needsTiming, walk, act, errors, ok }, null, 2));
 process.exit(ok ? 0 : 1);

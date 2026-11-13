@@ -47,16 +47,16 @@ export const DISK_R = RAMP.rin;   // 66 m: biome floors stop where the ramp begi
 export const SLAB = 6;            // m: thickness of each floor (27 m of headroom per level)
 const B = (id, name, k, color, light) => ({ id, name, level: +(k * LEVEL_STEP).toFixed(3), color, light });
 export const BIOMES = [
-  B('floresta', 'Floresta das Raízes', 0, '#a6e07e', '#ffd9a0'),
-  B('lago', 'Lago Suspenso', 1, '#6fe3d2', '#c4f1ff'),
-  B('canion', 'Cânion Vermelho', 2, '#ff9a5c', '#ffb070'),
-  B('selva', 'Selva Tropical', 3, '#4fd18b', '#d9ffb8'),
-  B('savana', 'Savana Dourada', 4, '#f2c14e', '#ffe0a0'),
-  B('vulcao', 'Vale do Vulcão', 5, '#ff5a36', '#ff8a5c'),
-  B('recife', 'Recife de Coral', 6, '#5ab8ff', '#9fdcff'),
-  B('gelo', 'Caverna de Gelo', 7, '#9fd2ff', '#d6e9ff'),
-  B('outono', 'Bosque de Outono', 8, '#ff9f43', '#ffcf8a'),
-  B('prado', 'Prado do Céu', 9, '#ffd76a', null), // open to the sky
+  B('raizes', 'Floresta das Raízes', 0, '#a6e07e', '#ffd9a0'),
+  B('deserto', 'Deserto da Casca', 1, '#ffb070', '#ffc58a'),
+  B('oceano', 'Oceano Interior', 2, '#6fd6e3', '#c4f1ff'),
+  B('fornalha', 'Fornalha de Ignar', 3, '#ff5a36', '#ff8a5c'),
+  B('selva', 'Selva dos Gigantes', 4, '#4fd18b', '#d9ffb8'),
+  B('pantano', 'Pântano da Decomposição', 5, '#9bbf4a', '#cfe08a'),
+  B('cristais', 'Reino dos Cristais', 6, '#c59bff', '#d8c4ff'),
+  B('niveria', 'Nivéria', 7, '#9fd2ff', '#d6e9ff'),
+  B('suspensa', 'Floresta Suspensa', 8, '#7fe08a', '#e8ffd0'),
+  B('copa', 'Jardim da Copa', 9, '#ffd76a', null), // open to the sky
 ];
 export const LEVEL_COLORS = Object.fromEntries(BIOMES.map((b) => [b.level, b.color]));
 
@@ -89,10 +89,10 @@ export const ROUTES = (() => {
   const g = {
     trilha: ['anel_externo'],
     anel_externo: ['trilha', 'entradas'],
-    entradas: ['anel_externo', 'floresta'],
-    floresta: ['entradas', 'rampa'],
-    rampa: ['floresta'],
-    pontes_topo: ['galeria_prado', 'mirantes'],
+    entradas: ['anel_externo', 'raizes'],
+    raizes: ['entradas', 'rampa'],
+    rampa: ['raizes'],
+    pontes_topo: ['galeria_copa', 'mirantes'],
     mirantes: ['pontes_topo'],
   };
   for (const b of BIOMES.slice(1)) {
@@ -101,6 +101,6 @@ export const ROUTES = (() => {
     g[gal] = ['rampa', b.id];
     g[b.id] = [gal, 'rampa'];
   }
-  g.galeria_prado.push('pontes_topo');
+  g.galeria_copa.push('pontes_topo');
   return g;
 })();

@@ -1,14 +1,15 @@
-// The ten ecosystems stacked inside the trunk, one every 33.3 m, bottom to top:
-//   Floresta das Raízes  glowing mushrooms, ferns, small trees, fireflies
-//   Lago Suspenso        lakes crossed by boardwalks, reeds, lily pads, willows, mist
-//   Cânion Vermelho      dunes, red mesas, cacti, a stone arch, blowing dust
-//   Selva Tropical       palms, giant leaves, hanging vines, a stepped temple
-//   Savana Dourada       tall gold grass, flat-topped acacias, termite mounds, a baobab
-//   Vale do Vulcão       black rock, rivers of lava (no-go), basalt columns, rising embers
-//   Recife de Coral      coral gardens, sea fans, kelp, a giant clam, rising bubbles
-//   Caverna de Gelo      snow, frosted pines, ice crystals, a frozen pond, snowfall
-//   Bosque de Outono     red and gold trees, leaf litter, falling leaves, a great maple
-//   Prado do Céu         flower meadow under the open sky, exits to the lookouts
+// Aetherion's ten ecosystems stacked inside the trunk, one every 33.3 m, bottom to top
+// (the order of the design document's altitudes):
+//   Floresta das Raízes       glowing mushrooms, ferns, small trees, fireflies
+//   Deserto da Casca          dunes of sediment, wood canyons, succulents and cacti
+//   Oceano Interior           a lake with fossil-wood islands, coral beds, boardwalks
+//   Fornalha de Ignar         black rock, lava channels (no-go), basalt, embers (more.js)
+//   Selva dos Gigantes        palms, giant leaves, hanging vines, a stepped temple (more.js)
+//   Pântano da Decomposição   black water, rotting logs, fungi, spores (aetherion.js)
+//   Reino dos Cristais        glowing crystal clusters, quartz pillars (aetherion.js)
+//   Nivéria                   snow, conifers, ice crystals, a frozen lake
+//   Floresta Suspensa         small trees, bromeliads, giant nests, creepers (aetherion.js)
+//   Jardim da Copa            flower fields and giant flowers under the open sky
 // Each one is a terrain disk you can walk anywhere on, with marked trails from every entry
 // (ramp junction, level bridges, trunk entrances) to a landmark in the middle.
 import * as THREE from 'three';
@@ -16,7 +17,8 @@ import { mulberry32 } from '../noise.js';
 import { SEED, BIOMES, ENTRANCES, DISK_R, SLAB, LEVEL_STEP, junctionAngle } from '../tree/layout.js';
 import { V, polar, instances, label } from '../geom.js';
 import { makeTerrain, makeTrails, scatter, ceiling, noise2, entryAngles, drift, fernGeometry, lerpColor, std } from './common.js';
-import { jungle, savanna, volcano, reef, autumn } from './more.js';
+import { jungle, volcano } from './more.js';
+import { swamp, crystals, suspended, corals, giantFlowers } from './aetherion.js';
 
 
 export function buildBiomes(scene, mats) {
@@ -25,7 +27,8 @@ export function buildBiomes(scene, mats) {
   const noGo = [];
   const paths = {};
   let trailLength = 0;
-  const builders = { floresta: forest, lago: lake, canion: canyon, selva: jungle, savana: savanna, vulcao: volcano, recife: reef, gelo: ice, outono: autumn, prado: meadow };
+  const builders = { raizes: forest, deserto: canyon, oceano: ocean, fornalha: volcano, selva: jungle, pantano: swamp, cristais: crystals, niveria: ice, suspensa: suspended, copa: meadow };
+  const terrains = {};
   BIOMES.forEach((b, i) => {
     const rand = mulberry32(SEED + 100 + i);
     const out = builders[b.id]({ scene, mats, rand, b });
@@ -33,19 +36,20 @@ export function buildBiomes(scene, mats) {
     if (out.update) updates.push(out.update);
     if (out.noGo) noGo.push(out.noGo);
     trailLength += out.trailLength;
+    terrains[b.id] = out.h;
     paths[b.id] = out.trails.lines.map((l) => l.map((p) => ({ x: p.x, z: p.z })));
     out.trails.meshes.forEach((m) => scene.add(m));
     if (i < BIOMES.length - 1) ceiling(scene, { rand, top: BIOMES[i + 1].level, below: b, mats });
     scene.add(label(b.name, b.color, polar(DISK_R - 8, junctionAngle(b.level), b.level + 6), 22));
   });
-  return { walkables, trailLength, noGo, paths, update: (dt, t) => updates.forEach((u) => u(dt, t)) };
+  return { walkables, trailLength, noGo, paths, terrains, update: (dt, t) => updates.forEach((u) => u(dt, t)) };
 }
 
 // ---------------------------------------------------------------------------
 function forest({ scene, mats, rand, b }) {
   const L = b.level, R = 104;
   const terrain = makeTerrain({
-    level: L, radius: R, flatFrom: 54, name: 'biome-floresta',
+    level: L, radius: R, flatFrom: 54, name: 'biome-raizes',
     height: (x, z) => (noise2(x, z, 0.035, 1) - 0.5) * 4 + Math.max(0, noise2(x, z, 0.08, 2) - 0.6) * 6,
     color: (x, z, h, c) => lerpColor(c, '#3d5a26', '#6b8f3a', noise2(x, z, 0.1, 3) * 1.4 - 0.2).lerp(new THREE.Color('#4a3a28'), Math.max(0, -h) * 0.3),
     material: mats.terrain,
@@ -97,20 +101,20 @@ function forest({ scene, mats, rand, b }) {
     scatter(rand, 45, 12, 98, (x, z) => free(x, z, 3)).map(([x, z]) => ({ p: V(x, terrain.h(x, z), z), s: V(1 + rand() * 2.5, 0.6 + rand() * 1.4, 1 + rand() * 2.5), rot: [rand(), rand() * 6, rand()] }))));
 
   const flies = drift(scene, rand, { count: 500, rMax: 90, y0: L + 0.5, y1: L + 14, color: '#d8ff7a', size: 0.25, speed: 0.6 });
-  return { walkables: [terrain.mesh], trails, trailLength: trails.length + more.length, update: (dt, t) => flies(dt, t, 0.5 + 0.5 * Math.sin(t * 2.3)) };
+  return { h: terrain.h, walkables: [terrain.mesh], trails, trailLength: trails.length + more.length, update: (dt, t) => flies(dt, t, 0.5 + 0.5 * Math.sin(t * 2.3)) };
 }
 
 // ---------------------------------------------------------------------------
-function lake({ scene, mats, rand, b }) {
+function ocean({ scene, mats, rand, b }) {
   const L = b.level, W = -1.2;
   const lakeDepth = (x, z) => {
     const r = Math.hypot(x, z);
     const n = noise2(x, z, 0.035, 11);
-    const s = Math.min(1, Math.max(0, (n - 0.5) / 0.035));      // steep banks: you can't wade in
+    const s = Math.min(1, Math.max(0, (n - 0.44) / 0.035));     // steep banks: you can't wade in
     return s * 4 * Math.min(1, Math.max(0, (r - 16) / 6));      // keep the middle dry
   };
   const terrain = makeTerrain({
-    level: L, name: 'biome-lago',
+    level: L, name: 'biome-oceano',
     height: (x, z) => (noise2(x, z, 0.05, 12) - 0.5) * 1.6 - lakeDepth(x, z),
     color: (x, z, h, c) => {
       if (h < W - 0.3) return c.set('#1f3b3a');
@@ -132,6 +136,7 @@ function lake({ scene, mats, rand, b }) {
   const trails = makeTrails({ rand, h: terrain.h, surface: deck, entries: entryAngles(L), loopR: 42, material: mats.planks, lift: 0.12, width: 3.2 });
   trails.meshes.forEach((m) => { m.castShadow = true; });
   const inWater = (x, z) => terrain.h(x, z) < L + W - 0.2;
+  corals(scene, rand, terrain.h, (x, z) => terrain.h(x, z) < L + W - 1.5 && !trails.near(x, z, 3));
   const free = (x, z, d) => Math.hypot(x, z) > 14 && !trails.near(x, z, d);
 
   const reeds = [];
@@ -171,7 +176,7 @@ function lake({ scene, mats, rand, b }) {
 
   const mist = drift(scene, rand, { count: 500, rMax: 62, y0: L + W + 0.2, y1: L + W + 3, color: '#dff6ff', size: 0.5, speed: 0.3, opacity: 0.35 });
   return {
-    walkables: [terrain.mesh, ...trails.meshes], trails, trailLength: trails.length,
+    h: terrain.h, walkables: [terrain.mesh, ...trails.meshes], trails, trailLength: trails.length,
     // the water is not walkable: stay on the shore or the boardwalks
     noGo: (x, z, floor) => Math.abs(floor - L) < 12 && floor < L + W - 0.05 && Math.hypot(x, z) < DISK_R,
     update: (dt, t) => { mist(dt, t, 1); water.material.emissiveIntensity = 0.55 + Math.sin(t * 0.8) * 0.08; },
@@ -183,7 +188,7 @@ function canyon({ scene, mats, rand, b }) {
   const L = b.level;
   const ridge = (x, z) => 1 - Math.abs(2 * noise2(x, z, 0.045, 21) - 1);
   const terrain = makeTerrain({
-    level: L, name: 'biome-canion',
+    level: L, name: 'biome-deserto',
     height: (x, z) => ridge(x, z) * 3.2 - 1.2 + (noise2(x, z, 0.15, 22) - 0.5) * 0.6,
     color: (x, z, h, c) => lerpColor(c, '#b5652f', '#e0a060', (h + 1.2) / 3.5),
     material: mats.terrain,
@@ -231,14 +236,14 @@ function canyon({ scene, mats, rand, b }) {
   scene.add(arch);
 
   const dust = drift(scene, rand, { count: 500, rMax: 62, y0: L, y1: L + 20, color: '#ffc89a', size: 0.18, speed: 2.5, opacity: 0.5 });
-  return { walkables: [terrain.mesh], trails, trailLength: trails.length, update: (dt, t) => dust(dt, t, 1) };
+  return { h: terrain.h, walkables: [terrain.mesh], trails, trailLength: trails.length, update: (dt, t) => dust(dt, t, 1) };
 }
 
 // ---------------------------------------------------------------------------
 function ice({ scene, mats, rand, b }) {
   const L = b.level;
   const terrain = makeTerrain({
-    level: L, name: 'biome-gelo',
+    level: L, name: 'biome-niveria',
     height: (x, z) => {
       const r = Math.hypot(x, z);
       const hills = (noise2(x, z, 0.04, 31) - 0.5) * 5 + Math.max(0, noise2(x, z, 0.09, 32) - 0.55) * 7;
@@ -279,14 +284,14 @@ function ice({ scene, mats, rand, b }) {
   scene.add(instances(new THREE.OctahedronGeometry(1, 0), crystalMat, crystals));
 
   const snowfall = drift(scene, rand, { count: 1600, rMax: 64, y0: L, y1: L + LEVEL_STEP - SLAB, color: '#ffffff', size: 0.16, speed: 0, fall: 2.2, opacity: 0.9 });
-  return { walkables: [terrain.mesh], trails, trailLength: trails.length, update: (dt, t) => snowfall(dt, t, 1) };
+  return { h: terrain.h, walkables: [terrain.mesh], trails, trailLength: trails.length, update: (dt, t) => snowfall(dt, t, 1) };
 }
 
 // ---------------------------------------------------------------------------
 function meadow({ scene, mats, rand, b }) {
   const L = b.level;
   const terrain = makeTerrain({
-    level: L, name: 'biome-prado',
+    level: L, name: 'biome-copa',
     height: (x, z) => (noise2(x, z, 0.04, 41) - 0.5) * 2.5,
     color: (x, z, h, c) => lerpColor(c, '#5f8a35', '#9bb84a', noise2(x, z, 0.08, 42)),
     material: mats.terrain,
@@ -308,9 +313,11 @@ function meadow({ scene, mats, rand, b }) {
   saplings.forEach(([x, z]) => { for (let k = 0; k < 5; k++) blobs.push({ p: V(x + (rand() - 0.5) * 4, terrain.h(x, z) + 5 + rand() * 2, z + (rand() - 0.5) * 4), s: V(2.4, 1.6, 2.4), color: '#68724c' }); });
   scene.add(instances(new THREE.IcosahedronGeometry(1, 1), std({ flatShading: true }), blobs));
 
+  giantFlowers(scene, rand, terrain.h, free);
+
   // landmark: a ring of standing stones
   const stones = Array.from({ length: 11 }, (_, k) => ({ p: polar(9, (k / 11) * Math.PI * 2, terrain.h(0, 0) - 0.3), s: V(1.3, 5 + rand() * 3, 0.8), rot: [0, (k / 11) * Math.PI * 2, (rand() - 0.5) * 0.1], color: '#9a958a' }));
   scene.add(instances(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), std({ flatShading: true }), stones));
 
-  return { walkables: [terrain.mesh], trails, trailLength: trails.length };
+  return { h: terrain.h, walkables: [terrain.mesh], trails, trailLength: trails.length };
 }

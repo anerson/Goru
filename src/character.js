@@ -2,13 +2,15 @@
 // facing -z), with a backpack and a lantern, and a procedural walk / run / fly animation.
 import * as THREE from 'three';
 
-export function createCharacter() {
+// Options let the same figure dress the villagers: colours, no lantern light, no backpack.
+export function createCharacter({ name = 'player', skin: skinC = '#c99674', shirt: shirtC = '#2f7f86', pants: pantsC = '#3a3226', hat = '#7a4b2a', light = true, pack = true, scale = 1 } = {}) {
   const root = new THREE.Group();
-  root.name = 'player';
-  const skin = new THREE.MeshStandardMaterial({ color: '#c99674', roughness: 0.75 });
-  const shirt = new THREE.MeshStandardMaterial({ color: '#2f7f86', roughness: 0.8 });
-  const pants = new THREE.MeshStandardMaterial({ color: '#3a3226', roughness: 0.9 });
-  const leather = new THREE.MeshStandardMaterial({ color: '#7a4b2a', roughness: 0.7 });
+  root.name = name;
+  root.scale.setScalar(scale);
+  const skin = new THREE.MeshStandardMaterial({ color: skinC, roughness: 0.75 });
+  const shirt = new THREE.MeshStandardMaterial({ color: shirtC, roughness: 0.8 });
+  const pants = new THREE.MeshStandardMaterial({ color: pantsC, roughness: 0.9 });
+  const leather = new THREE.MeshStandardMaterial({ color: hat, roughness: 0.7 });
   const add = (parent, geo, mat, x, y, z) => {
     const m = new THREE.Mesh(geo, mat);
     m.position.set(x, y, z);
@@ -24,7 +26,7 @@ export function createCharacter() {
   add(body, new THREE.SphereGeometry(0.15, 16, 12), skin, 0, 0.76, 0);
   add(body, new THREE.CylinderGeometry(0.17, 0.17, 0.06, 16), leather, 0, 0.84, 0);       // hat brim
   add(body, new THREE.CylinderGeometry(0.11, 0.13, 0.12, 16), leather, 0, 0.9, 0);        // hat crown
-  add(body, new THREE.BoxGeometry(0.32, 0.38, 0.16), leather, 0, 0.36, 0.22);            // backpack (behind: +z)
+  if (pack) add(body, new THREE.BoxGeometry(0.32, 0.38, 0.16), leather, 0, 0.36, 0.22);  // backpack (behind: +z)
   const lantern = add(body, new THREE.SphereGeometry(0.07, 10, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffd28a').multiplyScalar(2) }), 0.16, 0.1, 0.32);
 
   const limb = (parent, x, y, len, rad, mat) => {
@@ -40,9 +42,12 @@ export function createCharacter() {
   const armR = limb(body, 0.27, 0.56, 0.62, 0.065, shirt);
 
   // A soft light carried by the explorer, so dark corners stay readable.
-  const glow = new THREE.PointLight('#ffd9a0', 6, 9, 2);
-  glow.position.set(0, 1.3, 0.4);
-  root.add(glow);
+  if (light) {
+    const glow = new THREE.PointLight('#ffd9a0', 6, 9, 2);
+    glow.position.set(0, 1.3, 0.4);
+    root.add(glow);
+  }
+  lantern.visible = pack;
 
   let phase = 0, heading = 0, amount = 0;
 
@@ -73,5 +78,16 @@ export function createCharacter() {
     lantern.material.color.setScalar(1.6 + Math.sin(phase * 0.7) * 0.15).multiply(new THREE.Color('#ffd28a'));
   }
 
-  return { root, update };
+  // villagers: stand, breathe, turn to face someone
+  function idle(dt, t, faceYaw) {
+    if (faceYaw !== null && faceYaw !== undefined) {
+      const d = Math.atan2(Math.sin(faceYaw - heading), Math.cos(faceYaw - heading));
+      heading += d * (1 - Math.exp(-5 * dt));
+      root.rotation.y = heading;
+    }
+    body.position.y = 0.95 + Math.sin(t * 1.6) * 0.012;
+    armL.rotation.x = Math.sin(t * 1.1) * 0.05; armR.rotation.x = -armL.rotation.x;
+  }
+
+  return { root, update, idle, setHeading: (h) => { heading = h; root.rotation.y = h; } };
 }

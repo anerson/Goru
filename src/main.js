@@ -14,6 +14,8 @@ import { createParticles } from './particles.js';
 import { createWalker } from './player.js';
 import { createInput } from './input.js';
 import { createCharacter } from './character.js';
+import { createGame } from './game/game.js';
+import { createHud } from './game/hud.js';
 import {
   TRUNK, ringR, strandR, strandTheta,
   RAMP, GALLERY, BIOMES, LOOKOUT, TOP_BRIDGES, ENTRANCES, APPROACH, ROUTES, DISK_R, levelBridges, junctionAngle,
@@ -50,11 +52,11 @@ let windLevel = reduceMotion ? 0.3 : 1;
 
 function buildWorld() {
   const tex = createTextures(renderer);
-  const barkProps = { color: '#b3afa2', map: tex.bark, normalMap: tex.barkNormal, normalScale: new THREE.Vector2(1.4, 1.4), roughness: 0.93 };
+  const barkProps = { color: '#a89a88', map: tex.bark, normalMap: tex.barkNormal, normalScale: new THREE.Vector2(1.4, 1.4), roughness: 0.93 };
   const mats = {
     bark: addWind(new THREE.MeshStandardMaterial(barkProps)),
     barkStatic: new THREE.MeshStandardMaterial(barkProps),
-    leaf: addWind(new THREE.MeshStandardMaterial({ color: '#8a8f80', side: THREE.DoubleSide, roughness: 0.7 }), { flutter: true, silverBack: true }),
+    leaf: addWind(new THREE.MeshStandardMaterial({ color: '#9aa48a', side: THREE.DoubleSide, roughness: 0.7 }), { flutter: true, silverBack: true }),
     olive: addWind(new THREE.MeshStandardMaterial({ roughness: 0.35 })),
     planks: new THREE.MeshStandardMaterial({ map: tex.planks, normalMap: tex.planksNormal, roughness: 0.85, side: THREE.DoubleSide }),
     wood: new THREE.MeshStandardMaterial({ color: '#5c4129', roughness: 0.8 }),
@@ -86,11 +88,13 @@ function buildWorld() {
   const character = createCharacter();
   character.root.visible = false;
   scene.add(character.root);
+  const hud = createHud($('hud'));
+  const game = createGame({ scene, biomes, walker, hud });
 
   $('sHeight').textContent = `${Math.round(canopy.maxY)} m`;
   $('sCrown').textContent = `${(canopy.crownR * 2 / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`;
   $('sPaths').textContent = `${((paths.totalLength + biomes.trailLength) / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`;
-  return { walker, character, canopy, updateParticles, updateBiomes: biomes.update, paths: biomes.paths };
+  return { walker, character, canopy, game, hud, updateParticles, updateBiomes: biomes.update, paths: biomes.paths };
 }
 
 // ---------- places you can jump to ----------
@@ -145,8 +149,10 @@ function exitWalk() {
   orbit.enabled = true;
   camera.position.copy(ORBIT_HOME.pos);
   orbit.target.copy(ORBIT_HOME.target);
-  document.body.classList.remove('walking');
-  if (world) world.character.root.visible = false;
+  document.body.classList.remove('walking', 'journey');
+  if (world) { world.character.root.visible = false; if (journey) world.game.save(); }
+  journey = false;
+  $('bContinue').hidden = !world?.game.hasSave();
   input.releaseLock();
   setFly(false);
 }
@@ -162,7 +168,20 @@ const input = createInput(renderer.domElement, $('joy'), $('knob'), {
   onLook: (dx, dy) => world?.walker.look(dx, dy),
 });
 addEventListener('keydown', (e) => {
-  if (mode === 'walk' && e.code === 'KeyF' && !e.repeat) setFly(!world.walker.state.flying);
+  if (mode !== 'walk' || !world) return;
+  const g = world.game, h = world.hud;
+  if (journey && h.dialogueOpen) {
+    // dialogue box: number keys pick a choice, Enter / Space / E continue
+    const n = Number(e.key);
+    if (n >= 1 && n <= 9) { h.pick(n - 1); e.preventDefault(); return; }
+    if (['Enter', 'Space', 'KeyE'].includes(e.code) && !e.repeat) { h.pick(0); e.preventDefault(); return; }
+  }
+  if (e.repeat) return;
+  if (e.code === 'KeyF') setFly(!world.walker.state.flying);
+  if (!journey) return;
+  if (e.code === 'KeyE') g.interact();
+  if (e.code === 'KeyQ') g.drink();
+  if (e.code === 'KeyI') h.toggleBag();
 });
 // mouse wheel / trackpad pinch: move the third-person camera closer or further
 renderer.domElement.addEventListener('wheel', (e) => {
@@ -172,7 +191,18 @@ renderer.domElement.addEventListener('wheel', (e) => {
 }, { passive: false });
 
 // ---------- UI ----------
-$('bWalk').onclick = () => enterWalk('trilha');
+let journey = false;
+function startJourney(continueGame) {
+  if (!world) return;
+  journey = true;
+  document.body.classList.add('journey');
+  enterWalk('trilha');
+  world.hud.reset();
+  world.game.start(continueGame);
+}
+$('bStart').onclick = () => startJourney(false);
+$('bContinue').onclick = () => startJourney(true);
+$('bWalk').onclick = () => { journey = false; document.body.classList.remove('journey'); enterWalk('trilha'); };
 $('bExit').onclick = exitWalk;
 $('bFly').onclick = () => setFly(!world.walker.state.flying);
 $('bPlaces').onclick = () => {
@@ -211,9 +241,12 @@ renderer.setAnimationLoop(() => {
 
   if (world) {
     if (mode === 'walk') {
-      world.walker.update(dt, input.read());
+      // no walking while a conversation is open
+      const busy = journey && world.game.busy;
+      world.walker.update(dt, busy ? { forward: 0, right: 0, up: 0, run: false } : input.read());
       world.walker.applyToCamera(camera, t, dt);
       const s = world.walker.state;
+      if (journey) world.game.update(dt, t, { running: s.running && s.moving, flying: s.flying, camYaw: s.yaw });
       world.character.update(dt, { x: s.x, y: s.feet, z: s.z, speed: s.speed, flying: s.flying, moveYaw: s.moveYaw });
       env.setShadowFocus(shadowCenter.set(s.x, s.feet, s.z), 220);
     } else {
@@ -231,6 +264,8 @@ requestAnimationFrame(() => setTimeout(() => {
   try {
     world = buildWorld();
     $('loading').hidden = true;
+    world.hud.bind({ interact: () => world.game.interact(), drink: () => world.game.drink(), useItem: (id) => world.game.useItem(id) });
+    $('bContinue').hidden = !world.game.hasSave();
   } catch (err) {
     $('loading').textContent = 'Não foi possível montar a cena. Recarregue a página.';
     console.error(err);
@@ -245,7 +280,9 @@ window.__oliveira = {
   get paths() { return world?.paths; },
   get camera() { return camera.position.clone(); },
   strands: (y) => Array.from({ length: TRUNK.strands }, (_, i) => ({ x: Math.cos(strandTheta(i, y)) * ringR(y), z: Math.sin(strandTheta(i, y)) * ringR(y), r: strandR(y) })),
-  enterWalk, goTo, setFly,
+  enterWalk, goTo, setFly, startJourney,
+  get game() { return world?.game; },
+  get hud() { return world?.hud; },
   layout: { RAMP, GALLERY, BIOMES, TOP_BRIDGES, LOOKOUT, ENTRANCES, APPROACH, ROUTES, DISK_R, rampStart, bridges: BIOMES.map((b) => levelBridges(b.level)), junctions: BIOMES.map((b) => junctionAngle(b.level)) },
   keys: input.keys,
   step(n, dt = 0.05) { for (let i = 0; i < n; i++) world.walker.update(dt, input.read()); },

@@ -1,5 +1,5 @@
-// Dry Mediterranean plain around the tree: ground, far hills, grass, ordinary-sized olive
-// trees and people. The normal trees (6-8 m) and the people (1.8 m) set the scale.
+// The savanna around Aetherion: golden grass, acacias, far sandstone cliffs and people.
+// The acacias (6-8 m) and the people (1.8 m) set the scale.
 import * as THREE from 'three';
 import { fbm, mulberry32 } from './noise.js';
 import { SEED, TAU, ENTRANCES, LOOP_R, APPROACH } from './tree/layout.js';
@@ -38,14 +38,19 @@ export function buildLandscape(scene, mats) {
   ground.receiveShadow = true;
   scene.add(ground);
 
-  const hillMat = new THREE.MeshStandardMaterial({ color: '#6b6a3d', roughness: 1 });
-  for (let i = 0; i < 18; i++) {
-    const an = (i / 18) * TAU + rand() * 0.3, r = 3600 + rand() * 2200, s = 500 + rand() * 700;
-    const h = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), hillMat);
-    h.scale.set(s * 1.8, s * (0.25 + rand() * 0.3), s);
-    h.position.set(Math.cos(an) * r, -s * 0.12, Math.sin(an) * r);
-    h.rotation.y = rand() * 3;
-    scene.add(h);
+  // distant sandstone cliffs and mesas, banded like the walls in a canyon
+  const cliffMat = new THREE.MeshStandardMaterial({ color: '#a8754a', roughness: 1, flatShading: true });
+  const capMat = new THREE.MeshStandardMaterial({ color: '#c99a66', roughness: 1, flatShading: true });
+  for (let i = 0; i < 26; i++) {
+    const an = (i / 26) * TAU + rand() * 0.2, r = 3200 + rand() * 2400;
+    const w = 300 + rand() * 600, h = 180 + rand() * 420;
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.8, w, h, 9), cliffMat);
+    base.position.set(Math.cos(an) * r, h / 2 - 10, Math.sin(an) * r);
+    base.rotation.y = rand() * 3;
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(w * 0.7, w * 0.8, h * 0.12, 9), capMat);
+    cap.position.set(base.position.x, h + h * 0.06 - 10, base.position.z);
+    cap.rotation.y = base.rotation.y;
+    scene.add(base, cap);
   }
 
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = V(1, 1, 1), p = V(0, 0, 0);
@@ -69,10 +74,10 @@ export function buildLandscape(scene, mats) {
   grass.receiveShadow = true;
   scene.add(grass);
 
-  // ordinary olive trees: an orchard along the approach plus scattered ones
+  // acacias: an avenue along the approach plus scattered ones on the savanna
   const small = 90;
   const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.25, 0.4, 1, 7).translate(0, 0.5, 0), mats.barkStatic, small);
-  const crowns = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: '#68724c', roughness: 0.85, flatShading: true }), small * 5);
+  const crowns = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 0.7, 0.6, 12), new THREE.MeshStandardMaterial({ color: '#4f6a2a', roughness: 0.85, flatShading: true }), small * 5);
   let ci = 0;
   for (let i = 0; i < small; i++) {
     let x, z;
@@ -87,10 +92,10 @@ export function buildLandscape(scene, mats) {
       if (onTrail(x, z)) { x += 20; }
     }
     const h = 2.2 + rand() * 1.2;
-    trunks.setMatrixAt(i, m4.compose(V(x, 0, z), q.setFromEuler(e.set((rand() - 0.5) * 0.3, 0, (rand() - 0.5) * 0.3)), sc.set(1, h, 1)));
+    trunks.setMatrixAt(i, m4.compose(V(x, 0, z), q.setFromEuler(e.set((rand() - 0.5) * 0.3, 0, (rand() - 0.5) * 0.3)), sc.set(1.3, h * 2, 1.3)));
     for (let k = 0; k < 5; k++) {
-      const s = 1.6 + rand() * 1.4;
-      crowns.setMatrixAt(ci++, m4.compose(V(x + (rand() - 0.5) * 3.5, h + 1.4 + rand() * 2, z + (rand() - 0.5) * 3.5), q.identity(), sc.set(s * 1.2, s * 0.8, s * 1.2)));
+      const s = 2.2 + rand() * 1.8;
+      crowns.setMatrixAt(ci++, m4.compose(V(x + (rand() - 0.5) * 4, h * 2 + 1 + rand() * 0.8, z + (rand() - 0.5) * 4), q.identity(), sc.set(s * 1.4, 1, s * 1.4)));
     }
   }
   trunks.castShadow = crowns.castShadow = true;

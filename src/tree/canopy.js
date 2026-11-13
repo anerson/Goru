@@ -10,11 +10,11 @@ const MAX_DEPTH = 8;
 const SPRIGS_PER_SPOT = 60;
 const CLUSTER_RADIUS = 22; // m
 
-// One olive sprig, 1 unit long: eight lanceolate leaves alternating up a stem, plus a tip leaf.
+// One oak sprig, 1 unit long: eight broad leaves alternating up a stem, plus a tip leaf.
 function sprigGeometry() {
   const pos = [];
   const leaf = (t, side, angle, len) => {
-    const bx = 0, by = t, w = 0.045;
+    const bx = 0, by = t, w = 0.11; // broad oak leaves
     const dx = Math.sin(angle) * side, dy = Math.cos(angle);
     const tx = bx + dx * len, ty = by + dy * len;
     const mx = bx + dx * len * 0.42, my = by + dy * len * 0.42;
@@ -100,8 +100,8 @@ export function buildCanopy(group, trunk, mats) {
   for (let i = total - 1; i > 0; i--) { const j = (rand() * (i + 1)) | 0; [order[i], order[j]] = [order[j], order[i]]; }
 
   const leaves = new THREE.InstancedMesh(sprigGeometry(), mats.leaf, total);
-  const greens = ['#4a5733', '#56643b', '#636f45', '#3f4a2b', '#6e7a50', '#59663f'].map((h) => new THREE.Color(h));
-  const silver = new THREE.Color('#8f9870');
+  const greens = ['#2f4a1f', '#3a5a25', '#46682b', '#2a4019', '#55772f', '#3d5f22'].map((h) => new THREE.Color(h));
+  const silver = new THREE.Color('#7f9a4a');
   const col = new THREE.Color(), e = new THREE.Euler(), pp = new THREE.Vector3(), out = new THREE.Vector3();
   const tipPoints = [];
   let n = 0, maxY = 0, crownR = 0;
@@ -129,13 +129,13 @@ export function buildCanopy(group, trunk, mats) {
 
   const oliveCount = Math.min(5000, spots.length * 4);
   const olives = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 8), mats.olive, oliveCount);
-  const oliveTones = ['#2e1d33', '#3b2640', '#5c6a2a', '#4a2a3a'].map((h) => new THREE.Color(h));
+  const oliveTones = ['#7a5428', '#8f6630', '#5f4a22', '#a07a3a'].map((h) => new THREE.Color(h)); // acorns
   for (let i = 0; i < oliveCount; i++) {
     pp.copy(spots[(rand() * spots.length) | 0]).add(rv(CLUSTER_RADIUS * 1.5));
     olives.setMatrixAt(i, m4.compose(pp, q.identity(), sc.set(0.8, 1.1, 0.8)));
     olives.setColorAt(i, oliveTones[(rand() * oliveTones.length) | 0]);
   }
-  olives.name = 'olives';
+  olives.name = 'acorns';
   group.add(olives);
 
   return {

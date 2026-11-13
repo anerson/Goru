@@ -1,0 +1,126 @@
+// The game's on-screen interface (game-ui-ux): needs bars with a warning state, the flask,
+// the current objective with a direction arrow and distance, the interaction prompt, the
+// dialogue box with choices, a backpack, short notices and the end-of-act card.
+// Pure DOM; the game calls these functions, the player's clicks and keys call back into it.
+import { ITEMS, FLASK, NEEDS } from './data.js';
+
+export function createHud(root) {
+  root.innerHTML = `
+    <div class="hud-needs" aria-label="Estado do explorador">
+      <div class="bar" data-k="health"><span>Vida</span><i><b></b></i></div>
+      <div class="bar" data-k="thirst"><span>Sede</span><i><b></b></i></div>
+      <div class="bar" data-k="hunger"><span>Fome</span><i><b></b></i></div>
+      <div class="flask" id="hudFlask"></div>
+    </div>
+    <div class="hud-quest" aria-live="polite">
+      <small>Ato I · Descoberta e sobrevivência</small>
+      <strong id="hudObjective"></strong>
+      <div class="guide" id="hudGuide"><span class="arrow" id="hudArrow">▲</span><span id="hudDist"></span><em id="hudHint"></em></div>
+    </div>
+    <div class="hud-prompt" id="hudPrompt" hidden><kbd>E</kbd><span></span></div>
+    <div class="hud-actions">
+      <button type="button" id="hudUse" hidden>Interagir</button>
+      <button type="button" id="hudDrink">Beber (Q)</button>
+      <button type="button" id="hudBag" aria-expanded="false">Mochila (I)</button>
+    </div>
+    <div class="hud-bag" id="hudBagPanel" hidden></div>
+    <div class="hud-dialogue" id="hudDialogue" hidden>
+      <b id="hudSpeaker"></b>
+      <p id="hudLine"></p>
+      <div class="choices" id="hudChoices"></div>
+    </div>
+    <div class="hud-toasts" id="hudToasts" aria-live="polite"></div>
+    <div class="hud-end" id="hudEnd" hidden><div><h2>Fim do Ato I</h2><p id="hudEndText"></p><button type="button" id="hudEndOk">Continuar explorando</button></div></div>
+  `;
+  const $ = (id) => root.querySelector(`#${id}`);
+  let handlers = { interact() {}, drink() {}, useItem() {} };
+  let choices = [];
+  let lastState = null;
+
+  $('hudUse').onclick = () => handlers.interact();
+  $('hudDrink').onclick = () => handlers.drink();
+  $('hudBag').onclick = () => toggleBag();
+  $('hudEndOk').onclick = () => { $('hudEnd').hidden = true; };
+  function toggleBag(force) {
+    const open = force ?? $('hudBagPanel').hidden;
+    $('hudBagPanel').hidden = !open;
+    $('hudBag').setAttribute('aria-expanded', String(open));
+    if (open && lastState) renderBag(lastState);
+  }
+
+  function renderBag(state) {
+    const rows = Object.entries(state.inv).filter(([, n]) => n > 0).map(([id, n]) => {
+      const it = ITEMS[id];
+      const btn = it.use ? `<button type="button" data-use="${id}">${it.verb}</button>` : '';
+      return `<li><span>${it.name}</span><b>× ${n}</b>${btn}</li>`;
+    });
+    const flask = state.flags.cantil ? `<li><span>Cantil</span><b>${state.flask}/${FLASK.capacity} goles</b><button type="button" data-drink>Beber</button></li>` : '';
+    $('hudBagPanel').innerHTML = `<h3>Mochila</h3><ul>${flask}${rows.join('') || (flask ? '' : '<li class="empty">Vazia. Colete cogumelos, ervas, resina e algas pelo caminho.</li>')}</ul>`;
+    $('hudBagPanel').querySelectorAll('[data-use]').forEach((b) => { b.onclick = () => handlers.useItem(b.dataset.use); });
+    $('hudBagPanel').querySelector('[data-drink]')?.addEventListener('click', () => handlers.drink());
+  }
+
+  function close() { $('hudDialogue').hidden = true; choices = []; }
+
+  const hud = {
+    bind(h) { handlers = h; },
+    objective(text) { $('hudObjective').textContent = text; },
+    needs(state) {
+      for (const k of ['health', 'thirst', 'hunger']) {
+        const el = root.querySelector(`.bar[data-k="${k}"]`);
+        const v = Math.round(state[k]);
+        el.querySelector('b').style.width = `${v}%`;
+        el.classList.toggle('low', v <= NEEDS.warnAt);
+      }
+      $('hudFlask').textContent = state.flags.cantil ? `Cantil ${state.flask}/${FLASK.capacity}` : '';
+    },
+    inventory(state) { lastState = state; if (!$('hudBagPanel').hidden) renderBag(state); },
+    prompt(label) {
+      $('hudPrompt').hidden = !label;
+      $('hudUse').hidden = !label;
+      if (label) $('hudPrompt').querySelector('span').textContent = label;
+    },
+    guide(dist, bearing, hint) {
+      const g = $('hudGuide');
+      if (dist === null || dist === undefined) { g.hidden = true; return; }
+      g.hidden = false;
+      $('hudArrow').style.transform = `rotate(${(-bearing * 180) / Math.PI}deg)`;
+      $('hudDist').textContent = dist < 1000 ? `${Math.round(dist)} m` : `${(dist / 1000).toFixed(1).replace('.', ',')} km`;
+      $('hudHint').textContent = hint ?? '';
+    },
+    toast(msg) {
+      const t = document.createElement('div');
+      t.textContent = msg;
+      $('hudToasts').append(t);
+      setTimeout(() => t.remove(), 3500);
+    },
+    // a description that does not block movement: shown in the dialogue box with one button
+    message(text) {
+      hud.dialogue('', text, [{ text: 'Continuar', pick: close }]);
+    },
+    dialogue(speaker, line, list) {
+      $('hudDialogue').hidden = false;
+      $('hudSpeaker').textContent = speaker;
+      $('hudSpeaker').hidden = !speaker;
+      $('hudLine').textContent = line;
+      choices = list;
+      const box = $('hudChoices');
+      box.innerHTML = '';
+      list.forEach((c, i) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = list.length > 1 ? `${i + 1}. ${c.text}` : c.text;
+        b.onclick = () => c.pick();
+        box.append(b);
+      });
+      box.querySelector('button')?.focus({ preventScroll: true });
+    },
+    closeDialogue: close,
+    get dialogueOpen() { return !$('hudDialogue').hidden; },
+    pick(i) { if (choices[i]) choices[i].pick(); },
+    toggleBag,
+    ending(text) { $('hudEndText').textContent = text; $('hudEnd').hidden = false; },
+    reset() { close(); $('hudEnd').hidden = true; toggleBag(false); $('hudToasts').innerHTML = ''; },
+  };
+  return hud;
+}

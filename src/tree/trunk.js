@@ -1,4 +1,4 @@
-// Nine twisted strands that fuse into an olive trunk, hollow in the middle, each one bending
+// Nine twisted strands that fuse into the oak's trunk, hollow in the middle, each one bending
 // out at the top into a main limb. Buttress roots spread from every strand's foot.
 import * as THREE from 'three';
 import { fbm, vnoise, mulberry32 } from '../noise.js';
@@ -64,12 +64,12 @@ export function buildTrunk(group, barkMat) {
       radii.push(strandR(y));
     }
     // limb: arcs outward and up; `tilt` decides between a spreading or a climbing limb
-    const tilt = 0.35 + rand() * 0.85;
+    const tilt = 0.05 + rand() * 0.55; // oak: limbs spread wide and low rather than climbing
     let R = ringR(TRUNK.top), y = TRUNK.top, th = strandTheta(i, TRUNK.top);
     const r0 = strandR(TRUNK.top);
     for (let s = 1; s <= 6; s++) {
-      R += 40 * (1.25 - tilt * 0.45);
-      y += 25 + tilt * 22 - s * 2.6;
+      R += 48 * (1.25 - tilt * 0.45);
+      y += 20 + tilt * 20 - s * 3.2;
       th += (rand() - 0.5) * 0.1;
       pts.push(V(Math.cos(th) * R, y, Math.sin(th) * R));
       radii.push(r0 * (1 - s * 0.115));
