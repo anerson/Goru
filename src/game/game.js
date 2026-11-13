@@ -178,9 +178,11 @@ export function createGame({ scene, biomes, walker, hud }) {
   for (const res of RESOURCES) {
     const ls = lines[res.biome];
     for (let k = 0; k < res.count; k++) {
-      const li = k % ls.length, frac = 0.12 + ((k * 0.37 + res.item.length * 0.11) % 0.76), side = (k % 2 ? 1 : -1) * (2.6 + (k % 3));
+      // on the Oceano the trails are boardwalks over deep water: put algae on the deck itself
+      const wet = res.biome === 'oceano';
+      const li = k % ls.length, frac = 0.12 + ((k * 0.37 + res.item.length * 0.11) % 0.76), side = (k % 2 ? 1 : -1) * (wet ? 0.8 : 2.6 + (k % 3));
       const pos = along(res.biome, li, frac, side);
-      if (res.biome === 'oceano') pos.y = Math.max(pos.y, LEVEL.oceano.level - 1.2 + 0.7);
+      if (wet) pos.y = Math.max(pos.y, LEVEL.oceano.level - 1.2 + 0.7) + 0.12;
       const mesh = nodeLook[res.item]();
       mesh.position.add(pos);
       scene.add(mesh);

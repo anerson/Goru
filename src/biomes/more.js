@@ -67,7 +67,8 @@ export function volcano({ scene, mats, rand, b }) {
     const r = Math.hypot(x, z);
     const n = 1 - Math.abs(2 * noise2(x, z, 0.03, 71) - 1);          // ridged noise -> winding rivers
     const s = Math.min(1, Math.max(0, (n - 0.86) / 0.04));
-    return s * 2.2 * Math.min(1, Math.max(0, (r - 15) / 5));           // keep the middle solid
+    // keep the middle and a 12 m band along the edge solid, so the bridges and the ramp land on rock
+    return s * 2.2 * Math.min(1, Math.max(0, (r - 15) / 5)) * Math.min(1, Math.max(0, (54 - r) / 4));
   };
   const terrain = makeTerrain({
     level: L, name: 'biome-vulcao',

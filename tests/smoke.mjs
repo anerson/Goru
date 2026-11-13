@@ -208,7 +208,10 @@ const act = await page.evaluate(() => {
   step('sinais', () => { use('sinal_1'); use('sinal_2'); use('sinal_3'); });
   step('Ilian (fim)', () => converse('ilian'));
   // every quest object stands on ground the walker can reach (not floating, not buried)
-  const misplaced = D.items.filter((i) => i.kind !== 'resource' || true).filter((i) => {
+  // (contamination signs float on the water: they must be within reach of a boardwalk instead)
+  const boardwalk = O.paths.oceano.flat();
+  const misplaced = D.items.filter((i) => {
+    if (i.group === 'sinal') return !boardwalk.some((p) => Math.hypot(p.x - i.pos.x, p.z - i.pos.z) < i.radius - 0.5);
     const f = O.floorAt(i.pos.x, i.pos.z, i.pos.y);
     return !(f > i.pos.y - 4 && f < i.pos.y + 1);
   }).map((i) => i.id);
