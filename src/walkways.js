@@ -1,56 +1,17 @@
-// Every path in the world. Inside the trunk: a four-turn spiral ramp, four circular galleries
-// (75/150/225/300 m), four hanging bridges to a ring around the planet, and from the top
-// gallery three bridges out to lookouts. Outside: nine trails through the trunk openings,
-// a loop trail around the tree and a long approach. Floors you can stand on are returned in
-// `walkables`; the player finds the floor with a downward ray against them.
+// Every built path in the world. Inside the trunk: a four-turn spiral ramp along the wall,
+// four circular galleries (75/150/225/300 m), short bridges from each gallery onto that level's
+// ecosystem, and from the top gallery three bridges out to lookouts. Outside: nine trails
+// to the trunk entrances, a loop around the tree and a long approach. Floors you can stand on
+// are returned in `walkables`; the player finds the floor with a downward ray against them.
 import * as THREE from 'three';
 import { mulberry32 } from './noise.js';
 import {
-  SEED, TAU, TRUNK, RAMP, GALLERY, PLANET, TOP_BRIDGES, LOOKOUT, LEVEL_COLORS,
-  ENTRANCES, LOOP_R, APPROACH, HALL_R, ringR, strandR, strandTheta, rampAt, rampStart,
+  SEED, TAU, TRUNK, RAMP, GALLERY, TOP_BRIDGES, LOOKOUT, LEVEL_COLORS, LEVEL_BRIDGES, DISK_R,
+  ENTRANCES, LOOP_R, APPROACH, ringR, strandR, strandTheta, rampAt, rampStart,
 } from './tree/layout.js';
+import { V, angDist, polar, ribbon, offsetLine, label } from './geom.js';
 
-const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const UP = V(0, 1, 0);
-const angDist = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
-const polar = (r, a, y) => V(Math.cos(a) * r, y, Math.sin(a) * r);
-
-// Flat strip along a centre line with horizontal sides; v runs in metres along the strip.
-function ribbon(points, width, closed = false) {
-  const pts = closed ? points.concat([points[0]]) : points;
-  const pos = [], uv = [], idx = [];
-  let len = 0;
-  for (let i = 0; i < pts.length; i++) {
-    const p = pts[i];
-    const a = pts[Math.max(i - 1, 0)], b = pts[Math.min(i + 1, pts.length - 1)];
-    let tx = b.x - a.x, tz = b.z - a.z;
-    if (closed && (i === 0 || i === pts.length - 1)) { tx = pts[1].x - pts[pts.length - 2].x; tz = pts[1].z - pts[pts.length - 2].z; }
-    const tl = Math.hypot(tx, tz) || 1;
-    const sx = -tz / tl * width / 2, sz = tx / tl * width / 2;
-    if (i > 0) len += p.distanceTo(pts[i - 1]);
-    pos.push(p.x - sx, p.y, p.z - sz, p.x + sx, p.y, p.z + sz);
-    uv.push(0, len, width / 3, len);
-    if (i < pts.length - 1) { const k = i * 2; idx.push(k, k + 2, k + 1, k + 1, k + 2, k + 3); }
-  }
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  g.setIndex(idx);
-  g.computeVertexNormals();
-  g.userData.length = len;
-  return g;
-}
-
-// points along an edge offset sideways from a centre line
-function offsetLine(points, offset, closed = false) {
-  return points.map((p, i) => {
-    const a = points[i === 0 ? (closed ? points.length - 1 : 0) : i - 1];
-    const b = points[i === points.length - 1 ? (closed ? 0 : i) : i + 1];
-    let tx = b.x - a.x, tz = b.z - a.z;
-    const tl = Math.hypot(tx, tz) || 1;
-    return V(p.x - (tz / tl) * offset, p.y, p.z + (tx / tl) * offset);
-  });
-}
 
 const circle = (r, y, n, a0 = 0) => Array.from({ length: n }, (_, i) => polar(r, a0 + (i / n) * TAU, y));
 const rampLine = (r, n) => Array.from({ length: n + 1 }, (_, i) => { const { a, y } = rampAt(i / n); return polar(r, a, y); });
@@ -107,9 +68,9 @@ export function buildWalkways(scene, mats) {
   floor(ribbon(rampLine(rampMid, RN), RAMP.rout - RAMP.rin), mats.planks, 'ramp');
   {
     const inner = rampLine(RAMP.rin + 0.15, RN), outer = rampLine(RAMP.rout - 0.15, RN);
-    postsAlong(inner, 4);
+    postsAlong(inner, 4, atJunction);
     postsAlong(outer, 4, atJunction);
-    rail(inner);
+    for (const run of runs(inner, (p) => !atJunction(p))) rail(run);
     for (const run of runs(outer, (p) => !atJunction(p))) rail(run);
     // fascia under both edges
     for (const R of [RAMP.rin, RAMP.rout]) {
@@ -146,7 +107,7 @@ export function buildWalkways(scene, mats) {
   const gMid = (GALLERY.rin + GALLERY.rout) / 2;
   for (const level of GALLERY.levels) {
     floor(ribbon(circle(gMid, level, GN), GALLERY.rout - GALLERY.rin, true), mats.planks, `gallery-${level}`);
-    const mouths = level === PLANET.y ? PLANET.bridgeAngles : [];
+    const mouths = LEVEL_BRIDGES;
     const outerMouths = level === GALLERY.levels[3] ? TOP_BRIDGES : [];
     const inner = circle(GALLERY.rin + 0.15, level, GN), outer = circle(GALLERY.rout - 0.15, level, GN);
     const innerOpen = (p) => { const a = Math.atan2(p.z, p.x); return angDist(a, rampStart) < 0.11 || mouths.some((m) => angDist(a, m) < 0.03); };
@@ -162,36 +123,21 @@ export function buildWalkways(scene, mats) {
       const end = c.clone().add(V(-Math.cos(th), 0, -Math.sin(th)).multiplyScalar(strandR(level - 10) * 0.85));
       for (const d of [-0.04, 0.04]) beams.push([polar(GALLERY.rout - 0.5, th + d, level - 0.5), end, 0.6]);
     }
-    scene.add(label(levelName(level), LEVEL_COLORS[level], polar(RAMP.rin - 1, rampStart, level + 7), 26));
-  }
 
-  // ---- ring around the planet + hanging bridges ---------------------------
-  const pMid = (PLANET.ringIn + PLANET.ringOut) / 2;
-  floor(ribbon(circle(pMid, PLANET.y, 240), PLANET.ringOut - PLANET.ringIn, true), mats.planks, 'planet-ring');
-  {
-    const inner = circle(PLANET.ringIn + 0.15, PLANET.y, 240), outer = circle(PLANET.ringOut - 0.15, PLANET.y, 240);
-    const outerOpen = (p) => { const a = Math.atan2(p.z, p.x); return PLANET.bridgeAngles.some((m) => angDist(a, m) < 0.05); };
-    postsAlong(inner.concat([inner[0]]), 3);
-    postsAlong(outer.concat([outer[0]]), 3, outerOpen);
-    rail(inner, true);
-    for (const run of runs(outer.concat([outer[0]]), (p) => !outerOpen(p))) rail(run);
-    for (let k = 0; k < 16; k++) lanterns.push([polar(PLANET.ringOut - 0.15, (k / 16) * TAU + 0.1, PLANET.y + 1.4), LEVEL_COLORS[150]]);
-  }
-  for (const ang of PLANET.bridgeAngles) {
-    const line = sagLine(polar(GALLERY.rin + 0.2, ang, PLANET.y), polar(PLANET.ringOut - 0.2, ang, PLANET.y), PLANET.sag, 48);
-    floor(ribbon(line, PLANET.bridgeWidth), mats.planks, 'planet-bridge');
-    for (const s of [-1, 1]) {
-      const edge = offsetLine(line, s * (PLANET.bridgeWidth / 2 - 0.1));
-      postsAlong(edge, 2.5);
-      rail(edge, false, mats.rope, 0.07);
+    // short bridges across the ramp gap onto the ecosystem, and a rail round the floor's edge
+    for (const ang of LEVEL_BRIDGES) {
+      const line = Array.from({ length: 9 }, (_, i) => polar(DISK_R - 1 + (i / 8) * (GALLERY.rin - DISK_R + 1.4), ang, level));
+      floor(ribbon(line, 3.2), mats.planks, 'level-bridge');
+      for (const s of [-1, 1]) {
+        const edge = offsetLine(line, s * 1.5);
+        postsAlong(edge, 2);
+        rail(edge, false, mats.wood, 0.06);
+      }
     }
-    // cables from the bridge mouth up into the wall
-    for (const s of [-1, 1]) beams.push([polar(GALLERY.rin, ang + s * 0.02, PLANET.y + 1.2), polar(84, ang + s * 0.05, PLANET.y + 60), 0.12]);
-  }
-  // vines that hold the ring, hanging from high in the trunk
-  for (let k = 0; k < 8; k++) {
-    const a = (k / 8) * TAU + 0.3;
-    beams.push([polar(PLANET.ringOut - 0.5, a, PLANET.y), polar(80, a + 0.25, PLANET.y + 120), 0.5]);
+    const edge = circle(DISK_R - 0.2, level, 360);
+    const edgeOpen = (p) => { const a = Math.atan2(p.z, p.x); return angDist(a, rampStart) < 0.11 || LEVEL_BRIDGES.some((m) => angDist(a, m) < 0.035); };
+    postsAlong(edge.concat([edge[0]]), 4, edgeOpen);
+    for (const run of runs(edge.concat([edge[0]]), (p) => !edgeOpen(p))) rail(run);
   }
 
   // ---- top bridges and lookouts --------------------------------------------
@@ -227,12 +173,7 @@ export function buildWalkways(scene, mats) {
     for (let k = 0; k < 8; k++) lanterns.push([c.clone().add(polar(LOOKOUT.radius - 0.15, (k / 8) * TAU, 1.4)), LEVEL_COLORS[300]]);
   }
 
-  // ---- ground: hall floor, nine trails, loop, approach ------------------------
-  const hall = new THREE.Mesh(new THREE.CircleGeometry(HALL_R, 96), mats.hallFloor);
-  hall.rotation.x = -Math.PI / 2;
-  hall.position.y = 0.03;
-  hall.receiveShadow = true;
-  scene.add(hall);
+  // ---- ground outside: nine trails to the entrances, loop, approach ------------
   const stones = [];
   const trail = (line, width, closed = false) => {
     const g = ribbon(line, width, closed);
@@ -243,7 +184,7 @@ export function buildWalkways(scene, mats) {
     if (!closed) for (const s of [-1, 1]) offsetLine(line, s * (width / 2 + 0.6)).forEach((p, i) => { if (i % 2 === 0) stones.push(p); });
   };
   for (const a of ENTRANCES) {
-    const line = Array.from({ length: 80 }, (_, i) => polar(20 + (i / 79) * (LOOP_R - 20), a + Math.sin(i * 0.15) * 0.004, 0.05));
+    const line = Array.from({ length: 70 }, (_, i) => polar(96 + (i / 69) * (LOOP_R - 96), a + Math.sin(i * 0.15) * 0.004, 0.05));
     trail(line, 4);
   }
   trail(circle(LOOP_R, 0.05, 400), 5, true);
@@ -280,13 +221,6 @@ export function buildWalkways(scene, mats) {
   });
   scene.add(lanternMesh);
 
-  // warm fill at the bottom and the top of the hollow (the planet lights the middle)
-  for (const y of [30, 280]) {
-    const L = new THREE.PointLight('#ffc27a', 5000, 0, 2);
-    L.position.set(0, y, 0);
-    scene.add(L);
-  }
-
   return { walkables, totalLength, lookoutCentres };
 }
 
@@ -294,27 +228,4 @@ function bandColor(y) {
   let best = GALLERY.levels[0];
   for (const L of GALLERY.levels) if (Math.abs(L - y) < Math.abs(best - y)) best = L;
   return LEVEL_COLORS[best];
-}
-
-function levelName(level) {
-  return { 75: 'Galeria 75 m', 150: 'Galeria 150 m · Planeta', 225: 'Galeria 225 m', 300: 'Topo 300 m · Mirantes' }[level];
-}
-
-// A floating sign: big, readable text on a sprite, used as a landmark at each junction.
-function label(text, color, position, width) {
-  const c = document.createElement('canvas');
-  c.width = 1024; c.height = 160;
-  const g = c.getContext('2d');
-  g.fillStyle = 'rgba(20, 22, 16, 0.72)';
-  g.beginPath(); g.roundRect(8, 8, 1008, 144, 28); g.fill();
-  g.fillStyle = color;
-  g.font = '700 76px "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif';
-  g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.fillText(text, 512, 84);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, fog: false }));
-  s.scale.set(width, (width * 160) / 1024, 1);
-  s.position.copy(position);
-  return s;
 }

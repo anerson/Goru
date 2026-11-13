@@ -9,12 +9,12 @@ import { buildTrunk } from './tree/trunk.js';
 import { buildCanopy, singleLeafGeometry } from './tree/canopy.js';
 import { buildWalkways } from './walkways.js';
 import { buildLandscape } from './landscape.js';
-import { buildPlanet } from './planet.js';
+import { buildBiomes } from './biomes/index.js';
 import { createParticles } from './particles.js';
 import { createWalker } from './player.js';
 import { createInput } from './input.js';
 import {
-  RAMP, GALLERY, PLANET, LOOKOUT, TOP_BRIDGES, ENTRANCES, APPROACH, ROUTES,
+  RAMP, GALLERY, BIOMES, LOOKOUT, TOP_BRIDGES, ENTRANCES, APPROACH, ROUTES, LEVEL_BRIDGES, DISK_R,
   rampAt, rampStart,
 } from './tree/layout.js';
 
@@ -58,12 +58,15 @@ function buildWorld() {
     wood: new THREE.MeshStandardMaterial({ color: '#5c4129', roughness: 0.8 }),
     woodDouble: new THREE.MeshStandardMaterial({ color: '#5c4129', roughness: 0.8, side: THREE.DoubleSide }),
     rope: new THREE.MeshStandardMaterial({ color: '#b59b6c', roughness: 1 }),
-    hallFloor: new THREE.MeshStandardMaterial({ map: tex.dirt, color: '#7d7a5a', roughness: 1, polygonOffset: true, polygonOffsetFactor: -2 }),
     trail: new THREE.MeshStandardMaterial({ map: tex.trail, roughness: 1, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -3 }),
+    trailDirt: new THREE.MeshStandardMaterial({ map: tex.trail, color: '#c9b28c', roughness: 1, polygonOffset: true, polygonOffsetFactor: -3 }),
+    trailSand: new THREE.MeshStandardMaterial({ map: tex.trail, color: '#f0c99a', roughness: 1, polygonOffset: true, polygonOffsetFactor: -3 }),
+    trailSnow: new THREE.MeshStandardMaterial({ map: tex.trail, color: '#b9c6d9', roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -3 }),
+    terrain: new THREE.MeshStandardMaterial({ vertexColors: true, map: tex.terrainDetail, roughness: 0.95 }),
+    slabUnder: new THREE.MeshStandardMaterial({ color: '#3a3326', map: tex.bark, roughness: 1, side: THREE.DoubleSide }),
     stone: new THREE.MeshStandardMaterial({ color: '#9b958a', roughness: 0.9 }),
     ground: new THREE.MeshStandardMaterial({ vertexColors: true, map: tex.groundDetail, roughness: 1 }),
   };
-  tex.dirt.repeat.set(30, 30);
   tex.groundDetail.repeat.set(1400, 1400);
 
   const tree = new THREE.Group();
@@ -74,19 +77,25 @@ function buildWorld() {
   canopy.setFoliage(QUALITY[qualityIndex].foliage);
   const paths = buildWalkways(scene, mats);
   buildLandscape(scene, mats);
-  const updatePlanet = buildPlanet(scene);
+  const biomes = buildBiomes(scene, mats);
   const updateParticles = createParticles(scene, singleLeafGeometry(), mats.leaf, canopy.tipPoints);
-  const walker = createWalker({ walkables: paths.walkables, rootMeshes: trunk.rootMeshes, rootSegs: trunk.rootSegs });
+  const walker = createWalker({ walkables: paths.walkables.concat(biomes.walkables), rootMeshes: trunk.rootMeshes, rootSegs: trunk.rootSegs, noGo: biomes.noGo });
 
   $('sHeight').textContent = `${Math.round(canopy.maxY)} m`;
   $('sCrown').textContent = `${(canopy.crownR * 2 / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`;
-  $('sPaths').textContent = `${(paths.totalLength / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`;
-  return { walker, canopy, updateParticles, updatePlanet };
+  $('sPaths').textContent = `${((paths.totalLength + biomes.trailLength) / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`;
+  return { walker, canopy, updateParticles, updateBiomes: biomes.update };
 }
 
 // ---------- places you can jump to ----------
 const yawToward = (dx, dz) => Math.atan2(-dx, -dz);
 const at = (r, a) => ({ x: Math.cos(a) * r, z: Math.sin(a) * r });
+// arriving on a level: just inside its first bridge, looking toward the middle
+const onLevel = (b, label, pitch = 0.08) => () => {
+  const a = b.level === 0 ? ENTRANCES[0] : LEVEL_BRIDGES[0];
+  const p = at(b.level === 0 ? 90 : DISK_R - 4, a);
+  return { ...p, feet: b.level + 0.5, yaw: yawToward(-p.x, -p.z), pitch, label };
+};
 const PLACES = {
   trilha() {
     const p = at(700, APPROACH.angle);
@@ -96,28 +105,15 @@ const PLACES = {
     const p = at(230, ENTRANCES[0]);
     return { ...p, feet: 0, yaw: yawToward(-p.x, -p.z), pitch: 0.1, label: 'Entrada entre as raízes' };
   },
-  salao() {
-    const p = at(95, ENTRANCES[0]);
-    return { ...p, feet: 0, yaw: yawToward(-p.x, -p.z), pitch: 0.55, label: 'Salão · olhe para o planeta' };
-  },
+  floresta: onLevel(BIOMES[0], `0 m · ${BIOMES[0].name}`, 0.12),
+  lago: onLevel(BIOMES[1], `75 m · ${BIOMES[1].name}`),
+  canion: onLevel(BIOMES[2], `150 m · ${BIOMES[2].name}`),
+  gelo: onLevel(BIOMES[3], `225 m · ${BIOMES[3].name}`),
+  prado: onLevel(BIOMES[4], `300 m · ${BIOMES[4].name}`),
   rampa() {
-    const { a, y } = rampAt(0.1);
+    const { a, y } = rampAt(0.62);
     const p = at(70, a);
-    return { ...p, feet: y, yaw: yawToward(-Math.sin(a), Math.cos(a)), pitch: 0.12, label: `Rampa · ${Math.round(y)} m` };
-  },
-  galeria() {
-    const a = PLANET.bridgeAngles[0], p = at(78, a);
-    return { ...p, feet: PLANET.y, yaw: yawToward(-p.x, -p.z), pitch: 0.02, label: 'Galeria 150 m · ponte para o planeta' };
-  },
-  planeta() {
-    // look along the ring, with the planet filling the left of the view
-    const a = PLANET.bridgeAngles[0] + 0.25, p = at(39, a);
-    const dx = -Math.sin(a) * 0.75 - Math.cos(a) * 0.66, dz = Math.cos(a) * 0.75 - Math.sin(a) * 0.66;
-    return { ...p, feet: PLANET.y, yaw: yawToward(dx, dz), pitch: 0.12, label: 'Anel do planeta' };
-  },
-  topo() {
-    const p = at(78, rampStart + 0.3);
-    return { ...p, feet: GALLERY.levels[3], yaw: yawToward(-p.x, -p.z), pitch: -0.25, label: 'Topo 300 m' };
+    return { ...p, feet: y, yaw: yawToward(-Math.sin(a), Math.cos(a)) + 0.5, pitch: 0.1, label: `Rampa · ${Math.round(y)} m` };
   },
   mirante() {
     const a = TOP_BRIDGES[0], p = at(LOOKOUT.centre + 4, a);
@@ -211,7 +207,7 @@ renderer.setAnimationLoop(() => {
       env.setShadowFocus(shadowCenter.set(0, 300, 0), 1100);
     }
     world.updateParticles(dt, t, windLevel);
-    world.updatePlanet(dt);
+    world.updateBiomes(dt, t);
   }
   if (mode === 'orbit') orbit.update(dt);
   env.render();
@@ -232,8 +228,9 @@ requestAnimationFrame(() => setTimeout(() => {
 window.__oliveira = {
   get ready() { return !!world; },
   get walker() { return world?.walker.state; },
+  floorAt: (x, z, feet) => world?.walker.floorAt(x, z, feet),
   enterWalk, goTo, setFly,
-  layout: { RAMP, GALLERY, PLANET, TOP_BRIDGES, LOOKOUT, ENTRANCES, APPROACH, ROUTES, rampStart },
+  layout: { RAMP, GALLERY, BIOMES, TOP_BRIDGES, LOOKOUT, ENTRANCES, APPROACH, ROUTES, LEVEL_BRIDGES, DISK_R, rampStart },
   keys: input.keys,
   step(n, dt = 0.05) { for (let i = 0; i < n; i++) world.walker.update(dt, input.read()); },
 };

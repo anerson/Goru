@@ -160,5 +160,6 @@ export function createTextures(renderer) {
     dirt: toTexture(dirt, { srgb: true, aniso, repeat: [3, 3] }),
     trail: toTexture(dirt, { srgb: true, aniso }),
     groundDetail: toTexture(paintGroundDetail(rand), { srgb: true, aniso, repeat: [220, 220] }),
+    terrainDetail: toTexture(paintGroundDetail(rand), { srgb: true, aniso }),
   };
 }

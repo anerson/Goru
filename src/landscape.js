@@ -2,7 +2,7 @@
 // trees and people. The normal trees (6-8 m) and the people (1.8 m) set the scale.
 import * as THREE from 'three';
 import { fbm, mulberry32 } from './noise.js';
-import { SEED, TAU, ENTRANCES, LOOP_R, APPROACH, HALL_R } from './tree/layout.js';
+import { SEED, TAU, ENTRANCES, LOOP_R, APPROACH } from './tree/layout.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const angDist = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
@@ -56,7 +56,7 @@ export function buildLandscape(scene, mats) {
   const ga = new THREE.Color('#8e8a48'), gb = new THREE.Color('#c2ae6a'), col = new THREE.Color();
   for (let gi = 0; gi < N;) {
     const an = rand() * TAU;
-    const r = gi < N * 0.15 ? 25 + rand() * (HALL_R - 30) : 180 + Math.pow(rand(), 0.8) * 900;
+    const r = 180 + Math.pow(rand(), 0.8) * 900;
     const x = Math.cos(an) * r, z = Math.sin(an) * r;
     if (onTrail(x, z)) continue;
     p.set(x, 0, z);
@@ -114,6 +114,6 @@ export function buildLandscape(scene, mats) {
   person(along(560, 1), V(0, 0, 0), 0);
   person(along(562, -1), V(0, 0, 0), 1);
   person(along(360, 1.5), V(0, 0, 0), 2);
-  person(V(12, 0, 6), V(0, 0, 0), 3);
-  person(V(14, 0, 4), V(0, 0, 0), 4);
+  person(along(250, 1), V(0, 0, 0), 3);
+  person(along(252, -1), V(0, 0, 0), 4);
 }

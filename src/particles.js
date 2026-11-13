@@ -1,9 +1,8 @@
-// Leaves drifting down from the crown and dust motes hanging in the hollow's light.
+// Leaves drifting down from the crown.
 // Simulation state lives in plain arrays; the meshes are only a view of it.
 import * as THREE from 'three';
 
 const FALL = 400;
-const MOTES = 1200;
 
 export function createParticles(scene, leafGeo, leafMat, tipPoints) {
   const falling = new THREE.InstancedMesh(leafGeo, leafMat, FALL);
@@ -28,19 +27,6 @@ export function createParticles(scene, leafGeo, leafMat, tipPoints) {
   }
   scene.add(falling);
 
-  const moteGeo = new THREE.BufferGeometry();
-  moteGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MOTES * 3), 3));
-  const base = [];
-  for (let i = 0; i < MOTES; i++) {
-    const an = Math.random() * Math.PI * 2, r = Math.sqrt(Math.random()) * 80;
-    base.push([Math.cos(an) * r, 2 + Math.random() * 300, Math.sin(an) * r, Math.random() * 10]);
-  }
-  const motes = new THREE.Points(moteGeo, new THREE.PointsMaterial({
-    color: 0xffe6b0, size: 0.12, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false,
-  }));
-  motes.frustumCulled = false;
-  scene.add(motes);
-
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), scale = new THREE.Vector3(3, 3, 3);
 
   return function update(dt, t, wind) {
@@ -61,13 +47,5 @@ export function createParticles(scene, leafGeo, leafMat, tipPoints) {
     }
     falling.instanceMatrix.needsUpdate = true;
 
-    const mp = moteGeo.attributes.position.array;
-    for (let i = 0; i < MOTES; i++) {
-      const b = base[i];
-      mp[i * 3] = b[0] + Math.sin(t * 0.2 + b[3]) * 3;
-      mp[i * 3 + 1] = b[1] + Math.sin(t * 0.15 + b[3] * 2) * 2;
-      mp[i * 3 + 2] = b[2] + Math.cos(t * 0.18 + b[3]) * 3;
-    }
-    moteGeo.attributes.position.needsUpdate = true;
   };
 }

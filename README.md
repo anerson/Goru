@@ -1,12 +1,23 @@
 # Goru · Oliveira Colossal
 
 Uma oliveira de ~900 m em three.js, para explorar a pé ou voando. Nove troncos torcidos formam
-um salão oco de 180 m de largura com um pequeno planeta flutuando no meio. São ~10 km de caminhos:
+um tronco oco de 180 m de largura, e dentro dele há um mundo inteiro: cinco ecossistemas
+empilhados, cada um com o próprio sol pendurado no teto (o fundo do andar de cima).
+
+| Altura | Ecossistema | O que tem |
+|--------|-------------|-----------|
+| 0 m | Floresta das Raízes | cogumelos que brilham, samambaias, árvores pequenas, vaga-lumes |
+| 75 m | Lago Suspenso | lagos com passarelas de madeira, juncos, vitórias-régias, salgueiros, névoa |
+| 150 m | Cânion Vermelho | dunas, mesas de rocha, cactos, marcos de pedra, um arco, poeira |
+| 225 m | Caverna de Gelo | neve caindo, pinheiros nevados, cristais, lago congelado |
+| 300 m | Prado do Céu | flores, oliveiras jovens, círculo de pedras, aberto para o céu |
+
+Caminhos (~13 km):
 
 - 9 entradas entre as raízes, ligadas por trilhas a um anel em volta da árvore e a uma trilha de chegada;
-- uma rampa espiral de 4 voltas pela parede interna, do chão aos 300 m;
-- galerias circulares a 75, 150, 225 e 300 m, cada uma com uma cor de lanterna;
-- 4 pontes suspensas da galeria de 150 m até o anel que circunda o planeta;
+- uma rampa espiral de 4 voltas pela parede interna, que chega a cada andar no mesmo ponto;
+- em cada andar: uma galeria circular, 3 pontes curtas até o ecossistema, trilhas de cada
+  entrada até o marco central e uma trilha em anel;
 - 3 pontes do topo que saem pelas frestas do tronco até mirantes do lado de fora.
 
 ## Rodar
@@ -38,11 +49,13 @@ src/wind.js           vento no vertex shader (galhos, folhas e azeitonas balanç
 src/tree/layout.js    a planta: troncos, rampa, galerias, pontes, trilhas e o grafo de rotas
 src/tree/trunk.js     troncos torcidos, galhos principais e raízes (tubos com ruído)
 src/tree/canopy.js    galhos recursivos, ~70 mil raminhos de folhas e azeitonas (InstancedMesh)
-src/walkways.js       rampa, galerias, pontes, anel do planeta, mirantes, trilhas, placas
+src/walkways.js       rampa, galerias, pontes de cada andar, mirantes, trilhas de fora
+src/biomes/index.js   os cinco ecossistemas
+src/biomes/common.js  terreno, trilhas, teto de cada andar (raízes, musgo, sol)
+src/geom.js           faixas, placas e instâncias usadas em todo lugar
 src/landscape.js      chão, grama, oliveiras normais e pessoas para dar escala
-src/planet.js         o planeta: mares, continentes, nuvens, atmosfera e a luz do salão
-src/particles.js      folhas caindo e poeira no ar
-src/player.js         primeira pessoa e voo: colisão com troncos, raízes e planeta; piso por raycast
+src/particles.js      folhas caindo da copa
+src/player.js         primeira pessoa e voo: colisão com troncos, raízes, pisos e água; piso por raycast
 src/input.js          teclado, mouse, pointer lock e joystick na tela
 tests/smoke.mjs       teste: grafo de rotas, render sem erro e percurso de cada tipo de caminho
 ```
@@ -59,9 +72,9 @@ node tests/smoke.mjs http://localhost:5173
 ```
 
 O teste falha se a página registrar erro, se algum lugar do grafo de rotas virar beco sem saída,
-ou se o jogador não conseguir: entrar pelo vão das raízes, subir a rampa inteira, atravessar a
-ponte até o planeta, atravessar a ponte do topo até o mirante. Também confere que voando não
-se atravessa o planeta. Os passos são simulados direto no código, então o
+ou se o jogador não conseguir: entrar pelo vão das raízes, subir a rampa inteira, chegar ao
+centro de cada ecossistema pela ponte do andar, atravessar a ponte do topo até o mirante.
+Também confere que a água do lago bloqueia e que voando não se atravessa o piso entre andares. Os passos são simulados direto no código, então o
 resultado não depende da velocidade da máquina.
 
 ## Skills usadas

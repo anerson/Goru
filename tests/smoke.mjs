@@ -37,7 +37,13 @@ if (process.env.THREE_DIR) {
 await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.fulfill({ body: '', contentType: 'text/css' }));
 
 await page.goto(url);
-await page.waitForFunction(() => window.__oliveira?.ready && window.renderer?.info.render.frame > 2, null, { timeout: 240000 });
+await page.waitForFunction(() => (window.__oliveira?.ready && window.renderer?.info.render.frame > 2)
+  || document.getElementById('loading')?.textContent.startsWith('Não'), null, { timeout: 240000 });
+if (!(await page.evaluate(() => window.__oliveira?.ready))) {
+  console.log(JSON.stringify({ errors: errors.length ? errors : ['the scene did not build'] }, null, 2));
+  await browser.close();
+  process.exit(1);
+}
 const stats = await page.evaluate(() => ({
   height: document.getElementById('sHeight').textContent,
   crown: document.getElementById('sCrown').textContent,
@@ -54,11 +60,11 @@ const walk = await page.evaluate(() => {
   const face = (dx, dz) => { w().yaw = Math.atan2(-dx, -dz); };
   const out = {};
 
-  // through an entrance between the roots into the hall
+  // through an entrance between the roots into the forest
   O.enterWalk('entrada');
   O.keys.add('KeyW'); O.keys.add('ShiftLeft');
   O.step(300);
-  out.entranceToHall = { r: +r().toFixed(1), ok: r() < 100 };
+  out.entranceToForest = { r: +r().toFixed(1), ok: r() < 100 };
 
   // the whole spiral ramp, ground to 300 m, steering along the centre line
   const a0 = L.rampStart + 0.01;
@@ -71,34 +77,62 @@ const walk = await page.evaluate(() => {
   }
   out.rampToTop = { feet: +w().feet.toFixed(1), ok: w().feet > L.RAMP.top - 1 };
 
-  // gallery 150 -> hanging bridge -> planet ring (and the ring's inner rail stops you)
-  O.goTo('galeria');
-  O.step(200);
-  out.bridgeToPlanet = { r: +r().toFixed(1), feet: +w().feet.toFixed(1), ok: r() < L.PLANET.ringOut && Math.abs(w().feet - L.PLANET.y) < 0.6 };
+  // every level: from its gallery across a short bridge onto the ecosystem, then to the middle
+  out.levels = {};
+  for (const b of L.BIOMES.slice(1)) {
+    const a = L.LEVEL_BRIDGES[1];
+    Object.assign(w(), { x: Math.cos(a) * 78, z: Math.sin(a) * 78, feet: b.level, vy: 0 });
+    face(-Math.cos(a), -Math.sin(a));
+    O.keys.clear(); O.keys.add('KeyW'); O.keys.add('ShiftLeft');
+    O.step(72);                                    // ~65 m at run speed: bridge + most of the way in
+    out.levels[b.id] = { r: +r().toFixed(1), height: +(w().feet - b.level).toFixed(1) };
+    out.levels[b.id].ok = r() < 30 && Math.abs(w().feet - b.level) < 6;
+  }
+  out.levels.ok = Object.values(out.levels).every((v) => v.ok);
+
+  // the lake's water is a barrier: walking straight off the shore into it is refused
+  {
+    const lago = L.BIOMES[1];
+    let probe = null;
+    for (let r = 20; r < 62 && !probe; r += 0.5) for (let k = 0; k < 64 && !probe; k++) {
+      const a = (k / 64) * Math.PI * 2, x = Math.cos(a) * r, z = Math.sin(a) * r;
+      if (O.floorAt(x, z, lago.level + 1) < lago.level - 2.5) probe = { x, z };
+    }
+    if (probe) {
+      const d = Math.hypot(probe.x, probe.z), ux = probe.x / d, uz = probe.z / d;
+      // start 10 m toward the centre from the water and walk outward into it
+      Object.assign(w(), { x: probe.x - ux * 10, z: probe.z - uz * 10, feet: lago.level + 3, vy: 0 });
+      O.step(1);
+      face(ux, uz);
+      O.keys.clear(); O.keys.add('KeyW');
+      O.step(80);
+      out.waterBlocks = { feet: +(w().feet - lago.level).toFixed(1), ok: w().feet > lago.level - 1.3 };
+    } else out.waterBlocks = { ok: false, note: 'no water found' };
+  }
 
   // top gallery -> bridge out through the trunk -> far edge of a lookout (no falling off)
   const ta = L.TOP_BRIDGES[0];
   Object.assign(w(), { x: Math.cos(ta) * 78, z: Math.sin(ta) * 78, feet: L.GALLERY.levels[3], vy: 0 });
   face(Math.cos(ta), Math.sin(ta));
+  O.keys.clear(); O.keys.add('KeyW'); O.keys.add('ShiftLeft');
   O.step(400);
   out.bridgeToLookout = { r: +r().toFixed(1), feet: +w().feet.toFixed(1), ok: r() > L.LOOKOUT.centre && Math.abs(w().feet - 300) < 0.6 };
+  O.keys.clear();
 
-  // flying up from the hall stops at the planet instead of passing through it
-  O.goTo('salao');
-  Object.assign(w(), { x: 0, z: 0, feet: 20 });
+  // flying up from the forest stops under the floor of the lake level
+  Object.assign(w(), { x: 5, z: 5, feet: 20, vy: 0 });
   O.setFly(true); O.keys.clear(); O.keys.add('Space');
   O.step(200);
-  out.flyBlockedByPlanet = { feet: +w().feet.toFixed(1), ok: w().feet < L.PLANET.y - L.PLANET.radius };
+  out.flyBlockedBySlab = { feet: +w().feet.toFixed(1), ok: w().feet < L.BIOMES[1].level - 6 };
   O.keys.clear(); O.setFly(false);
   return out;
 });
 
-await page.evaluate(() => window.__oliveira.goTo('salao'));
-await page.waitForTimeout(4000);
-await page.screenshot({ path: 'tests/smoke-hall.png', timeout: 240000 });
-await page.evaluate(() => window.__oliveira.goTo('planeta'));
-await page.waitForTimeout(4000);
-await page.screenshot({ path: 'tests/smoke-planet.png', timeout: 240000 });
+for (const place of ['floresta', 'lago', 'canion', 'gelo', 'prado']) {
+  await page.evaluate((p) => window.__oliveira.goTo(p), place);
+  await page.waitForTimeout(3000);
+  await page.screenshot({ path: `tests/smoke-${place}.png`, timeout: 240000 });
+}
 await browser.close();
 
 const ok = !errors.length && !graphProblems.length && Object.values(walk).every((c) => c.ok);
