@@ -37,7 +37,7 @@ O progresso é salvo no navegador.
 ## Modo Mestre (para o GM)
 
 Abra o jogo com `#mestre` no fim do endereço para ver o botão **Mestre**, ou aperte **Shift+G**
-durante a jornada. O mestre empunha o **Cajado do GM**: dano infinito, e um feixe de seiva que
+durante a jornada. O mestre empunha o **Cajado do GM**: 999.999.999 de dano, e um feixe de seiva que
 atinge a criatura na mira até 40 m de distância (de perto, varre um arco largo). Ganha também um
 painel com:
 

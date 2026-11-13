@@ -159,7 +159,7 @@ body.journey .place { display: none !important; }
 .hud-hurt.on { animation: hurt 0.45s ease-out; }
 @keyframes hurt { from { opacity: 1; } to { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .hud-hurt.on { animation-duration: 0.2s; } }
-.dmg { position: fixed; left: 0; top: 0; font: 800 18px/1 var(--display); text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8); pointer-events: none; }
+.dmg { position: fixed; left: 0; top: 0; font: 800 18px/1 var(--display); white-space: nowrap; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8); pointer-events: none; }
 #hudAttack { background: #8a2a1a; border-color: #c9483a; font-weight: 800; }
 /* crosshair: four ticks and a dot at the centre of the view */
 .hud-aim { position: fixed; left: 50%; top: 50%; width: 28px; height: 28px; margin: -14px 0 0 -14px; pointer-events: none; }

@@ -1,7 +1,7 @@
 // Modo Mestre: the Game Master's tools. Opened with Shift+G (or the "Mestre" button that
 // appears when the page is opened with #mestre). Players never see it otherwise.
 //
-// The GM carries the Cajado do GM (infinite damage, a sap beam up to 40 m at the crosshair) and can:
+// The GM carries the Cajado do GM (999.999.999 damage, a sap beam up to 40 m at the crosshair) and can:
 //   R  Onda de Seiva   every creature within 18 m falls
 //   T  Acalmar         creatures within 25 m stop hunting for 30 s (the base of negotiating)
 //   V  Invocar         the chosen creature or boss appears 6 m ahead, on the current level
@@ -13,7 +13,7 @@ export function createGM({ root, game, combat, hud, isJourney }) {
   let on = false;
   root.innerHTML = `
     <h3>Mestre do Jogo</h3>
-    <p class="gm-weapon">Arma: <b>Cajado do GM</b> · dano infinito · mire e ataque até 40 m</p>
+    <p class="gm-weapon">Arma: <b>Cajado do GM</b> · dano <b>999.999.999</b> · mire e ataque até 40 m</p>
     <div class="gm-row">
       <button type="button" data-t="invulnerable" aria-pressed="false">Invencível</button>
       <button type="button" data-t="frozenNeeds" aria-pressed="false">Sem fome e sede</button>

@@ -17,11 +17,11 @@ import { CREATURES, FAUNA } from './creatures.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 // Weapons. The explorer's staff is a melee weapon. The Cajado do GM belongs to the Game Master
-// (gm.js): infinite damage, and it fires a beam of sap at whatever is under the crosshair, up to
+// (gm.js): 999.999.999 damage, and it fires a beam of sap at whatever is under the crosshair, up to
 // 40 m away (with nothing aimed it still sweeps close range).
 export const WEAPONS = {
   cajado: { name: 'Cajado do explorador', damage: [18, 26], range: 2.6, cone: Math.cos(THREE.MathUtils.degToRad(60)), cooldown: 0.45, color: '#fff2c8' },
-  gm: { name: 'Cajado do GM', damage: [Infinity, Infinity], range: 6, reach: 40, cone: Math.cos(THREE.MathUtils.degToRad(80)), cooldown: 0.25, color: '#ffd76a' },
+  gm: { name: 'Cajado do GM', damage: [999999999, 999999999], range: 6, reach: 40, cone: Math.cos(THREE.MathUtils.degToRad(80)), cooldown: 0.25, color: '#ffd76a' },
 };
 const CHASE_IN = 12, CHASE_OUT = 20, LEASH = 32, BOSS_LEASH = 46;
 
@@ -109,7 +109,8 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     m.flash = 0.12;
     const away = m.pos.clone().sub(from).setY(0).normalize();
     m.knock.copy(away).multiplyScalar(m.boss ? 2 : 7);
-    popNumber(m.pos.clone().setY(m.pos.y + m.model.height + 0.6), amount === Infinity ? '∞' : String(Math.round(amount)), amount === Infinity ? '#ffd76a' : '#ffe9a8');
+    const huge = amount >= 1e6;
+    popNumber(m.pos.clone().setY(m.pos.y + m.model.height + 0.6), Math.round(amount).toLocaleString('pt-BR'), huge ? '#ffd76a' : '#ffe9a8');
     feedback(m.boss ? 'large' : 'medium');
     if (m.state === 'idle' || m.state === 'alert' || m.state === 'return') { m.state = 'chase'; m.timer = 0; }
     if (m.hp <= 0) { die(m); return; }
