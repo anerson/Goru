@@ -112,7 +112,16 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     popNumber(m.pos.clone().setY(m.pos.y + m.model.height + 0.6), amount === Infinity ? '∞' : String(Math.round(amount)), amount === Infinity ? '#ffd76a' : '#ffe9a8');
     feedback(m.boss ? 'large' : 'medium');
     if (m.state === 'idle' || m.state === 'alert' || m.state === 'return') { m.state = 'chase'; m.timer = 0; }
-    if (m.hp <= 0) die(m);
+    if (m.hp <= 0) { die(m); return; }
+    // a story boss at a quarter of its health yields instead of fighting on: the player chooses
+    if (m.boss && m.boss !== 'gm' && !m.yielded && m.hp <= m.def.hp * 0.25) {
+      m.yielded = true;
+      m.state = 'yield';
+      m.knock.set(0, 0, 0);
+      lane.visible = ring.visible = false;
+      hud.boss(`${m.def.name} · rendido`, m.hp / m.def.hp);
+      game.bossYield(m.boss);
+    }
   }
   function die(m) {
     m.state = 'dead';
@@ -143,7 +152,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     const yaw = me.yaw, fwd = V(-Math.sin(yaw), 0, -Math.cos(yaw));
     let best = null, bestScore = Infinity;
     for (const m of mobs) {
-      if (m.state === 'dead' || m.state === 'dormant' || m.state === 'rise') continue;
+      if (['dead', 'dormant', 'rise', 'yield', 'gone', 'retreat'].includes(m.state) || m.ally) continue;
       const flat = Math.hypot(m.pos.x - me.x, m.pos.z - me.z);
       if (weapon.reach) {
         toMob.set(m.pos.x, m.pos.y + m.model.height * 0.5, m.pos.z).sub(camera.position);
@@ -208,7 +217,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     slash.rotation.y = heading;
     const from = V(me.x, me.feet, me.z);
     for (const m of mobs) {
-      if (m.state === 'dead' || m.state === 'dormant') continue;
+      if (['dead', 'dormant', 'rise', 'yield', 'gone', 'retreat'].includes(m.state) || m.ally) continue;
       const d = V(m.pos.x - me.x, 0, m.pos.z - me.z);
       const dist = d.length();
       if (dist > PLAYER.range + m.model.radius || Math.abs(m.pos.y - me.feet) > 3) continue;
@@ -268,7 +277,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
       return m;
     },
     reviveBosses() {
-      for (const b of Object.values(bosses)) { b.state = 'dormant'; b.hp = b.def.hp; b.pos.copy(b.home); b.model.root.visible = false; b.model.root.scale.setScalar(1); b.summoned = false; }
+      for (const b of Object.values(bosses)) { b.state = 'dormant'; b.hp = b.def.hp; b.pos.copy(b.home); b.model.root.visible = false; b.model.root.scale.setScalar(1); b.summoned = false; b.yielded = false; b.ally = false; }
       resetBosses();
     },
     clearSummons() {
@@ -313,7 +322,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
         }
         face(m, m.wander.x, m.wander.z, dt, 3);
         speed = move(m, m.wander.x - m.pos.x, m.wander.z - m.pos.z, def.speed * 0.3, dt);
-        if (m.sense && sameLevel && dist < CHASE_IN && !(m.calmUntil > now())) { m.state = 'alert'; m.timer = 0.35; }
+        if (!m.ally && m.sense && sameLevel && dist < CHASE_IN && !(m.calmUntil > now())) { m.state = 'alert'; m.timer = 0.35; }
         break;
       }
       case 'alert':
@@ -388,6 +397,14 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
         if (homeD < 2) { m.state = m.boss ? 'lurk' : 'idle'; m.timer = 1; }
         if (sameLevel && dist < CHASE_IN * 0.7 && homeD < (m.boss ? BOSS_LEASH : LEASH) * 0.6) m.state = 'chase';
         break;
+      case 'yield':                                          // kneeling, waiting for the choice
+        windup = 1;
+        break;
+      case 'retreat':                                        // spared: goes back into its lair and vanishes
+        face(m, m.home.x, m.home.z, dt);
+        speed = move(m, m.home.x - m.pos.x, m.home.z - m.pos.z, def.speed * 0.6, dt);
+        if (homeD < 2) { m.state = 'gone'; m.model.root.visible = false; }
+        break;
       case 'lurk':                                           // a boss back home, waiting
         m.hp = Math.min(def.hp, m.hp + def.hp * 0.2 * dt);
         if (sameLevel && dist < 16) { m.state = 'chase'; hud.boss(def.name, m.hp / def.hp); }
@@ -412,9 +429,37 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     hud.toast(`${b.def.name} desperta!`);
     feedback('large');
   }
+  // what the player chose for a yielded boss
+  function applyOutcome(id, how) {
+    const b = bosses[id];
+    if (!b) return;
+    hud.boss(null);
+    if (how === 'destruir') { if (b.state !== 'dead') { b.state = 'chase'; b.yielded = true; die(b); } return; }
+    b.yielded = true;
+    b.hp = b.def.hp;
+    if (how === 'poupar') { b.state = 'retreat'; return; }
+    // restored or negotiated: it stays as a guardian that no longer fights the explorer
+    b.ally = true;
+    b.state = 'idle';
+    b.model.root.visible = true;
+  }
+  game.onBossOutcome(applyOutcome);
+  // a saved game: put each resolved boss where the player's choice left it
+  function syncBossesWithStory() {
+    for (const [id, b] of Object.entries(bosses)) {
+      const how = game.bossChoice(id);
+      if (!how) continue;
+      if (how === 'destruir') { b.state = 'dead'; b.model.root.visible = false; }
+      else if (how === 'poupar') { b.state = 'gone'; b.model.root.visible = false; }
+      else { b.ally = true; b.state = 'idle'; b.pos.copy(b.home); b.model.root.visible = true; }
+      b.yielded = true;
+    }
+  }
+
   function resetBosses() {
     for (const b of Object.values(bosses)) {
-      if (b.state === 'dead') continue;
+      if (b.state === 'dead' || b.state === 'gone' || b.ally || game.bossChoice(b.boss)) continue;
+      b.yielded = false;
       b.hp = b.def.hp;
       b.pos.copy(b.home);
       b.state = game.bossAwake(b.boss) ? 'lurk' : 'dormant';
@@ -514,7 +559,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   }
 
   return {
-    update, attack, shake, resetBosses, gm,
+    update, attack, shake, resetBosses, gm, syncBossesWithStory,
     debug: {
       mobs, bosses, wake,
       killBoss(id) { const b = bosses[id]; if (b.state === 'dormant') wake(id); b.state = 'chase'; hurtMob(b, b.hp + 1, b.pos.clone().add(V(0, 0, 1))); },

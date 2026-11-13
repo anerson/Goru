@@ -65,7 +65,8 @@ export const stageIndex = (id) => STAGES.findIndex((s) => s.id === id);
 // ---- dialogue graphs (dialogue-systems skill: data graph, line IDs into a string table,
 // conditions as plain data — no eval — and effects applied on the transition) ----
 // node: { speaker, line, next | choices: [{ text, to, do? }] | end: true, do? }
-// effects (`do`): { advance: true, give: { item: n }, take: { item: n }, flag: 'name' }
+// effects (`do`): { advance: true, give: { item: n }, take: { item: n }, flag: 'name', resolve: [boss, choice] }
+// conditions (`if`, on choices only): { has: { item: n } } — plain data, never evaluated as code
 export const DIALOGUES = {
   maela_chegada: {
     start: 'a',
@@ -145,6 +146,40 @@ export const DIALOGUES = {
     },
   },
   ilian_geral: { start: 'a', nodes: { a: { speaker: 'ilian', line: 'ILIAN_GERAL', next: 'fim' }, fim: { end: true } } },
+
+  // ---- the bosses yield at 25% health: fight, spare, negotiate or restore ----
+  // The design's revelation: the bosses are parts of the tree's protection system out of
+  // balance. Each choice is remembered (flag escolha_<boss>) for the acts that follow.
+  devorador_rendido: {
+    start: 'a',
+    nodes: {
+      a: { speaker: 'narrador', line: 'DEV_REND_1', next: 'b' },
+      b: { speaker: 'narrador', line: 'DEV_REND_2', choices: [
+        { text: 'OPT_DESTRUIR', to: 'd', do: { resolve: ['devorador', 'destruir'] } },
+        { text: 'OPT_POUPAR', to: 'p', do: { resolve: ['devorador', 'poupar'] } },
+        { text: 'OPT_RESTAURAR_ERVA', to: 'r', if: { has: { erva: 1 } }, do: { take: { erva: 1 }, resolve: ['devorador', 'restaurar'] } },
+      ] },
+      d: { speaker: 'narrador', line: 'DEV_DESTRUIR', next: 'fim' },
+      p: { speaker: 'narrador', line: 'DEV_POUPAR', next: 'fim' },
+      r: { speaker: 'narrador', line: 'DEV_RESTAURAR', next: 'fim' },
+      fim: { end: true },
+    },
+  },
+  escorpiao_rendido: {
+    start: 'a',
+    nodes: {
+      a: { speaker: 'narrador', line: 'ESC_REND_1', next: 'b' },
+      b: { speaker: 'narrador', line: 'ESC_REND_2', choices: [
+        { text: 'OPT_DESTRUIR', to: 'd', do: { resolve: ['escorpiao', 'destruir'] } },
+        { text: 'OPT_POUPAR', to: 'p', do: { resolve: ['escorpiao', 'poupar'] } },
+        { text: 'OPT_NEGOCIAR_RESINA', to: 'n', if: { has: { resina: 2 } }, do: { take: { resina: 2 }, resolve: ['escorpiao', 'negociar'] } },
+      ] },
+      d: { speaker: 'narrador', line: 'ESC_DESTRUIR', next: 'fim' },
+      p: { speaker: 'narrador', line: 'ESC_POUPAR', next: 'fim' },
+      n: { speaker: 'narrador', line: 'ESC_NEGOCIAR', next: 'fim' },
+      fim: { end: true },
+    },
+  },
 };
 
 // Which conversation an NPC starts, given the current stage.
@@ -213,6 +248,21 @@ export const STRINGS = {
   ILIAN_ESPERA: 'Siga as passarelas. Os sinais estão perto delas, na água.',
   ILIAN_04: 'Lodo de folhas apodrecidas, escorrendo de cima. Não é o lago que está doente: algo acima de nós está jogando resíduos na água.',
   ILIAN_05: 'Se a comporta voltou a mandar água, ela agora carrega isso para toda a árvore. Precisamos descobrir a origem antes que chegue às raízes.',
+  DEV_REND_1: 'O Devorador de Raízes desaba e para de lutar. Ofegante, abaixa as mandíbulas.',
+  DEV_REND_2: 'De perto você vê: as raízes que ele roía estavam pretas e moles, apodrecidas por dentro. As saudáveis estão intactas. Ele não destruía a árvore — cortava a parte doente.',
+  OPT_DESTRUIR: 'Destruir a criatura',
+  OPT_POUPAR: 'Poupar e deixá-la ir',
+  OPT_RESTAURAR_ERVA: 'Tratar a ferida com uma erva medicinal',
+  OPT_NEGOCIAR_RESINA: 'Oferecer 2 resinas em troca da passagem',
+  DEV_DESTRUIR: 'Você golpeia até o fim. As raízes param de ser roídas… e a podridão continua avançando, agora sem ninguém para contê-la.',
+  DEV_POUPAR: 'Você recua. O Devorador se arrasta de volta para a parede do tronco, ainda faminto pelas raízes doentes.',
+  DEV_RESTAURAR: 'Você cobre a ferida com a erva. A criatura se acalma e volta a vigiar as raízes. A podridão nas raízes primárias encontra um guardião.',
+  ESC_REND_1: 'O Escorpião-Rei finca as pinças na areia e baixa o ferrão. A luta acabou.',
+  ESC_REND_2: 'Os entalhes do santuário mostram escorpiões ao lado de guardiões antigos: ele não é um invasor. Protege o núcleo há gerações contra quem o roubaria.',
+  ESC_DESTRUIR: 'O Escorpião-Rei cai. O santuário fica sem guardião.',
+  ESC_POUPAR: 'Você abaixa o cajado. O escorpião se enterra na areia e some, deixando a porta livre.',
+  ESC_NEGOCIAR: 'Você deposita as resinas diante dele. O escorpião as recolhe e se afasta para o lado: o santuário segue guardado, e você tem passagem.',
+  ESCOLHAS: 'Suas escolhas:',
   FIM_ATO: 'Fim do Ato I — Descoberta e sobrevivência. O primeiro núcleo foi recuperado e a água voltou às raízes, mas o Oceano Interior está contaminado. A origem está acima.',
   ILIAN_GERAL: 'O Oceano dá peixe e água para três andares. Se ele adoecer, a árvore inteira sente.',
 };
@@ -252,7 +302,13 @@ export function validateDialogues() {
       if (!n.end && !n.next && !n.choices?.length) problems.push(`${id}.${nid}: no exit`);
       for (const o of [n.next, ...(n.choices ?? []).map((c) => c.to)].filter(Boolean)) if (!g.nodes[o]) problems.push(`${id}.${nid}: missing target ${o}`);
       if (n.line && !STRINGS[n.line]) problems.push(`${id}.${nid}: missing string ${n.line}`);
-      for (const c of n.choices ?? []) if (!STRINGS[c.text]) problems.push(`${id}.${nid}: missing string ${c.text}`);
+      for (const c of n.choices ?? []) {
+        if (!STRINGS[c.text]) problems.push(`${id}.${nid}: missing string ${c.text}`);
+        if (c.if && Object.keys(c.if).some((k) => k !== 'has')) problems.push(`${id}.${nid}: unknown condition in ${c.text}`);
+        if (c.if?.has) for (const item of Object.keys(c.if.has)) if (!ITEMS[item]) problems.push(`${id}.${nid}: condition on unknown item ${item}`);
+      }
+      // a conversation must never offer only gated choices (the player could be stuck)
+      if (n.choices?.length && n.choices.every((c) => c.if)) problems.push(`${id}.${nid}: every choice is conditional`);
       if (n.speaker && !(n.speaker in SPEAKERS)) problems.push(`${id}.${nid}: unknown speaker ${n.speaker}`);
       if (!seen.has(nid)) problems.push(`${id}.${nid}: unreachable`);
     }

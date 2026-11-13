@@ -195,12 +195,27 @@ const act = await page.evaluate(() => {
   step('cogumelos + nascente', () => { useGroup('cogumelo', 3); use('nascente'); });
   step('Maela (relato)', () => converse('maela'));
   step('leito', () => use('leito'));
-  step('Devorador de Raízes', () => O.combat.debug.killBoss('devorador'));
+  // the Devorador yields at 25% health; spare it (second choice)
+  const yieldThenChoose = (id, choice) => {
+    const b = O.combat.debug.bosses[id];
+    O.combat.debug.wake(id);
+    b.state = 'chase';
+    O.combat.debug.hurtMob(b, b.hp * 0.8, b.pos.clone().setX(b.pos.x + 1));
+    const yielded = b.state === 'yield' && !!D.dialogue;
+    O.hud.pick(0);                               // continue past the first line
+    O.hud.pick(choice);                          // the decision
+    for (let k = 0; k < 5 && D.dialogue; k++) O.hud.pick(0);
+    O.hud.closeDialogue();
+    return { yielded, outcome: b.state, choice: G.state.flags[`escolha_${id}`] };
+  };
+  let devorador;
+  step('Devorador de Raízes (rendido, poupado)', () => { devorador = yieldThenChoose('devorador', 1); });
   step('Tarek', () => converse('tarek'));
   step('resinas', () => useGroup('resina', 3));
   step('Tarek (troca)', () => converse('tarek'));
   step('comporta', () => use('comporta'));
-  step('Escorpião-Rei', () => O.combat.debug.killBoss('escorpiao'));
+  let escorpiao;
+  step('Escorpião-Rei (rendido, destruído)', () => { escorpiao = yieldThenChoose('escorpiao', 0); });
   step('santuário', () => use('santuario'));
   step('núcleo na comporta', () => use('comporta'));
   step('Maela (água amarga)', () => converse('maela'));
@@ -215,7 +230,11 @@ const act = await page.evaluate(() => {
     const f = O.floorAt(i.pos.x, i.pos.z, i.pos.y);
     return !(f > i.pos.y - 4 && f < i.pos.y + 1);
   }).map((i) => i.id);
-  return { log, final: G.state.stage, misplaced, ok: G.state.stage === 'concluido' && misplaced.length === 0 };
+  const ending = document.getElementById('hudEndText').textContent;
+  const choicesOk = devorador.yielded && devorador.choice === 'poupar' && ['retreat', 'gone'].includes(devorador.outcome)
+    && escorpiao.yielded && escorpiao.choice === 'destruir' && escorpiao.outcome === 'dead'
+    && ending.includes('Devorador de Raízes: poupado') && ending.includes('Escorpião-Rei da Casca: destruído');
+  return { log, final: G.state.stage, misplaced, devorador, escorpiao, ending, ok: G.state.stage === 'concluido' && misplaced.length === 0 && choicesOk };
 });
 
 for (const place of ['raizes', 'deserto', 'oceano', 'fornalha', 'pantano', 'cristais']) {

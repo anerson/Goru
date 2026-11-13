@@ -22,6 +22,13 @@ selva, larvas no pântano, aranhas de cristal, lobos de Nivéria — percebem, a
 brilham), mordem e voltam para casa se você fugir. Os chefões têm investida (linha vermelha no chão) e
 pancada em área (anel vermelho); o Devorador chama besouros na metade da vida.
 
+Escolhas: com 25% de vida, cada chefão **se rende** e o jogador decide o destino dele — a ideia
+central do Aetherion, em que os chefões são partes de um sistema de proteção da árvore fora de
+equilíbrio. O Devorador de Raízes só roía as raízes apodrecidas: pode ser destruído, poupado ou
+restaurado com uma erva medicinal (vira guardião). O Escorpião-Rei protegia o núcleo: pode ser
+destruído, poupado ou negociado com 2 resinas (segue guardando o santuário). A escolha fica salva
+e aparece no fim do ato; o Cajado do GM mata direto, sem rendição.
+
 Sobrevivência: sede (10 min de cheia a vazia parado, 1,8× mais rápido correndo), fome (18 min),
 aviso a 30%. Com sede ou fome em zero a vida cai devagar; ao desmaiar o explorador acorda na vila
 sem perder nada. Itens: cogumelo, erva medicinal, resina, alga, chave de âmbar, Núcleo de Seiva I.

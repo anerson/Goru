@@ -209,7 +209,7 @@ export function createGame({ scene, biomes, walker, hud }) {
     hud.toast('Novo objetivo');
     applyWorld();
     save();
-    if (state.stage === 'concluido') { ended = true; hud.ending(STRINGS.FIM_ATO); }
+    if (state.stage === 'concluido') { ended = true; hud.ending(STRINGS.FIM_ATO + choicesSummary()); }
   }
   function needsMet() {
     const n = stage().need;
@@ -299,13 +299,15 @@ export function createGame({ scene, biomes, walker, hud }) {
     if (fx.take) for (const [k, v] of Object.entries(fx.take)) take(k, v);
     if (fx.give) for (const [k, v] of Object.entries(fx.give)) give(k, v);
     if (fx.flag) { state.flags[fx.flag] = true; if (fx.flag === 'cantil') { state.flask = 0; hud.toast('Você recebeu um cantil.'); } }
+    if (fx.resolve) resolveBoss(...fx.resolve);
     if (fx.advance) advance();
   }
+  const meets = (cond) => !cond?.has || Object.entries(cond.has).every(([k, v]) => (state.inv[k] ?? 0) >= v);
   function goto(nodeId) {
     const node = dialogue.graph.nodes[nodeId];
     applyEffects(node.do);
     if (node.end) { dialogue = null; hud.closeDialogue(); return; }
-    const choices = node.choices?.map((c) => ({ text: STRINGS[c.text], pick: () => { applyEffects(c.do); goto(c.to); } }));
+    const choices = node.choices?.filter((c) => meets(c.if)).map((c) => ({ text: STRINGS[c.text], pick: () => { applyEffects(c.do); goto(c.to); } }));
     hud.dialogue(SPEAKERS[node.speaker], STRINGS[node.line], choices ?? [{ text: 'Continuar', pick: () => goto(node.next) }]);
   }
 
@@ -438,10 +440,32 @@ export function createGame({ scene, biomes, walker, hud }) {
     give(item, 1);
     hud.toast(`A criatura deixou: ${ITEMS[item].name}`);
   }
+  // killed outright (no yield, e.g. by the GM's staff): counts as destroying it
   function bossDefeated(id) {
+    if (state.flags[`boss_${id}`]) return;
     state.flags[`boss_${id}`] = true;
+    state.flags[`escolha_${id}`] = state.flags[`escolha_${id}`] ?? 'destruir';
     hud.message(INSPECT[`${id}_morto`]);
     save();
+  }
+  // the boss yields at 25%: the player decides its fate in a conversation
+  function bossYield(id) {
+    dialogue = { graph: DIALOGUES[`${id}_rendido`], npc: null };
+    goto(dialogue.graph.start);
+  }
+  const outcomeHooks = [];
+  function resolveBoss(id, how) {
+    state.flags[`boss_${id}`] = true;
+    state.flags[`escolha_${id}`] = how;
+    outcomeHooks.forEach((f) => f(id, how));
+    save();
+  }
+  const CHOICE_NAMES = { destruir: 'destruído', poupar: 'poupado', restaurar: 'restaurado', negociar: 'negociado' };
+  function choicesSummary() {
+    const rows = [['devorador', 'Devorador de Raízes'], ['escorpiao', 'Escorpião-Rei da Casca']]
+      .filter(([id]) => state.flags[`escolha_${id}`])
+      .map(([id, name]) => `${name}: ${CHOICE_NAMES[state.flags[`escolha_${id}`]]}`);
+    return rows.length ? ` ${STRINGS.ESCOLHAS} ${rows.join(' · ')}.` : '';
   }
 
   function faint() {
@@ -487,7 +511,7 @@ export function createGame({ scene, biomes, walker, hud }) {
     hud.closeDialogue();
     if (continueGame && state.pos) walker.teleport({ x: state.pos.x, z: state.pos.z, feet: state.pos.feet, yaw: state.pos.yaw, pitch: -0.15 });
     else spawnAtVillage();
-    if (state.stage === 'concluido') { ended = true; hud.ending(STRINGS.FIM_ATO); }
+    if (state.stage === 'concluido') { ended = true; hud.ending(STRINGS.FIM_ATO + choicesSummary()); }
   }
 
   applyWorld();
@@ -496,7 +520,9 @@ export function createGame({ scene, biomes, walker, hud }) {
     get state() { return state; },
     get busy() { return !!dialogue; },
     interact() { if (!dialogue && current) current.use(); },
-    update, drink, useItem, start, hasSave, save, hurt, loot, bossDefeated, lairs, cheats,
+    update, drink, useItem, start, hasSave, save, hurt, loot, bossDefeated, bossYield, lairs, cheats,
+    onBossOutcome: (f) => outcomeHooks.push(f),
+    bossChoice: (id) => state.flags[`escolha_${id}`] ?? null,
     heal() { state.health = 100; state.thirst = 100; state.hunger = 100; },
     // GM: jump to any stage with the world made consistent (items and flags that stage assumes)
     jumpTo(id) {
@@ -519,7 +545,7 @@ export function createGame({ scene, biomes, walker, hud }) {
       hud.inventory(state);
       save();
     },
-    reviveBosses() { delete state.flags.boss_devorador; delete state.flags.boss_escorpiao; save(); },
+    reviveBosses() { for (const k of ['boss_devorador', 'boss_escorpiao', 'escolha_devorador', 'escolha_escorpiao']) delete state.flags[k]; save(); },
     onFaint: (f) => onFaint.push(f),
     nearSafeZone: (biome, x, z, d) => safeZones().some(([b, p]) => b === biome && Math.hypot(p.x - x, p.z - z) < d) || Math.hypot(x, z) < 15,
     bossShouldWake: (id) => !state.flags[`boss_${id}`] && (id === 'devorador' ? stageIndex(state.stage) >= stageIndex('devorador') : (state.inv.chave > 0 || stageIndex(state.stage) >= stageIndex('nucleo'))),

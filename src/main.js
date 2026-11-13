@@ -217,6 +217,9 @@ function startJourney(continueGame) {
   enterWalk('trilha');
   world.hud.reset();
   world.game.start(continueGame);
+  // a new journey brings every boss back; a continued one puts them where the choices left them
+  if (continueGame) world.combat.resetBosses(); else world.combat.gm.reviveBosses();
+  world.combat.syncBossesWithStory();
 }
 $('bStart').onclick = () => startJourney(false);
 $('bContinue').onclick = () => startJourney(true);
