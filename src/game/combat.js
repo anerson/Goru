@@ -1,4 +1,4 @@
-// Combat: the explorer's staff, the creatures of each level and the two Act I bosses.
+// Combat: the explorer's crafted weapon, the creatures of each level and the guardians.
 //
 // Creature AI (game-ai skill): perceive -> decide -> steer -> animate.
 //   Perception runs at 5 Hz and only writes facts (distance, same level).
@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import { mulberry32 } from '../noise.js';
 import { BIOMES, DISK_R } from '../tree/layout.js';
 import { CREATURES, FAUNA } from './creatures.js';
+import { UNDER_TIER } from './campaign_data.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 // Weapons. The explorer's staff is a melee weapon. The Cajado do GM belongs to the Game Master
@@ -80,7 +81,11 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     new THREE.MeshBasicMaterial({ color: '#fff2c8', transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
   scene.add(slash);
   let slashT = 0, attackCd = 0;
-  let weapon = WEAPONS.cajado;
+  // the explorer's weapon is whatever the game says is equipped (crafted at the workbenches);
+  // in Modo Mestre it is the Cajado do GM
+  let gmOn = false;
+  const cur = () => (gmOn ? WEAPONS.gm : game.weapon());
+  let gateToast = 0;
 
   // ---------- feedback: trauma shake, hit-stop, numbers ----------
   let trauma = 0, shakeT = 0, stopUntil = 0;
@@ -106,6 +111,14 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     if (m.state === 'dead' || m.state === 'dormant' || !(amount > 0)) return;
     // armour from the bestiary's Defesa (and a boss's own mechanics); the GM's staff ignores it
     if (amount < 1e6) amount *= (m.def.armor ?? 1) * (rulesOf(m).armorMul ?? 1);
+    // a guardian barely feels a weapon below its floor's tier: craft that floor's weapon first
+    if (amount < 1e6 && m.boss && m.boss !== 'gm' && !gmOn) {
+      const need = game.bossTier(m.boss);
+      if (cur().tier < need) {
+        amount *= UNDER_TIER;
+        if (performance.now() / 1000 > gateToast) { gateToast = performance.now() / 1000 + 6; hud.toast(`${cur().name} mal arranha ${m.def.name}. Crie a arma deste andar na bancada.`); }
+      }
+    }
     m.hp -= amount;
     m.flash = 0.12;
     const away = m.pos.clone().sub(from).setY(0).normalize();
@@ -134,7 +147,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
       hud.boss(null);
       if (m.boss !== 'gm') game.bossDefeated(m.boss);   // a boss the GM summoned is not the story's
       feedback('large');
-    } else if (rand() < 0.35) {
+    } else if (rand() < 0.7) {
       game.loot(m.biome);
     }
   }
@@ -150,24 +163,24 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   const camDir = new THREE.Vector3(), toMob = new THREE.Vector3();
   let aimed = null;
   function findAim() {
-    const me = walker.state;
+    const me = walker.state, w = cur();
     camera.getWorldDirection(camDir);
     const yaw = me.yaw, fwd = V(-Math.sin(yaw), 0, -Math.cos(yaw));
     let best = null, bestScore = Infinity;
     for (const m of mobs) {
       if (['dead', 'dormant', 'rise', 'yield', 'gone', 'retreat'].includes(m.state) || m.ally) continue;
       const flat = Math.hypot(m.pos.x - me.x, m.pos.z - me.z);
-      if (weapon.reach) {
+      if (w.reach) {
         toMob.set(m.pos.x, m.pos.y + m.model.height * 0.5, m.pos.z).sub(camera.position);
         const d = toMob.length();
-        if (d > weapon.reach + 6) continue;
+        if (d > w.reach + 6) continue;
         const angle = Math.acos(Math.min(1, toMob.divideScalar(d).dot(camDir)));
         const allow = THREE.MathUtils.degToRad(4) + Math.atan(m.model.radius / d);
         if (angle < allow && angle < bestScore) { best = m; bestScore = angle; }
       } else {
-        if (flat > weapon.range + m.model.radius || Math.abs(m.pos.y - me.feet) > 3) continue;
+        if (flat > w.range + m.model.radius || Math.abs(m.pos.y - me.feet) > 3) continue;
         const dot = flat > 0.6 ? (fwd.x * (m.pos.x - me.x) + fwd.z * (m.pos.z - me.z)) / flat : 1;
-        if (dot < weapon.cone) continue;
+        if (dot < w.cone) continue;
         const score = flat * (2 - dot);
         if (score < bestScore) { best = m; bestScore = score; }
       }
@@ -196,7 +209,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   // ---------- the explorer attacks ----------
   function attack() {
     if (attackCd > 0 || game.busy || walker.state.flying) return;
-    const PLAYER = weapon;
+    const PLAYER = cur();
     attackCd = PLAYER.cooldown;
     slash.material.color.set(PLAYER.color);
     slash.scale.setScalar(PLAYER.range / 2.6);
@@ -250,8 +263,8 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     return mobs.filter((m) => m.state !== 'dead' && m.state !== 'dormant' && Math.hypot(m.pos.x - me.x, m.pos.z - me.z) < radius && Math.abs(m.pos.y - me.feet) < 8);
   }
   const gm = {
-    setWeapon(id) { weapon = WEAPONS[id]; character.setWeapon(id); },
-    get weapon() { return weapon; },
+    setWeapon(id) { gmOn = id === 'gm'; character.setWeapon(gmOn ? 'gm' : 'cajado'); },
+    get weapon() { return cur(); },
     // Onda de Seiva: everything within the radius falls
     wave(radius = 18) {
       const me = walker.state, from = V(me.x, me.feet, me.z);
@@ -342,11 +355,6 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
         if (m.boss && m.specialCd <= 0) {
           if (m.hp < def.hp * 0.5 && rand() < 0.5) { m.state = 'slamWind'; m.timer = 1.2; ring.visible = true; m.specialCd = 7; break; }
           if (dist > 5 && dist < 18 && !rulesOf(m).stationary) { m.state = 'chargeWind'; m.timer = 0.9; m.lock = V(dx / dist, 0, dz / dist); lane.visible = true; m.specialCd = 6; break; }
-        }
-        if (m.boss === 'devorador' && !m.summoned && m.hp < def.hp * 0.5) {
-          m.summoned = true;
-          for (let k = 0; k < 2; k++) { const s = spawn('besouroRachador', m.biome, m.pos.x + (k ? 3 : -3), m.pos.z + 2); s.state = 'chase'; s.sense = true; s.temp = true; }
-          hud.toast('O Devorador chama sua prole!');
         }
         // reinforcements while the boss's mechanic allows (the Matriarca's pack while the ice stands)
         const sm = rulesOf(m).summon;
@@ -549,7 +557,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     if (ringFxT > 0) { const k = 1 - ringFxT / 0.6; ringFx.scale.setScalar(Math.max(0.01, ringFxR * k)); ringFx.material.opacity = 0.8 * (1 - k); }
     else ringFx.material.opacity = 0;
     aimed = game.busy ? null : findAim();
-    hud.aim(aimed ? { name: aimed.def.name, frac: Math.max(0, aimed.hp) / aimed.def.hp } : null, !!weapon.reach);
+    hud.aim(aimed ? { name: aimed.def.name, frac: Math.max(0, aimed.hp) / aimed.def.hp } : null, !!cur().reach);
     beamT -= dt;
     beam.material.opacity = Math.max(0, beamT / 0.18) * 0.9;
     // slash fade

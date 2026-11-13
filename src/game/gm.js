@@ -7,7 +7,7 @@
 //   V  Invocar         the chosen creature or boss appears 6 m ahead, on the current level
 //   H  Curar           health, thirst and hunger back to full
 // plus invulnerability, frozen needs, reviving the bosses and jumping to any story stage.
-import { STAGES } from './data.js';
+import { STAGES } from './campaign_data.js';
 
 export function createGM({ root, game, combat, hud, isJourney }) {
   let on = false;
@@ -34,7 +34,7 @@ export function createGM({ root, game, combat, hud, isJourney }) {
     </div>
     <label for="gmStage">Pular para a etapa</label>
     <div class="gm-row">
-      <select id="gmStage">${STAGES.map((s, i) => `<option value="${s.id}">${i + 1}. ${s.text}</option>`).join('')}</select>
+      <select id="gmStage">${STAGES.map((s, i) => `<option value="${s.id}">${i + 1}. ${s.region} · ${s.text.slice(0, 60)}</option>`).join('')}</select>
       <button type="button" data-a="stage">Ir</button>
     </div>
     <p class="gm-note">Shift+G fecha o modo mestre e devolve o cajado.</p>

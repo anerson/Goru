@@ -132,5 +132,40 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
     sceptre.visible = id === 'gm';
   }
 
-  return { root, update, idle, setWeapon, swing: () => { swingT = 0.3; if (sceptre?.visible) sceptre.userData.heart.rotation.y += 1; }, setHeading: (h) => { heading = h; root.rotation.y = h; } };
+  // crafted gear: the weapon recolours the staff and its tip (and grows a blade from tier 4),
+  // an outfit recolours shirt, trousers and hat, adds a cape and a soft glow
+  const base = { shirt: shirtC, pants: pantsC, hat };
+  const cape = new THREE.Mesh(new THREE.PlaneGeometry(0.46, 0.85, 1, 4), new THREE.MeshStandardMaterial({ color: '#888', roughness: 0.9, side: THREE.DoubleSide }));
+  cape.position.set(0, 0.2, 0.33);
+  cape.rotation.x = 0.12;
+  cape.visible = false;
+  body.add(cape);
+  const staffMat = staffMesh ? staffMesh.material.clone() : null;
+  if (staffMesh) staffMesh.material = staffMat;
+  let blade = null;
+  function setWeaponLook(look, tier = 0) {
+    if (!staffMesh) return;
+    staffMat.color.set(look?.color ?? hat);
+    const tip = staffMesh.children[0];
+    tip.material.color.set(new THREE.Color(look?.tip ?? '#9dffcf').multiplyScalar(1.6));
+    tip.scale.setScalar(1 + tier * 0.12);
+    if (blade) { staffMesh.remove(blade); blade = null; }
+    if (tier >= 4) {
+      blade = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.45, 4), new THREE.MeshStandardMaterial({ color: look.tip, emissive: look.tip, emissiveIntensity: 0.6, metalness: 0.4, roughness: 0.3 }));
+      blade.position.y = 0.95;
+      staffMesh.add(blade);
+    }
+  }
+  function setOutfit(look) {
+    const L = look ?? base;
+    shirt.color.set(L.shirt ?? base.shirt);
+    pants.color.set(L.pants ?? base.pants);
+    leather.color.set(L.hat ?? base.hat);
+    shirt.emissive.set(L.glow ?? '#000000');
+    shirt.emissiveIntensity = L.glow ? 0.25 : 0;
+    cape.visible = !!L.cape;
+    if (L.cape) cape.material.color.set(L.cape);
+  }
+
+  return { root, update, idle, setWeapon, setWeaponLook, setOutfit, swing: () => { swingT = 0.3; if (sceptre?.visible) sceptre.userData.heart.rotation.y += 1; }, setHeading: (h) => { heading = h; root.rotation.y = h; } };
 }

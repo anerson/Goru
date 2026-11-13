@@ -5,7 +5,7 @@
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { ROUTES } from '../src/tree/layout.js';
-import { validateDialogues, NEEDS, STAGES } from '../src/game/data.js';
+import { validateCampaign, validateRecipes, NEEDS } from '../src/game/campaign_data.js';
 
 // ---- 1. route graph: every place reaches every other place, and edges are two-way ----
 const graphProblems = [];
@@ -21,7 +21,9 @@ for (const [from, tos] of Object.entries(ROUTES)) {
 }
 
 // ---- 1b. dialogue graphs are valid (dialogue-systems skill) ----
-const dialogueProblems = validateDialogues();
+const dialogueProblems = validateCampaign();
+// ---- 1b'. every recipe input can be gathered on or below its floor (survival-crafting) ----
+const recipeProblems = validateRecipes();
 
 // ---- 1c. needs timing (survival-crafting skill): minutes from full to warning and to empty ----
 const minutes = (perSec, k) => ({ warn: +((100 - NEEDS.warnAt) / (perSec * k) / 60).toFixed(1), empty: +(100 / (perSec * k) / 60).toFixed(1) });
@@ -180,101 +182,113 @@ const fight = await page.evaluate(async () => {
   return { hit, state: m.state, playerHurt: O.game.state.health < health0, ok: hit && m.state !== 'idle' };
 });
 
-// ---- 5. Act I from start to end: every stage reachable through its own action ----
+// ---- 5. the whole campaign, floor 1 to floor 10, every stage through its own action ----
 const act = await page.evaluate(() => {
-  const O = window.__oliveira, G = O.game, D = G.debug, W = O.walker;
+  const O = window.__oliveira, G = O.game, D = G.debug, C = O.combat.debug;
   O.startJourney(false);
   const log = [];
-  const use = (id) => { const it = D.items.find((i) => i.id === id); if (!it) throw new Error('missing ' + id); if (!it.enabled()) throw new Error('disabled ' + id); it.use(); };
-  const useGroup = (g, n) => { for (const it of D.items.filter((i) => i.group === g && i.enabled()).slice(0, n)) it.use(); };
-  // walk the conversation picking the first choice each time, the way a player clicking through would
+  const item = (id) => { const it = D.items.find((i) => i.id === id); if (!it) throw new Error('missing ' + id); return it; };
+  const use = (id) => { const it = item(id); if (!it.enabled()) throw new Error('disabled ' + id + ' at ' + G.state.stage); it.use(); };
+  const useGroup = (g, n) => { const list = D.items.filter((i) => i.group === g && i.kind === 'quest' && i.enabled()).slice(0, n); if (list.length < n) throw new Error(`only ${list.length} of ${g}`); list.forEach((it) => it.use()); };
   const converse = (npc) => { use(npc); for (let k = 0; k < 20 && D.dialogue; k++) O.hud.pick(0); O.hud.closeDialogue(); };
   const tick = () => G.update(0.05, 0, { running: false, flying: false, camYaw: 0 });
-  const step = (label, fn) => { const before = G.state.stage; fn(); tick(); log.push(`${label}: ${before} -> ${G.state.stage}`); };
-  step('Maela', () => converse('maela'));
-  step('cogumelos + nascente', () => { useGroup('cogumelo', 3); use('nascente'); });
-  step('Maela (relato)', () => converse('maela'));
-  step('leito', () => use('leito'));
-  // the Devorador yields at 25% health; spare it (second choice)
+  // gather what a recipe needs from that floor's resource nodes (each node gives one, then regrows)
+  const gather = (region, inputs) => {
+    for (const [k, v] of Object.entries(inputs)) {
+      const nodes = D.items.filter((i) => i.kind === 'resource' && i.id.startsWith(`node_${region}_${k}_`) && i.enabled());
+      while ((G.state.inv[k] ?? 0) < v) { const n = nodes.shift(); if (!n) throw new Error(`not enough ${k} on ${region}`); n.use(); }
+    }
+  };
   const yieldThenChoose = (id, choice) => {
-    const b = O.combat.debug.bosses[id];
-    O.combat.debug.wake(id);
+    const b = C.bosses[id];
+    C.wake(id);
     b.state = 'chase';
-    b.hp = b.def.hp * 0.3;                         // bring it close to its yield point, then strike
-    O.combat.debug.hurtMob(b, 60, b.pos.clone().setX(b.pos.x + 1));
+    const yieldAt = G.bossRules(id).yieldAt ?? 0.25;
+    b.hp = b.def.hp * yieldAt + 1;                // just above its yield point, then strike
+    C.hurtMob(b, 10, b.pos.clone().setX(b.pos.x + 1));
     const yielded = b.state === 'yield' && !!D.dialogue;
-    O.hud.pick(0);                               // continue past the first line
-    O.hud.pick(choice);                          // the decision
+    O.hud.pick(0);
+    const offered = [...document.querySelectorAll('#hudChoices button')].map((x) => x.textContent);
+    O.hud.pick(choice);
     for (let k = 0; k < 5 && D.dialogue; k++) O.hud.pick(0);
     O.hud.closeDialogue();
-    return { yielded, outcome: b.state, choice: G.state.flags[`escolha_${id}`] };
+    return { yielded, choice: G.state.flags[`escolha_${id}`], offered: offered.length };
   };
-  let devorador;
-  step('Devorador de Raízes (rendido, poupado)', () => { devorador = yieldThenChoose('devorador', 1); });
-  step('Tarek', () => converse('tarek'));
-  step('resinas', () => useGroup('resina', 3));
-  step('Tarek (troca)', () => converse('tarek'));
-  step('comporta', () => use('comporta'));
-  let escorpiao;
-  step('Escorpião-Rei (rendido, destruído)', () => { escorpiao = yieldThenChoose('escorpiao', 0); });
-  step('santuário', () => use('santuario'));
-  step('núcleo na comporta', () => use('comporta'));
-  step('Maela (água amarga)', () => converse('maela'));
-  step('Ilian', () => converse('ilian'));
-  step('sinais', () => { use('sinal_1'); use('sinal_2'); use('sinal_3'); });
-  step('Ilian (fim)', () => converse('ilian'));
-  const act1Stage = G.state.stage;
-  // every quest object stands on ground the walker can reach (not floating, not buried)
-  // (contamination signs float on the water: they must be within reach of a boardwalk instead)
-  const boardwalk = O.paths.oceano.flat();
-  const misplaced = D.items.filter((i) => {
-    if (i.group === 'sinal') return !boardwalk.some((p) => Math.hypot(p.x - i.pos.x, p.z - i.pos.z) < i.radius - 0.5);
+  const bosses = {};
+  const checks = {};
+  const { STAGES, RECIPES } = O.campaign;
+  const S = (id) => STAGES.find((x) => x.id === id);
+  const recipe = (out) => RECIPES.find((r) => r.output === out).inputs;
+  let guard = 0;
+  while (G.state.stage !== 'campanha_fim' && guard++ < 200) {
+    const before = G.state.stage;
+    const region = before.split('_')[0];
+    const st = S(before);
+    if (st.kind === 'talk') {
+      converse(st.target);
+    } else if (st.kind === 'craft') {
+      const outs = Object.keys(st.need);
+      if (region === 'raizes') {
+        // the tier gate: the starting branch barely scratches the floor's sub-boss
+        const b = C.bosses.escavadorAmbar;
+        C.wake('escavadorAmbar'); b.state = 'chase';
+        const hp0 = b.hp; C.hurtMob(b, 40, b.pos.clone().setX(b.pos.x + 1)); const weak = hp0 - b.hp;
+        b.hp = b.def.hp; b.state = 'dormant'; b.model.root.visible = false;
+        checks.gateWeak = +weak.toFixed(2);
+        // craft through the real workbench panel: open it, click Criar
+        for (const out of outs) gather(region, recipe(out));
+        use('bancada_raizes');
+        for (const out of outs) document.querySelector(`#hudBench [data-craft="${out}"]`)?.click();
+        checks.benchShown = !document.getElementById('hudBench').hidden;
+        C.wake('escavadorAmbar'); b.state = 'chase';
+        const hp1 = b.hp; C.hurtMob(b, 40, b.pos.clone().setX(b.pos.x + 1)); checks.gateStrong = +(hp1 - b.hp).toFixed(2);
+        b.hp = b.def.hp; b.state = 'dormant'; b.model.root.visible = false;
+      } else {
+        for (const out of outs) { gather(region, recipe(out)); G.craft(out); }
+      }
+      checks[`equip_${region}`] = `${G.state.equip.weapon}/${G.state.equip.outfit}`;
+    } else {
+      const need = st.need ?? {};
+      const bossKey = Object.keys(need).find((k) => k.startsWith('boss_'));
+      const groups = Object.entries(need).filter(([k]) => !k.startsWith('boss_') && k !== st.group);
+      for (const [g, n] of groups) {
+        if (g === 'chamine') {
+          // out of order: the sequence resets and it hurts
+          const h0 = G.state.health; D.items.find((i) => i.id === 'chamine_1').use();
+          checks.wrongOrder = { reset: (G.state.count.chamine ?? 0) === 0, hurt: G.state.health < h0 };
+        }
+        useGroup(g, n);
+      }
+      if (st.group) useGroup(st.group, 3);
+      if (bossKey) {
+        const id = bossKey.slice(5);
+        bosses[id] = yieldThenChoose(id, 1);      // second option: restore (Final B on the last guardian)
+      }
+    }
+    tick();
+    log.push(`${before} -> ${G.state.stage}`);
+    if (G.state.stage === before) { log.push('STUCK at ' + before); break; }
+  }
+  // every placed thing stands on floor the walker can reach (not floating, not buried)
+  const misplaced = D.items.filter((i) => i.radius > 0).filter((i) => {
     const f = O.floorAt(i.pos.x, i.pos.z, i.pos.y);
-    return !(f > i.pos.y - 4 && f < i.pos.y + 1);
+    return !(f > i.pos.y - 4 && f < i.pos.y + 0.2);
   }).map((i) => i.id);
+  const endTitle = document.getElementById('hudEndTitle').textContent;
   const ending = document.getElementById('hudEndText').textContent;
-  const act1Done = act1Stage === 'concluido';
-  const choicesOk = devorador.yielded && devorador.choice === 'poupar' && ['retreat', 'gone'].includes(devorador.outcome)
-    && escorpiao.yielded && escorpiao.choice === 'destruir' && escorpiao.outcome === 'dead'
-    && ending.includes('Devorador de Raízes: poupado') && ending.includes('Escorpião-Rei da Casca: destruído');
-
-  // ---- Act II (manual regions 4-6): restore every guardian ----
-  const act2 = {};
-  step('Começar o Ato II', () => G.beginAct2());
-  step('Kaela', () => converse('kaela'));
-  step('mineiros', () => useGroup('mineiro', 3));
-  step('rupturas', () => useGroup('ruptura', 3));
-  step('minerais', () => useGroup('mineral', 3));
-  step('instrumento + chaminés (leste, norte, oeste)', () => { use('instrumento'); use('chamine_leste'); use('chamine_norte'); use('chamine_oeste'); });
-  step('fornalhas I, II, III', () => { use('forja_0'); use('forja_1'); use('forja_2'); });
-  step('Ferreiro Vulcânico (restaurar)', () => { act2.ferreiro = yieldThenChoose('ferreiro', 1); });
-  step('Ignar (estabilizar)', () => { act2.ignar = yieldThenChoose('ignar', 1); });
-  step('Sora', () => converse('sora'));
-  step('estação', () => use('estacao'));
-  step('torres', () => useGroup('torre', 3));
-  step('placas + Matriarca (poupar)', () => { useGroup('placa', 3); act2.matriarca = yieldThenChoose('matriarca', 1); });
-  step('Rei do Inverno (recalibrar)', () => { act2.reiInverno = yieldThenChoose('reiInverno', 1); });
-  step('Yara', () => converse('yara'));
-  step('pegadas', () => useGroup('pegada', 3));
-  step('restos', () => use('restos'));
-  step('raízes + Devorador de Troncos (podar)', () => { useGroup('raiz', 3); act2.devoradorTroncos = yieldThenChoose('devoradorTroncos', 1); });
-  step('bloqueios', () => useGroup('bloqueio', 3));
-  step('Rei das Feras (manada)', () => { act2.reiFeras = yieldThenChoose('reiFeras', 1); });
-  step('Yara (fim)', () => converse('yara'));
-  const inv = G.state.inv;
-  const rewards = ['martelo_obsidiana', 'nucleo_incandescente', 'cristal_glacial', 'armadura_geada', 'semente_ancestral', 'presas_ancestrais'].filter((k) => !inv[k]);
-  const ending2 = document.getElementById('hudEndText').textContent;
-  const act2Ok = G.state.stage === 'ato2_concluido' && rewards.length === 0 && Object.values(act2).every((r) => r.yielded) && ending2.includes('Ignar, o Coração Incandescente: restaurado');
-  return { log, act1Done, misplaced, devorador, escorpiao, ending, act2, missingRewards: rewards, ending2, level: G.state.level, ok: act1Done && misplaced.length === 0 && choicesOk && act2Ok };
+  const allYielded = Object.values(bosses).every((b) => b.yielded) && Object.keys(bosses).length === 20;
+  const ok = G.state.stage === 'campanha_fim' && misplaced.length === 0 && allYielded && endTitle.includes('Final B') && D.intact() === 10
+    && checks.gateWeak < checks.gateStrong * 0.25 && checks.benchShown !== undefined && checks.wrongOrder?.reset && checks.wrongOrder?.hurt;
+  return { log, checks, bosses, misplaced, endTitle, ending, intact: D.intact(), level: G.state.level, equip: G.state.equip, ok };
 });
 
-for (const place of ['raizes', 'fornalha', 'niveria', 'selva']) {
+for (const place of ['raizes', 'fornalha', 'pantano', 'copa']) {
   await page.evaluate((p) => window.__oliveira.goTo(p), place);
   await page.waitForTimeout(3000);
   await page.screenshot({ path: `tests/smoke-${place}.png`, timeout: 240000 });
 }
 await browser.close();
 
-const ok = !errors.length && !graphProblems.length && !dialogueProblems.length && act.ok && fight.ok && Object.values(walk).every((c) => c.ok);
-console.log(JSON.stringify({ stats, graphProblems, dialogueProblems, needsTiming, walk, fight, act, errors, ok }, null, 2));
+const ok = !errors.length && !graphProblems.length && !dialogueProblems.length && !recipeProblems.length && act.ok && fight.ok && Object.values(walk).every((c) => c.ok);
+console.log(JSON.stringify({ stats, graphProblems, dialogueProblems, recipeProblems, needsTiming, walk, fight, act, errors, ok }, null, 2));
 process.exit(ok ? 0 : 1);

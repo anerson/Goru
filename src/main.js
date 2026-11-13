@@ -15,6 +15,7 @@ import { createWalker } from './player.js';
 import { createInput } from './input.js';
 import { createCharacter } from './character.js';
 import { createGame } from './game/game.js';
+import { STAGES, RECIPES } from './game/campaign_data.js';
 import { createHud } from './game/hud.js';
 import { createCombat } from './game/combat.js';
 import { createGM } from './game/gm.js';
@@ -95,6 +96,10 @@ function buildWorld() {
   const game = createGame({ scene, biomes, walker, hud });
   const combat = createCombat({ scene, camera, walker, character, biomes, game, hud, reduceMotion });
   game.onFaint(() => combat.resetBosses());
+  // crafted gear shows on the explorer: the weapon recolours the staff, the outfit the clothes
+  game.onGear((w, o) => { character.setWeaponLook(w.look, w.tier); character.setOutfit(o?.look ?? null); });
+  // XP a guardian is worth when it is spared or restored instead of killed
+  for (const b of game.bossList) game.setBossXp(b.id, combat.debug.bosses[b.id]?.def.xp ?? 200);
 
   $('sHeight').textContent = `${Math.round(canopy.maxY)} m`;
   $('sCrown').textContent = `${(canopy.crownR * 2 / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`;
@@ -293,7 +298,7 @@ requestAnimationFrame(() => setTimeout(() => {
   try {
     world = buildWorld();
     $('loading').hidden = true;
-    world.hud.bind({ interact: () => world.game.interact(), drink: () => world.game.drink(), useItem: (id) => world.game.useItem(id), attack: () => world.combat.attack() });
+    world.hud.bind({ interact: () => world.game.interact(), drink: () => world.game.drink(), useItem: (id) => world.game.useItem(id), attack: () => world.combat.attack(), craft: (id) => world.game.craft(id), equip: (id) => world.game.equip(id) });
     $('bContinue').hidden = !world.game.hasSave();
   } catch (err) {
     $('loading').textContent = 'Não foi possível montar a cena. Recarregue a página.';
@@ -314,6 +319,7 @@ window.__oliveira = {
   get hud() { return world?.hud; },
   get combat() { return world?.combat; },
   get gm() { return world?.gm; },
+  campaign: { STAGES, RECIPES },
   layout: { RAMP, GALLERY, BIOMES, TOP_BRIDGES, LOOKOUT, ENTRANCES, APPROACH, ROUTES, DISK_R, rampStart, bridges: BIOMES.map((b) => levelBridges(b.level)), junctions: BIOMES.map((b) => junctionAngle(b.level)) },
   keys: input.keys,
   step(n, dt = 0.05) { for (let i = 0; i < n; i++) world.walker.update(dt, input.read()); },

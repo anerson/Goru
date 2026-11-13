@@ -2,7 +2,7 @@
 // the current objective with a direction arrow and distance, the interaction prompt, the
 // dialogue box with choices, a backpack, short notices and the end-of-act card.
 // Pure DOM; the game calls these functions, the player's clicks and keys call back into it.
-import { ITEMS, FLASK, NEEDS } from './data.js';
+import { ITEMS, FLASK, NEEDS } from './campaign_data.js';
 
 export function createHud(root) {
   root.innerHTML = `
@@ -14,7 +14,7 @@ export function createHud(root) {
       <div class="lvl"><span id="hudLevel">Nível 1</span><i><b id="hudXp"></b></i></div>
     </div>
     <div class="hud-quest" aria-live="polite">
-      <small id="hudAct">Ato I · Descoberta e sobrevivência</small>
+      <small id="hudAct">Andar 1 de 10 · Floresta das Raízes</small>
       <strong id="hudObjective"></strong>
       <div class="guide" id="hudGuide"><span class="arrow" id="hudArrow">▲</span><span id="hudDist"></span><em id="hudHint"></em></div>
     </div>
@@ -26,6 +26,7 @@ export function createHud(root) {
       <button type="button" id="hudBag" aria-expanded="false">Mochila (I)</button>
     </div>
     <div class="hud-bag" id="hudBagPanel" hidden></div>
+    <div class="hud-bench" id="hudBench" hidden></div>
     <div class="hud-dialogue" id="hudDialogue" hidden>
       <b id="hudSpeaker"></b>
       <p id="hudLine"></p>
@@ -38,7 +39,7 @@ export function createHud(root) {
     <div class="hud-end" id="hudEnd" hidden><div><h2 id="hudEndTitle">Fim do Ato I</h2><p id="hudEndText"></p><div class="row"><button type="button" id="hudEndNext" hidden></button><button type="button" id="hudEndOk">Continuar explorando</button></div></div></div>
   `;
   const $ = (id) => root.querySelector(`#${id}`);
-  let handlers = { interact() {}, drink() {}, useItem() {}, attack() {} };
+  let handlers = { interact() {}, drink() {}, useItem() {}, attack() {}, craft() {}, equip() {} };
   let choices = [];
   let lastState = null;
 
@@ -55,26 +56,49 @@ export function createHud(root) {
   }
 
   function renderBag(state) {
+    const eq = state.equip ?? {};
     const rows = Object.entries(state.inv).filter(([, n]) => n > 0).map(([id, n]) => {
       const it = ITEMS[id];
-      const btn = it.use ? `<button type="button" data-use="${id}">${it.verb}</button>` : '';
-      const tag = it.fragment ? `<small>fragmento · ${it.fragment}</small>` : it.note ? `<small>${it.note}</small>` : '';
+      const worn = eq.weapon === id || eq.outfit === id;
+      const verb = it.weapon ? 'Empunhar' : it.outfit ? 'Vestir' : it.verb;
+      const btn = (it.use || it.weapon || it.outfit) && !worn ? `<button type="button" data-use="${id}">${verb}</button>` : worn ? '<em>em uso</em>' : '';
+      const tag = it.fragment ? `<small>fragmento · ${it.fragment}${state.flags[`intacto_${id}`] ? '' : ' · rachado'}</small>` : it.note ? `<small>${it.note}</small>` : it.material ? '<small>material</small>' : '';
       return `<li><span>${it.name}${tag}</span><b>× ${n}</b>${btn}</li>`;
     });
-    const flask = state.flags.cantil ? `<li><span>Cantil</span><b>${state.flask}/${FLASK.capacity} goles</b><button type="button" data-drink>Beber</button></li>` : '';
-    $('hudBagPanel').innerHTML = `<h3>Mochila</h3><ul>${flask}${rows.join('') || (flask ? '' : '<li class="empty">Vazia. Colete cogumelos, ervas, resina e algas pelo caminho.</li>')}</ul>`;
+    const gear = `<p class="gear">Arma: <b>${eq.weapon ? ITEMS[eq.weapon].name : 'Galho do explorador'}</b> · Roupa: <b>${eq.outfit ? ITEMS[eq.outfit].name : 'roupa de viagem'}</b></p>`;
+    const flask = `<li><span>Cantil</span><b>${state.flask}/${FLASK.capacity} goles</b><button type="button" data-drink>Beber</button></li>`;
+    $('hudBagPanel').innerHTML = `<h3>Mochila</h3>${gear}<ul>${flask}${rows.join('')}</ul>`;
     $('hudBagPanel').querySelectorAll('[data-use]').forEach((b) => { b.onclick = () => handlers.useItem(b.dataset.use); });
     $('hudBagPanel').querySelector('[data-drink]')?.addEventListener('click', () => handlers.drink());
+  }
+
+  // the camp's workbench: every recipe it offers, what it needs and what you carry
+  function renderBench(title, rows) {
+    const el = $('hudBench');
+    if (!title) { el.hidden = true; return; }
+    const KIND = { arma: 'Arma', roupa: 'Roupa', consumivel: 'Poção' };
+    el.innerHTML = `<h3>${title}</h3><button type="button" class="x" data-close aria-label="Fechar">×</button><ul>${rows.map((r) => `
+      <li class="${r.can ? 'can' : ''}">
+        <div><b>${r.name}</b> <small>${KIND[r.kind] ?? ''}${r.note ? ` · ${r.note}` : ''}</small></div>
+        <div class="req">${r.inputs.map((i) => `<span class="${i.have >= i.need ? 'ok' : ''}">${i.name} ${Math.min(i.have, i.need)}/${i.need}</span>`).join('')}</div>
+        <div class="act">${r.owned ? (r.equipped ? '<em>em uso</em>' : `<button type="button" data-equip="${r.id}">${r.kind === 'arma' ? 'Empunhar' : 'Vestir'}</button>`) : `<button type="button" data-craft="${r.id}" ${r.can ? '' : 'disabled'}>Criar</button>`}</div>
+      </li>`).join('')}</ul>`;
+    el.hidden = false;
+    el.querySelectorAll('[data-craft]').forEach((b) => { b.onclick = () => handlers.craft(b.dataset.craft); });
+    el.querySelectorAll('[data-equip]').forEach((b) => { b.onclick = () => handlers.equip(b.dataset.equip); });
+    el.querySelector('[data-close]').onclick = () => { el.hidden = true; };
   }
 
   function close() { $('hudDialogue').hidden = true; choices = []; }
 
   const hud = {
     bind(h) { handlers = h; },
-    objective(text, act = 1) {
+    objective(text, act = 1, floor = 1, place = '') {
       $('hudObjective').textContent = text;
-      $('hudAct').textContent = act === 2 ? 'Ato II · Calor, gelo e cadeia alimentar' : 'Ato I · Descoberta e sobrevivência';
+      $('hudAct').textContent = `Ato ${['I', 'II', 'III'][act - 1] ?? 'I'} · Andar ${floor} de 10${place ? ` · ${place[0].toUpperCase()}${place.slice(1)}` : ''}`;
     },
+    workbench: renderBench,
+    get benchOpen() { return !$('hudBench').hidden; },
     needs(state, { maxHealth = 100, xpFrac = 0 } = {}) {
       for (const k of ['health', 'thirst', 'hunger']) {
         const el = root.querySelector(`.bar[data-k="${k}"]`);
@@ -84,7 +108,7 @@ export function createHud(root) {
       }
       $('hudLevel').textContent = `Nível ${state.level ?? 1} · ${Math.round(state.health)}/${maxHealth}`;
       $('hudXp').style.width = `${Math.round(Math.min(1, xpFrac) * 100)}%`;
-      $('hudFlask').textContent = state.flags.cantil ? `Cantil ${state.flask}/${FLASK.capacity}` : '';
+      $('hudFlask').textContent = `Cantil ${state.flask}/${FLASK.capacity}`;
     },
     inventory(state) { lastState = state; if (!$('hudBagPanel').hidden) renderBag(state); },
     prompt(label) {
@@ -159,7 +183,7 @@ export function createHud(root) {
       if (next) { b.textContent = next.label; b.onclick = () => { $('hudEnd').hidden = true; next.run(); }; }
       $('hudEnd').hidden = false;
     },
-    reset() { close(); $('hudEnd').hidden = true; toggleBag(false); $('hudToasts').innerHTML = ''; },
+    reset() { close(); $('hudEnd').hidden = true; $('hudBench').hidden = true; toggleBag(false); $('hudToasts').innerHTML = ''; },
   };
   return hud;
 }

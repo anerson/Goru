@@ -274,9 +274,21 @@ export const CREATURES = {};
 for (const r of REGIONS) for (const e of r.mobs) if (e.model) CREATURES[e.id] = mob(r.id, e);
 const R = Object.fromEntries(REGIONS.map((r) => [r.id, r]));
 Object.assign(CREATURES, {
-  // Act I bosses (created before the manual; see README)
-  devorador: { name: 'Devorador de Raízes', boss: true, region: 'raizes', hp: 420, damage: 16, speed: 3.6, armor: 1, xp: 200, range: 3.2, build: () => arthropod({ color: '#4a3a28', shell: '#6a4a2a', legs: 6, mandibles: true, size: 3.2, long: 1.4 }) },
-  escorpiaoRei: { name: 'Escorpião-Rei da Casca', boss: true, region: 'deserto', hp: 520, damage: 14, speed: 4, armor: 1, xp: 260, range: 3.4, build: () => arthropod({ color: '#5a2a12', shell: '#c9702a', legs: 8, pincers: true, stinger: true, size: 3 }) },
+  // the manual's sub-bosses and bosses of regions 1-3 and 7-10
+  escavadorAmbar: bossOf('raizes', R.raizes.subBoss, 'subBoss', () => quadruped({ color: '#8a6a3a', belly: '#ffb347', size: 2.2, tail: true })),
+  rainhaRaizes: bossOf('raizes', R.raizes.boss, 'boss', () => arthropod({ color: '#3a2a1a', shell: '#ffb347', legs: 6, mandibles: true, size: 3, long: 1.6 }), 4),
+  escorpiaoReiSol: bossOf('deserto', R.deserto.subBoss, 'subBoss', () => arthropod({ color: '#7a3a12', shell: '#ffcf4a', legs: 8, pincers: true, stinger: true, size: 2.6 })),
+  colossoCasca: bossOf('deserto', R.deserto.boss, 'boss', () => golem({ color: '#8a5a2a', accent: '#e0a060', glow: '#ffcf4a', size: 2.8 }), 4.2),
+  guardiaoMares: bossOf('oceano', R.oceano.subBoss, 'subBoss', () => quadruped({ color: '#3a6a5a', belly: '#9ad0c0', size: 3, snout: false })),
+  leviata: bossOf('oceano', R.oceano.boss, 'boss', () => arthropod({ color: '#1f3a5a', shell: '#2a8a9a', legs: 0, long: 3, size: 2.4 }), 4.2),
+  pastorFungos: bossOf('pantano', R.pantano.subBoss, 'subBoss', () => golem({ color: '#5a6a3a', accent: '#a8ff5a', glow: '#a8ff5a', size: 2.2 })),
+  maeDecomposicao: bossOf('pantano', R.pantano.boss, 'boss', () => elemental({ color: '#4a5a2a', core: '#a8ff5a', size: 3.4 }), 4.2),
+  cavaleiroAmetista: bossOf('cristais', R.cristais.subBoss, 'subBoss', () => golem({ color: '#5a4a7a', accent: '#c59bff', glow: '#c59bff', size: 2.4 })),
+  arquiteto: bossOf('cristais', R.cristais.boss, 'boss', () => elemental({ color: '#8a7ab0', core: '#e6d6ff', size: 3.6 }), 4.2),
+  guardiaVentos: bossOf('suspensa', R.suspensa.subBoss, 'subBoss', () => decorate(quadruped({ color: '#e8f0d0', belly: '#ffffff', size: 2.2 }), { wings: '#d0e8c0', size: 2.2 })),
+  dragaoSeteGalhos: bossOf('suspensa', R.suspensa.boss, 'boss', () => decorate(quadruped({ color: '#4a7a3a', belly: '#9ac07a', size: 3.8, tail: true }), { horns: '#e8e0c0', wings: '#7fe08a', size: 3.8 }), 4.4),
+  sacerdotisa: bossOf('copa', R.copa.subBoss, 'subBoss', () => plant({ size: 1.3 }), 4.6),
+  devoradorSeiva: bossOf('copa', R.copa.boss, 'boss', () => arthropod({ color: '#3a1a2a', shell: '#ffb347', legs: 8, mandibles: true, size: 4, long: 1.8 }), 4.6),
   // Act II: the manual's sub-bosses and bosses of regions 4-6
   ferreiro: bossOf('fornalha', R.fornalha.subBoss, 'subBoss', () => golem({ color: '#3a3330', accent: '#ff7a2a', glow: '#ff5a10', size: 2.4 })),
   ignar: bossOf('fornalha', R.fornalha.boss, 'boss', () => elemental({ color: '#7a2a10', core: '#ffcf4a', size: 3.4 }), 4.2),
