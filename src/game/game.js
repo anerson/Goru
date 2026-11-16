@@ -234,7 +234,8 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     sfx('chest');
     if (epic) {
       state.chestsSinceEpic = 0;
-      const L = LEGENDS[Object.keys(state.flags).filter((k) => k.startsWith('bau_')).length % 2];
+      state.legends = (state.legends ?? 0) + 1;
+      const L = LEGENDS[(state.legends - 1) % 2];   // alternates: vigour, then edge
       L.apply();
       state.health = maxHealth();
       fx?.chest(p.clone().setY(p.y + 0.6), '#ffcf4a');
