@@ -13,6 +13,7 @@
 // Each one is a terrain disk you can walk anywhere on, with marked trails from every entry
 // (ramp junction, level bridges, trunk entrances) to a landmark in the middle.
 import * as THREE from 'three';
+import { lumpy, boulder } from '../organic.js';
 import { mulberry32 } from '../noise.js';
 import { SEED, BIOMES, ENTRANCES, DISK_R, SLAB, LEVEL_STEP, junctionAngle } from '../tree/layout.js';
 import { V, polar, instances, label } from '../geom.js';
@@ -73,7 +74,7 @@ function forest({ scene, mats, rand, b }) {
     const top = terrain.h(x, z) + 7;
     for (let k = 0; k < 4; k++) crowns.push({ p: V(x + (rand() - 0.5) * 5, top + rand() * 4, z + (rand() - 0.5) * 5), s: 3 + rand() * 2.5, color: ['#3f6b2a', '#4f7d30', '#2f5a24'][k % 3] });
   });
-  scene.add(instances(new THREE.IcosahedronGeometry(1, 1), std({ flatShading: true, roughness: 0.8 }), crowns));
+  scene.add(instances(lumpy({ detail: 2, amp: 0.25, seed: 1 }), std({ roughness: 0.85 }), crowns));
 
   const fern = fernGeometry();
   scene.add(instances(fern, std({ side: THREE.DoubleSide, roughness: 0.7 }),
@@ -97,7 +98,7 @@ function forest({ scene, mats, rand, b }) {
   glow.position.set(0, 13, 0);
   scene.add(glow);
 
-  scene.add(instances(new THREE.DodecahedronGeometry(1, 0), std({ color: '#6c7660', flatShading: true }),
+  scene.add(instances(boulder(4), std({ color: '#6c7660', roughness: 0.9 }),
     scatter(rand, 45, 12, 98, (x, z) => free(x, z, 3)).map(([x, z]) => ({ p: V(x, terrain.h(x, z), z), s: V(1 + rand() * 2.5, 0.6 + rand() * 1.4, 1 + rand() * 2.5), rot: [rand(), rand() * 6, rand()] }))));
 
   const flies = drift(scene, rand, { count: 500, rMax: 90, y0: L + 0.5, y1: L + 14, color: '#d8ff7a', size: 0.25, speed: 0.6 });
@@ -160,7 +161,7 @@ function ocean({ scene, mats, rand, b }) {
     for (let k = 0; k < 9; k++) { const a = (k / 9) * Math.PI * 2, d = 1.8 + rand() * 1.6; drapes.push({ p: V(x + Math.cos(a) * d, y - 2 - rand() * 1.5, z + Math.sin(a) * d), s: V(0.9, 3.5 + rand() * 1.5, 0.9), rot: [(rand() - 0.5) * 0.3, 0, (rand() - 0.5) * 0.3], color: ['#4f7a35', '#5f8a3e', '#6a9444'][k % 3] }); }
     drapes.push({ p: V(x, y + 0.5, z), s: V(3.6, 2, 3.6), color: '#557f3a' });
   });
-  scene.add(instances(new THREE.IcosahedronGeometry(1, 1), std({ flatShading: true, roughness: 0.7 }), drapes));
+  scene.add(instances(lumpy({ detail: 2, amp: 0.22, seed: 2 }), std({ roughness: 0.75 }), drapes));
 
   // landmark: a pavilion in the dry middle
   const y0 = terrain.h(0, 0);
@@ -197,7 +198,7 @@ function canyon({ scene, mats, rand, b }) {
   const trails = makeTrails({ rand, h: terrain.h, entries: entryAngles(L), loopR: 40, material: mats.trailSand });
   const free = (x, z, d) => Math.hypot(x, z) > 15 && !trails.near(x, z, d);
 
-  const rock = std({ flatShading: true, roughness: 0.95 });
+  const rock = std({ roughness: 0.95 });
   const mesas = [];
   scatter(rand, 26, 18, 60, (x, z) => free(x, z, 9)).forEach(([x, z]) => {
     const r = 3 + rand() * 6, h = 5 + Math.pow(rand(), 1.5) * 12, y = terrain.h(x, z) - 0.5;
@@ -206,7 +207,7 @@ function canyon({ scene, mats, rand, b }) {
     if (rand() < 0.6) mesas.push({ p: V(x, y + h, z), s: V(r * 0.7, h * 0.35, r * 0.7), rot: [0, rand() * 6, 0], color: '#d08a50' });
   });
   scene.add(instances(new THREE.CylinderGeometry(1, 1.15, 1, 9).translate(0, 0.5, 0), rock, mesas));
-  scene.add(instances(new THREE.DodecahedronGeometry(1, 0), rock,
+  scene.add(instances(boulder(5), rock,
     scatter(rand, 70, 15, 62, (x, z) => free(x, z, 3)).map(([x, z]) => ({ p: V(x, terrain.h(x, z), z), s: V(0.8 + rand() * 2, 0.6 + rand() * 1.6, 0.8 + rand() * 2), rot: [rand(), rand() * 6, rand()], color: '#a85a35' }))));
 
   // saguaro-style cacti: a trunk and two arms
@@ -226,10 +227,10 @@ function canyon({ scene, mats, rand, b }) {
     if (i % 9 !== 4) return;
     for (let k = 0; k < 3; k++) cairns.push({ p: V(p.x + 2.4, terrain.h(p.x + 2.4, p.z) + k * 0.45, p.z), s: V(0.55 - k * 0.12, 0.35, 0.55 - k * 0.12), rot: [0, rand() * 6, 0] });
   }));
-  scene.add(instances(new THREE.DodecahedronGeometry(1, 0), std({ color: '#8f7a68', flatShading: true }), cairns));
+  scene.add(instances(boulder(6), std({ color: '#8f7a68', roughness: 0.9 }), cairns));
 
   // landmark: a stone arch over the middle
-  const arch = new THREE.Mesh(new THREE.TorusGeometry(11, 2, 12, 48, Math.PI), std({ color: '#b5552e', flatShading: true }));
+  const arch = new THREE.Mesh(new THREE.TorusGeometry(11, 2, 16, 64, Math.PI), std({ color: '#b5552e', roughness: 0.9 }));
   arch.position.set(0, terrain.h(0, 0) - 1, 0);
   arch.rotation.y = junctionAngle(L);
   arch.castShadow = arch.receiveShadow = true;
@@ -311,7 +312,7 @@ function meadow({ scene, mats, rand, b }) {
   scene.add(instances(new THREE.CylinderGeometry(0.3, 0.5, 1, 8).translate(0, 0.5, 0), mats.barkStatic, saplings.map(([x, z]) => ({ p: V(x, terrain.h(x, z), z), s: V(1, 4, 1) }))));
   const blobs = [];
   saplings.forEach(([x, z]) => { for (let k = 0; k < 5; k++) blobs.push({ p: V(x + (rand() - 0.5) * 4, terrain.h(x, z) + 5 + rand() * 2, z + (rand() - 0.5) * 4), s: V(2.4, 1.6, 2.4), color: '#68724c' }); });
-  scene.add(instances(new THREE.IcosahedronGeometry(1, 1), std({ flatShading: true }), blobs));
+  scene.add(instances(lumpy({ detail: 2, amp: 0.2, seed: 3 }), std({ roughness: 0.8 }), blobs));
 
   giantFlowers(scene, rand, terrain.h, free);
 

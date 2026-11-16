@@ -2,6 +2,8 @@
 // legs swing with movement, the body dips for a wind-up, and every material can flash.
 // Every creature faces -z, like the explorer, so the same yaw convention applies.
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { lumpy } from '../organic.js';
 import { REGIONS, gameStats } from './bestiary.js';
 
 const mat = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.75, ...o });
@@ -28,7 +30,7 @@ function legPivot(parent, x, y, z, len, rad, m, splay = 0) {
   const p = new THREE.Group();
   p.position.set(x, y, z);
   p.rotation.z = splay;
-  const leg = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad * 0.7, len, 6), m);
+  const leg = new THREE.Mesh(new THREE.CylinderGeometry(rad, rad * 0.7, len, 14), m);
   leg.position.y = -len / 2;
   leg.castShadow = true;
   p.add(leg);
@@ -44,19 +46,19 @@ function quadruped({ color, belly, size = 1, snout = true, tail = true }) {
   const body = new THREE.Group();
   body.position.y = 0.75 * size;
   root.add(body);
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.28 * size, 0.8 * size, 4, 10), fur);
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.28 * size, 0.8 * size, 8, 20), fur);
   torso.rotation.x = Math.PI / 2;
   torso.castShadow = true;
   body.add(torso);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24 * size, 12, 10), fur);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24 * size, 28, 20), fur);
   head.position.set(0, 0.18 * size, -0.62 * size);
   head.castShadow = true;
   body.add(head);
-  if (snout) { const s = new THREE.Mesh(new THREE.ConeGeometry(0.11 * size, 0.3 * size, 8), light); s.rotation.x = -Math.PI / 2; s.position.set(0, 0.12 * size, -0.86 * size); body.add(s); }
-  for (const x of [-0.13, 0.13]) { const ear = new THREE.Mesh(new THREE.ConeGeometry(0.06 * size, 0.16 * size, 4), fur); ear.position.set(x * size, 0.42 * size, -0.6 * size); body.add(ear); }
+  if (snout) { const s = new THREE.Mesh(new THREE.ConeGeometry(0.11 * size, 0.3 * size, 16), light); s.rotation.x = -Math.PI / 2; s.position.set(0, 0.12 * size, -0.86 * size); body.add(s); }
+  for (const x of [-0.13, 0.13]) { const ear = new THREE.Mesh(new THREE.ConeGeometry(0.06 * size, 0.16 * size, 10), fur); ear.position.set(x * size, 0.42 * size, -0.6 * size); body.add(ear); }
   const eyes = new THREE.MeshBasicMaterial({ color: '#ffcf4a' });
-  for (const x of [-0.09, 0.09]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.03 * size, 6, 6), eyes); e.position.set(x * size, 0.24 * size, -0.82 * size); body.add(e); }
-  if (tail) { const t = new THREE.Mesh(new THREE.ConeGeometry(0.07 * size, 0.6 * size, 6), fur); t.rotation.x = Math.PI / 2 + 0.6; t.position.set(0, 0.15 * size, 0.6 * size); body.add(t); }
+  for (const x of [-0.09, 0.09]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.03 * size, 14, 10), eyes); e.position.set(x * size, 0.24 * size, -0.82 * size); body.add(e); }
+  if (tail) { const t = new THREE.Mesh(new THREE.ConeGeometry(0.07 * size, 0.6 * size, 12), fur); t.rotation.x = Math.PI / 2 + 0.6; t.position.set(0, 0.15 * size, 0.6 * size); body.add(t); }
   const legs = [[-0.16, -0.32], [0.16, -0.32], [-0.16, 0.32], [0.16, 0.32]].map(([x, z]) => legPivot(root, x * size, 0.7 * size, z * size, 0.7 * size, 0.07 * size, fur));
   return rig(root, body, legs, [fur, light], { radius: 0.6 * size, height: 1.1 * size });
 }
@@ -69,22 +71,22 @@ function arthropod({ color, shell, size = 1, legs: nLegs = 6, pincers = false, s
   const body = new THREE.Group();
   body.position.y = 0.45 * size;
   root.add(body);
-  const abdomen = new THREE.Mesh(new THREE.SphereGeometry(0.5 * size, 16, 12), carapace);
+  const abdomen = new THREE.Mesh(new THREE.SphereGeometry(0.5 * size, 32, 24), carapace);
   abdomen.scale.set(1, 0.6, 1.2 * long);
   abdomen.position.z = 0.25 * size * long;
   abdomen.castShadow = true;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.3 * size, 12, 10), skin);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.3 * size, 28, 20), skin);
   head.position.set(0, 0, -0.5 * size * long);
   head.castShadow = true;
   body.add(abdomen, head);
   const eyes = new THREE.MeshBasicMaterial({ color: '#ff3b2f' });
-  for (const x of [-0.12, 0.12]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.05 * size, 6, 6), eyes); e.position.set(x * size, 0.12 * size, -0.74 * size * long); body.add(e); }
+  for (const x of [-0.12, 0.12]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.05 * size, 14, 10), eyes); e.position.set(x * size, 0.12 * size, -0.74 * size * long); body.add(e); }
   const parts = {};
   if (mandibles || pincers) {
     parts.claws = [-1, 1].map((s) => {
       const p = new THREE.Group();
       p.position.set(s * 0.22 * size, 0, -0.7 * size * long);
-      const c = new THREE.Mesh(new THREE.ConeGeometry(0.08 * size, (pincers ? 0.7 : 0.45) * size, 6), carapace);
+      const c = new THREE.Mesh(new THREE.ConeGeometry(0.08 * size, (pincers ? 0.7 : 0.45) * size, 12), carapace);
       c.rotation.x = -Math.PI / 2;
       c.position.z = -0.25 * size;
       p.add(c);
@@ -99,14 +101,14 @@ function arthropod({ color, shell, size = 1, legs: nLegs = 6, pincers = false, s
       const seg = new THREE.Group();
       seg.position.set(0, y, z);
       seg.rotation.x = -0.45;
-      const m = new THREE.Mesh(new THREE.SphereGeometry((0.16 - k * 0.015) * size, 10, 8), carapace);
+      const m = new THREE.Mesh(new THREE.SphereGeometry((0.16 - k * 0.015) * size, 20, 14), carapace);
       m.castShadow = true;
       seg.add(m);
       parent.add(seg);
       parts.tail.push(seg);
       parent = seg; z = 0.0; y = 0.28 * size;
     }
-    const sting = new THREE.Mesh(new THREE.ConeGeometry(0.07 * size, 0.35 * size, 6), mat('#2a1a10'));
+    const sting = new THREE.Mesh(new THREE.ConeGeometry(0.07 * size, 0.35 * size, 12), mat('#2a1a10'));
     sting.position.set(0, 0.2 * size, -0.1 * size);
     sting.rotation.x = Math.PI * 0.8;
     parent.add(sting);
@@ -135,23 +137,23 @@ function arthropod({ color, shell, size = 1, legs: nLegs = 6, pincers = false, s
 // golems: stacked blocks of ice, stone or dead wood
 function golem({ color, accent, size = 1, glow = null }) {
   const root = new THREE.Group();
-  const stone = mat(color, { flatShading: true, emissive: '#ffffff', emissiveIntensity: 0 });
-  const trim = mat(accent, { flatShading: true, emissive: glow ?? '#ffffff', emissiveIntensity: glow ? 0.8 : 0 });
+  const stone = mat(color, { roughness: 0.85, emissive: '#ffffff', emissiveIntensity: 0 });
+  const trim = mat(accent, { roughness: 0.6, emissive: glow ?? '#ffffff', emissiveIntensity: glow ? 0.8 : 0 });
   const body = new THREE.Group();
   body.position.y = 1.1 * size;
   root.add(body);
-  const torso = new THREE.Mesh(new THREE.BoxGeometry(0.9 * size, 0.9 * size, 0.6 * size), stone);
+  const torso = new THREE.Mesh(new RoundedBoxGeometry(0.9 * size, 0.9 * size, 0.6 * size, 4, 0.09 * size), stone);
   torso.castShadow = true;
-  const head = new THREE.Mesh(new THREE.BoxGeometry(0.45 * size, 0.4 * size, 0.4 * size), trim);
+  const head = new THREE.Mesh(new RoundedBoxGeometry(0.45 * size, 0.4 * size, 0.4 * size, 4, 0.09 * size), trim);
   head.position.set(0, 0.62 * size, -0.05 * size);
   body.add(torso, head);
   const arms = [-1, 1].map((s) => {
     const p = new THREE.Group();
     p.position.set(s * 0.62 * size, 0.3 * size, 0);
-    const a = new THREE.Mesh(new THREE.BoxGeometry(0.3 * size, 0.95 * size, 0.3 * size), stone);
+    const a = new THREE.Mesh(new RoundedBoxGeometry(0.3 * size, 0.95 * size, 0.3 * size, 4, 0.09 * size), stone);
     a.position.y = -0.45 * size;
     a.castShadow = true;
-    const fist = new THREE.Mesh(new THREE.BoxGeometry(0.38 * size, 0.32 * size, 0.38 * size), trim);
+    const fist = new THREE.Mesh(new RoundedBoxGeometry(0.38 * size, 0.32 * size, 0.38 * size, 4, 0.09 * size), trim);
     fist.position.y = -0.95 * size;
     p.add(a, fist);
     body.add(p);
@@ -174,7 +176,7 @@ function elemental({ color, core, size = 1 }) {
   root.add(body);
   const puffs = [];
   for (let k = 0; k < 7; k++) {
-    const p = new THREE.Mesh(new THREE.IcosahedronGeometry((0.35 + (k % 3) * 0.08) * size, 0), smoke);
+    const p = new THREE.Mesh(lumpy({ detail: 2, amp: 0.3, seed: k }).scale((0.35 + (k % 3) * 0.08) * size, (0.35 + (k % 3) * 0.08) * size, (0.35 + (k % 3) * 0.08) * size), smoke);
     body.add(p);
     puffs.push(p);
   }
@@ -200,12 +202,12 @@ function plant({ size = 1 }) {
   const body = new THREE.Group();
   body.position.y = 0.2;
   root.add(body);
-  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.5 * size, 0.9 * size, 3.5 * size, 10), green);
+  const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.5 * size, 0.9 * size, 3.5 * size, 24), green);
   stem.position.y = 1.75 * size;
   stem.castShadow = true;
   const head = new THREE.Group();
   head.position.set(0, 3.6 * size, -0.3 * size);
-  const upper = new THREE.Mesh(new THREE.SphereGeometry(1.2 * size, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), jaw);
+  const upper = new THREE.Mesh(new THREE.SphereGeometry(1.2 * size, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), jaw);
   const lower = upper.clone();
   lower.rotation.x = Math.PI;
   head.add(upper, lower);
@@ -227,7 +229,7 @@ function plant({ size = 1 }) {
 function decorate(model, { horns = null, wings = null, size = 1 }) {
   const body = model.root.children[0];
   if (horns) for (const s of [-1, 1]) {
-    const h = new THREE.Mesh(new THREE.ConeGeometry(0.06 * size, 0.5 * size, 6), mat(horns));
+    const h = new THREE.Mesh(new THREE.ConeGeometry(0.06 * size, 0.5 * size, 12), mat(horns));
     h.position.set(s * 0.15 * size, 0.38 * size, -0.62 * size);
     h.rotation.set(-0.6, 0, s * 0.5);
     body.add(h);

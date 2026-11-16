@@ -1,6 +1,7 @@
 // The savanna around Aetherion: golden grass, acacias, far sandstone cliffs and people.
 // The acacias (6-8 m) and the people (1.8 m) set the scale.
 import * as THREE from 'three';
+import { lumpy } from './organic.js';
 import { fbm, mulberry32 } from './noise.js';
 import { SEED, TAU, ENTRANCES, LOOP_R, APPROACH } from './tree/layout.js';
 
@@ -77,7 +78,7 @@ export function buildLandscape(scene, mats) {
   // acacias: an avenue along the approach plus scattered ones on the savanna
   const small = 90;
   const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.25, 0.4, 1, 7).translate(0, 0.5, 0), mats.barkStatic, small);
-  const crowns = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 0.7, 0.6, 12), new THREE.MeshStandardMaterial({ color: '#4f6a2a', roughness: 0.85, flatShading: true }), small * 5);
+  const crowns = new THREE.InstancedMesh(lumpy({ detail: 2, amp: 0.2, seed: 9, flatten: 0.32 }), new THREE.MeshStandardMaterial({ color: '#4f6a2a', roughness: 0.85 }), small * 5);
   let ci = 0;
   for (let i = 0; i < small; i++) {
     let x, z;

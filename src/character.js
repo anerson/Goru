@@ -22,24 +22,58 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
   const body = new THREE.Group();          // everything above the hips, leans when running
   body.position.y = 0.95;
   root.add(body);
-  add(body, new THREE.CapsuleGeometry(0.2, 0.42, 4, 10), shirt, 0, 0.32, 0);
-  add(body, new THREE.SphereGeometry(0.15, 16, 12), skin, 0, 0.76, 0);
-  add(body, new THREE.CylinderGeometry(0.17, 0.17, 0.06, 16), leather, 0, 0.84, 0);       // hat brim
-  add(body, new THREE.CylinderGeometry(0.11, 0.13, 0.12, 16), leather, 0, 0.9, 0);        // hat crown
-  if (pack) add(body, new THREE.BoxGeometry(0.32, 0.38, 0.16), leather, 0, 0.36, 0.22);  // backpack (behind: +z)
-  const lantern = add(body, new THREE.SphereGeometry(0.07, 10, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffd28a').multiplyScalar(2) }), 0.16, 0.1, 0.32);
+  // torso: a rounded chest a little deeper at the top, a belt with a buckle, a scarf
+  add(body, new THREE.CapsuleGeometry(0.2, 0.4, 8, 24), shirt, 0, 0.32, 0).scale.set(1.05, 1, 0.78);
+  const dark = new THREE.MeshStandardMaterial({ color: '#2a2018', roughness: 0.6 });
+  const metal = new THREE.MeshStandardMaterial({ color: '#c9a24a', metalness: 0.8, roughness: 0.35 });
+  add(body, new THREE.TorusGeometry(0.205, 0.035, 8, 32), dark, 0, 0.06, 0).rotation.x = Math.PI / 2;
+  add(body, new THREE.BoxGeometry(0.07, 0.06, 0.03), metal, 0, 0.06, -0.165);
+  add(body, new THREE.TorusGeometry(0.12, 0.045, 8, 24), leather, 0, 0.62, 0).rotation.x = Math.PI / 2;   // scarf
+  add(body, new THREE.CylinderGeometry(0.06, 0.07, 0.1, 16), skin, 0, 0.64, 0);                         // neck
+  // head: face, eyes, nose, ears, hair under the hat
+  const head = new THREE.Group();
+  head.position.set(0, 0.78, 0);
+  body.add(head);
+  add(head, new THREE.SphereGeometry(0.14, 32, 24), skin, 0, 0, 0).scale.set(0.92, 1.08, 1);
+  const eye = new THREE.MeshStandardMaterial({ color: '#1a120c', roughness: 0.2 });
+  const white = new THREE.MeshStandardMaterial({ color: '#f4efe6', roughness: 0.4 });
+  for (const sx of [-1, 1]) {
+    add(head, new THREE.SphereGeometry(0.026, 16, 12), white, sx * 0.05, 0.02, -0.118).scale.set(1, 0.8, 0.5);
+    add(head, new THREE.SphereGeometry(0.014, 12, 10), eye, sx * 0.05, 0.02, -0.13);
+    add(head, new THREE.SphereGeometry(0.035, 12, 10), skin, sx * 0.132, 0.0, 0).scale.set(0.5, 1, 0.8); // ears
+    add(head, new THREE.BoxGeometry(0.045, 0.01, 0.01), dark, sx * 0.05, 0.058, -0.125).rotation.z = sx * -0.15; // brows
+  }
+  add(head, new THREE.SphereGeometry(0.022, 12, 10), skin, 0, -0.02, -0.14).scale.set(0.9, 1.2, 1);       // nose
+  add(head, new THREE.BoxGeometry(0.05, 0.008, 0.01), new THREE.MeshStandardMaterial({ color: '#8a4a3a' }), 0, -0.065, -0.128); // mouth
+  add(head, new THREE.SphereGeometry(0.145, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.5), dark, 0, 0.02, 0.012).scale.set(0.96, 0.9, 1.02); // hair
+  // a wide-brimmed explorer's hat with a band
+  add(head, new THREE.CylinderGeometry(0.2, 0.21, 0.018, 40), leather, 0, 0.075, 0);
+  add(head, new THREE.CylinderGeometry(0.105, 0.13, 0.13, 32), leather, 0, 0.14, 0);
+  add(head, new THREE.CylinderGeometry(0.132, 0.132, 0.03, 32), dark, 0, 0.1, 0);
+  if (pack) {   // backpack (behind: +z): a rounded pack, a rolled blanket on top, two straps
+    add(body, new THREE.CapsuleGeometry(0.13, 0.16, 8, 16), leather, 0, 0.36, 0.22).scale.set(1.25, 1, 0.7);
+    add(body, new THREE.CylinderGeometry(0.06, 0.06, 0.34, 16), new THREE.MeshStandardMaterial({ color: '#7a3a2a', roughness: 0.9 }), 0, 0.58, 0.22).rotation.z = Math.PI / 2;
+    for (const sx of [-1, 1]) add(body, new THREE.BoxGeometry(0.035, 0.4, 0.3), dark, sx * 0.11, 0.38, 0.05);
+  }
+  const lantern = add(body, new THREE.SphereGeometry(0.07, 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffd28a').multiplyScalar(2) }), 0.16, 0.1, 0.32);
 
-  const limb = (parent, x, y, len, rad, mat) => {
+  const limb = (parent, x, y, len, rad, mat, end) => {
     const pivot = new THREE.Group();
     pivot.position.set(x, y, 0);
     parent.add(pivot);
-    add(pivot, new THREE.CapsuleGeometry(rad, len - rad * 2, 4, 8), mat, 0, -len / 2, 0);
+    add(pivot, new THREE.CapsuleGeometry(rad, len - rad * 2, 8, 16), mat, 0, -len / 2, 0);
+    end?.(pivot, len);
     return pivot;
   };
-  const legL = limb(root, -0.1, 0.95, 0.9, 0.085, pants);
-  const legR = limb(root, 0.1, 0.95, 0.9, 0.085, pants);
-  const armL = limb(body, -0.27, 0.56, 0.62, 0.065, shirt);
-  const armR = limb(body, 0.27, 0.56, 0.62, 0.065, shirt);
+  const boot = (p, len) => {   // boots: a rounded toe pointing forward and a cuff
+    add(p, new THREE.CapsuleGeometry(0.075, 0.12, 8, 16), dark, 0, -len + 0.04, -0.05).rotation.x = Math.PI / 2;
+    add(p, new THREE.CylinderGeometry(0.095, 0.09, 0.14, 20), dark, 0, -len + 0.15, 0);
+  };
+  const hand = (p, len) => add(p, new THREE.SphereGeometry(0.05, 16, 12), skin, 0, -len + 0.01, 0).scale.set(0.9, 1.1, 0.8);
+  const legL = limb(root, -0.1, 0.95, 0.9, 0.085, pants, boot);
+  const legR = limb(root, 0.1, 0.95, 0.9, 0.085, pants, boot);
+  const armL = limb(body, -0.27, 0.56, 0.6, 0.065, shirt, hand);
+  const armR = limb(body, 0.27, 0.56, 0.6, 0.065, shirt, hand);
   let staffMesh = null, sceptre = null;
   if (pack) {
     // the explorer's staff, held in the right hand

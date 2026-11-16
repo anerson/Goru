@@ -322,8 +322,8 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   }
   function floorBanner() {
     const r = PLAN[stage().region];
-    const name = REGION_NAMES[r.id];
-    hud.banner(`Andar ${regionIndex()} de 10`, name[0].toUpperCase() + name.slice(1).replace(/^(A|O) /, ''), `Missão: ${r.mission}`);
+    const name = REGION_NAMES[r.id].replace(/^(a|o) /, '');
+    hud.banner(`Andar ${regionIndex()} de 10`, name[0].toUpperCase() + name.slice(1), `Missão: ${r.mission}`);
   }
   function finish() {
     ended = true;

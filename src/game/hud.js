@@ -108,7 +108,8 @@ export function createHud(root) {
     el.querySelector('span').textContent = b.sub;
     el.hidden = false;
     void el.offsetWidth; el.classList.add('on');
-    setTimeout(nextBanner, 3000);
+    setTimeout(() => el.classList.add('out'), 2600);
+    setTimeout(nextBanner, 3100);
   }
   function close() { $('hudDialogue').hidden = true; choices = []; }
 

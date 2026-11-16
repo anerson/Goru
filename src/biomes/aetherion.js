@@ -2,6 +2,7 @@
 // Cristais and Floresta Suspensa, plus the coral beds of the Oceano Interior and the giant
 // flowers of the Jardim da Copa. Same contract as the builders in index.js and more.js.
 import * as THREE from 'three';
+import { lumpy, boulder } from '../organic.js';
 import { V, polar, instances } from '../geom.js';
 import { makeTerrain, makeTrails, scatter, noise2, entryAngles, drift, fernGeometry, lerpColor, std } from './common.js';
 
@@ -122,7 +123,7 @@ export function suspended({ scene, mats, rand, b }) {
   scene.add(instances(new THREE.CylinderGeometry(0.3, 0.5, 1, 8).translate(0, 0.5, 0), mats.barkStatic, trees.map(([x, z]) => ({ p: V(x, terrain.h(x, z), z), s: V(1, 5 + rand() * 5, 1) }))));
   const crowns = [];
   trees.forEach(([x, z]) => { const top = terrain.h(x, z) + 5; for (let k = 0; k < 5; k++) crowns.push({ p: V(x + (rand() - 0.5) * 4.5, top + rand() * 4, z + (rand() - 0.5) * 4.5), s: 2.2 + rand() * 1.8, color: ['#3f7d34', '#5a9a3c', '#2f6a2a', '#76a84a'][k % 4] }); });
-  scene.add(instances(new THREE.IcosahedronGeometry(1, 1), std({ flatShading: true, roughness: 0.8 }), crowns));
+  scene.add(instances(lumpy({ detail: 2, amp: 0.25, seed: 1 }), std({ roughness: 0.85 }), crowns));
   // bromeliads: rosettes with a coloured heart
   const rosettes = scatter(rand, 160, 12, 64, (x, z) => free(x, z, 1.8));
   scene.add(instances(fernGeometry(), std({ side: THREE.DoubleSide, roughness: 0.6 }), rosettes.map(([x, z]) => ({ p: V(x, terrain.h(x, z), z), s: 0.9 + rand() * 0.8, rot: [0, rand() * 6, 0], color: '#4f8f3a' }))));
