@@ -31,6 +31,8 @@ export function createWalker({ walkables, rootMeshes, rootSegs, noGo = [] }) {
   ray.far = 400;
   const floorMeshes = walkables.concat(rootMeshes);
 
+  const DODGE = { time: 0.32, speed: 15, cooldown: 0.7 };
+  let lastF = 1, lastR = 0, dashX = 0, dashZ = 0, dodgeCd = 0;
   function floorAt(x, z, feet) {
     ray.ray.origin.set(x, feet + METRICS.step, z);
     const hits = ray.intersectObjects(floorMeshes, false);
@@ -96,6 +98,9 @@ export function createWalker({ walkables, rootMeshes, rootSegs, noGo = [] }) {
     const mag = Math.hypot(f, r);
     if (mag > 1) { f /= mag; r /= mag; }
     state.moving = mag > 0.1;
+    if (state.moving) { lastF = f; lastR = r; }
+    dodgeCd -= dt;
+    state.dodgeT = Math.max(0, (state.dodgeT ?? 0) - dt);
     state.running = input.run;
     const sy = Math.sin(state.yaw), cy = Math.cos(state.yaw);
 
@@ -112,7 +117,9 @@ export function createWalker({ walkables, rootMeshes, rootSegs, noGo = [] }) {
       state.feet = Math.max(state.feet, floorAt(state.x, state.z, state.feet), 0);
     } else {
       const speed = (input.run ? METRICS.run : METRICS.walk) * dt;
-      const mx = (-sy * f + cy * r) * speed, mz = (-cy * f - sy * r) * speed;
+      let mx = (-sy * f + cy * r) * speed, mz = (-cy * f - sy * r) * speed;
+      // a dodge roll: a short burst along its own direction, whatever the stick says
+      if (state.dodgeT > 0) { mx = dashX * DODGE.speed * dt; mz = dashZ * DODGE.speed * dt; }
       const raised = state.feet > 0.6;
       // refuse a step that drops off a raised walkway or lands in a no-go area (deep water)
       const allowed = (x, z) => {
@@ -189,5 +196,18 @@ export function createWalker({ walkables, rootMeshes, rootSegs, noGo = [] }) {
     camera.rotation.set(state.pitch, state.yaw, 0, 'YXZ');
   }
 
-  return { state, update, teleport, look, zoom, setFlying, applyToCamera, floorAt };
+  // dodge (game-feel): 0.32 s burst of 15 m/s toward where you were moving (backward when still),
+  // with invulnerability for its whole length; 0.7 s cooldown
+  function dodge() {
+    if (state.flying || dodgeCd > 0) return false;
+    const sy = Math.sin(state.yaw), cy = Math.cos(state.yaw);
+    let f = lastF, r = lastR;
+    if (!state.moving) { f = -1; r = 0; }
+    const m = Math.hypot(f, r) || 1;
+    dashX = (-sy * f + cy * r) / m; dashZ = (-cy * f - sy * r) / m;
+    state.dodgeT = DODGE.time;
+    dodgeCd = DODGE.cooldown;
+    return true;
+  }
+  return { state, update, teleport, dodge, look, zoom, setFlying, applyToCamera, floorAt };
 }

@@ -15,6 +15,7 @@ import { mulberry32 } from '../noise.js';
 import { BIOMES, DISK_R } from '../tree/layout.js';
 import { CREATURES, FAUNA } from './creatures.js';
 import { UNDER_TIER } from './campaign_data.js';
+import { sfx } from '../audio.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 // Weapons. The explorer's staff is a melee weapon. The Cajado do GM belongs to the Game Master
@@ -111,15 +112,19 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     if (m.state === 'dead' || m.state === 'dormant' || !(amount > 0)) return;
     // armour from the bestiary's Defesa (and a boss's own mechanics); the GM's staff ignores it
     if (amount < 1e6) amount *= (m.def.armor ?? 1) * (rulesOf(m).armorMul ?? 1);
+    let weakHit = false;
     // a guardian barely feels a weapon below its floor's tier: craft that floor's weapon first
     if (amount < 1e6 && m.boss && m.boss !== 'gm' && !gmOn) {
       const need = game.bossTier(m.boss);
       if (cur().tier < need) {
         amount *= UNDER_TIER;
+        weakHit = true;
+        sfx('weak');
         if (performance.now() / 1000 > gateToast) { gateToast = performance.now() / 1000 + 6; hud.toast(`${cur().name} mal arranha ${m.def.name}. Crie a arma deste andar na bancada.`); }
       }
     }
     m.hp -= amount;
+    if (!weakHit) sfx(m.boss || amount >= 1e6 ? 'bigHit' : 'hit');
     m.flash = 0.12;
     const away = m.pos.clone().sub(from).setY(0).normalize();
     m.knock.copy(away).multiplyScalar(m.boss ? 2 : 7);
@@ -152,7 +157,9 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     }
   }
   function hurtPlayer(amount) {
+    if (walker.state.dodgeT > 0) { popNumber(V(walker.state.x, walker.state.feet + 2.2, walker.state.z), 'esquivou', '#9dffcf'); return; }
     game.hurt(amount);
+    sfx('hurt');
     feedback(amount >= 20 ? 'large' : 'medium');
   }
 
@@ -211,6 +218,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     if (attackCd > 0 || game.busy || walker.state.flying) return;
     const PLAYER = cur();
     attackCd = PLAYER.cooldown;
+    sfx('swing');
     slash.material.color.set(PLAYER.color);
     slash.scale.setScalar(PLAYER.range / 2.6);
     // swing toward the crosshair: the explorer turns to where the camera looks
@@ -455,6 +463,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     b.timer = 1.6;
     b.model.root.visible = true;
     hud.toast(`${b.def.name} desperta!`);
+    sfx('boss');
     feedback('large');
   }
   // what the player chose for a yielded boss
@@ -587,7 +596,13 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     camera.rotation.z += 0.04 * s * Math.sin(shakeT * 1.1);
   }
 
+  function dodge() {
+    if (game.busy || !walker.dodge()) return;
+    character.roll();
+    sfx('dodge');
+  }
   return {
+    dodge,
     update, attack, shake, resetBosses, gm, syncBossesWithStory,
     debug: {
       mobs, bosses, wake,

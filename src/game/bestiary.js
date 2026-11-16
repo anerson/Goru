@@ -6,9 +6,9 @@
 // swimmers and colonies that the current engine cannot show well).
 
 export const GAME_SCALE = {
-  mobHp: 0.6,        // creature health = Vida x 0.6
-  subBossHp: 1 / 6,  // sub-boss health = Vida / 6
-  bossHp: 1 / 10,    // boss health = Vida / 10
+  mobHp: 0.9,        // creature health = Vida x 0.9 (2-3 hits with the floor's weapon)
+  subBossHp: 2 / 3,  // sub-boss health = Vida x 2/3 (about 15 hits)
+  bossHp: 0.35,      // boss health = Vida x 0.35 (about 30 hits)
   damage: 0.6,       // damage per hit = Ataque x 0.6
   speed: (v) => 2 + v * 0.45,           // m/s from Velocidade 1..10
   armor: (d) => 20 / (20 + d * 0.5),    // damage taken multiplier from Defesa

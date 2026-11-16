@@ -78,7 +78,7 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
   }
   lantern.visible = pack;
 
-  let phase = 0, heading = 0, amount = 0, swingT = 0;
+  let phase = 0, heading = 0, amount = 0, swingT = 0, rollT = 0;
 
   // speed in m/s on the ground, flying flag, the direction of travel (yaw) and dt
   function update(dt, { x, y, z, speed, flying, moveYaw }) {
@@ -112,6 +112,14 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
       armR.rotation.z = -0.8 + k * 1.6;
       body.rotation.y = 0.5 - k;
     } else body.rotation.y = 0;
+    if (rollT > 0) {
+      // dodge roll: tuck and spin forward once
+      rollT = Math.max(0, rollT - dt);
+      const k = 1 - rollT / 0.32;
+      body.rotation.x = -Math.PI * 2 * k;
+      body.position.y = 0.6 + Math.sin(Math.PI * k) * 0.15;
+      legL.rotation.x = legR.rotation.x = -1.4 * Math.sin(Math.PI * k);
+    }
     lantern.material.color.setScalar(1.6 + Math.sin(phase * 0.7) * 0.15).multiply(new THREE.Color('#ffd28a'));
   }
 
@@ -167,5 +175,5 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
     if (L.cape) cape.material.color.set(L.cape);
   }
 
-  return { root, update, idle, setWeapon, setWeaponLook, setOutfit, swing: () => { swingT = 0.3; if (sceptre?.visible) sceptre.userData.heart.rotation.y += 1; }, setHeading: (h) => { heading = h; root.rotation.y = h; } };
+  return { root, update, idle, setWeapon, setWeaponLook, setOutfit, roll: () => { rollT = 0.32; }, swing: () => { swingT = 0.3; if (sceptre?.visible) sceptre.userData.heart.rotation.y += 1; }, setHeading: (h) => { heading = h; root.rotation.y = h; } };
 }

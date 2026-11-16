@@ -50,7 +50,16 @@ fragmentos intactos) e **C — Nova Simbiose**. O resumo das escolhas aparece no
 Sobrevivência: sede (10 min), fome (18 min), aviso a 30%; o cantil (3 goles) enche no barril de
 qualquer acampamento; ao desmaiar o explorador acorda no último acampamento. Criaturas e chefes dão
 experiência: cada nível dá +10 de vida máxima e +5% de dano. Os números das criaturas vêm do manual
-(`src/game/bestiary.js`): vida = Vida × 0,6, subchefe = Vida ÷ 6, chefe = Vida ÷ 10, dano = Ataque × 0,6.
+(`src/game/bestiary.js`): vida = Vida × 0,9, subchefe = Vida × 2/3, chefe = Vida × 0,35, dano = Ataque × 0,6.
+Com a arma do andar isso dá de 2 a 3 golpes numa criatura comum, uns 15 num subchefe e uns 27 num chefe,
+do andar 1 ao 10; um chefe derruba o explorador em 7 a 12 mordidas (a roupa do andar faz parte da conta).
+
+**Esquiva** (C, Ctrl ou o botão): um rolamento curto na direção do movimento (para trás se parado),
+invulnerável enquanto dura, com 0,7 s de recarga. É a resposta aos golpes avisados dos chefes.
+
+**Som** (`src/audio.js`): todos os efeitos são sintetizados no navegador, sem arquivos: golpe, acerto,
+arranhão de arma fraca, dano, esquiva, coleta, bigorna da bancada, missão, novo andar, nível, rugido
+do chefe, rendição, final, e um vento ambiente que muda de cor a cada andar. M liga e desliga.
 O progresso é salvo no navegador.
 
 **Bestiário para a mesa:** `docs/bestiario.json` traz as 10 regiões com as 30 criaturas, os 10
@@ -117,7 +126,11 @@ Não há etapa de build. O three.js `0.186.1` vem da jsDelivr por import map (`i
 |------|------------|---------|
 | Andar | W A S D ou setas | controle redondo no canto |
 | Atacar | clique, Espaço ou J | botão Atacar |
+| Esquivar | C ou Ctrl | botão Esquivar |
 | Interagir / falar | E | botão Interagir |
+| Bancada de criação | E perto da bancada | botão Interagir |
+| Vestir / empunhar | Mochila (I) ou bancada | igual |
+| Som | M | botão Som |
 | Beber do cantil | Q | botão Beber |
 | Mochila | I | botão Mochila |
 | Escolher no diálogo | 1, 2, 3 ou Enter | tocar na opção |
@@ -145,7 +158,8 @@ src/biomes/common.js  terreno, trilhas, teto de cada andar (raízes, musgo, sol)
 src/geom.js           faixas, placas e instâncias usadas em todo lugar
 src/landscape.js      chão, grama, oliveiras normais e pessoas para dar escala
 src/particles.js      folhas caindo da copa
-src/player.js         movimento, voo e câmera em 3ª pessoa (braço de mola); colisão com troncos, raízes, pisos, água e lava
+src/audio.js          sons sintetizados (Web Audio) e ambiente de cada andar
+src/player.js         movimento, esquiva, voo e câmera em 3ª pessoa (braço de mola); colisão com troncos, raízes, pisos, água e lava
 src/character.js      o explorador e os moradores: modelo e animação
 src/game/campaign_data.js a campanha inteira como dados: 10 andares, materiais, receitas, armas, roupas, etapas, diálogos
 src/game/game.js      regras do jogo: sobrevivência, coleta, bancada, missões, mecânicas dos chefes, finais, salvamento

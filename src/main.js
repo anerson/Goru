@@ -15,6 +15,7 @@ import { createWalker } from './player.js';
 import { createInput } from './input.js';
 import { createCharacter } from './character.js';
 import { createGame } from './game/game.js';
+import { startAudio, toggleMute, isMuted } from './audio.js';
 import { STAGES, RECIPES } from './game/campaign_data.js';
 import { createHud } from './game/hud.js';
 import { createCombat } from './game/combat.js';
@@ -192,6 +193,8 @@ addEventListener('keydown', (e) => {
   if (!journey) return;
   if (e.code === 'KeyE') g.interact();
   if (e.code === 'KeyJ' || (e.code === 'Space' && !world.walker.state.flying)) { world.combat.attack(); e.preventDefault(); }
+  if ((e.code === 'KeyC' || e.code === 'ControlLeft') && !e.repeat) { world.combat.dodge(); e.preventDefault(); }
+  if (e.code === 'KeyM' && !e.repeat) setMute(toggleMute());
   if (e.code === 'KeyQ') g.drink();
   if (e.code === 'KeyI') h.toggleBag();
 });
@@ -217,6 +220,7 @@ renderer.domElement.addEventListener('wheel', (e) => {
 let journey = false;
 function startJourney(continueGame) {
   if (!world) return;
+  startAudio();
   journey = true;
   document.body.classList.add('journey');
   enterWalk('trilha');
@@ -226,6 +230,10 @@ function startJourney(continueGame) {
   if (continueGame) world.combat.resetBosses(); else world.combat.gm.reviveBosses();
   world.combat.syncBossesWithStory();
 }
+// sound: starts inside the first click (browser rule); M or the button mutes it
+function setMute(m) { $('bSound').setAttribute('aria-pressed', String(!m)); $('bSound').textContent = m ? 'Som: não (M)' : 'Som (M)'; }
+setMute(isMuted());
+$('bSound').onclick = () => { startAudio(); setMute(toggleMute()); };
 $('bStart').onclick = () => startJourney(false);
 $('bContinue').onclick = () => startJourney(true);
 $('bWalk').onclick = () => { journey = false; document.body.classList.remove('journey'); enterWalk('trilha'); };
@@ -298,7 +306,7 @@ requestAnimationFrame(() => setTimeout(() => {
   try {
     world = buildWorld();
     $('loading').hidden = true;
-    world.hud.bind({ interact: () => world.game.interact(), drink: () => world.game.drink(), useItem: (id) => world.game.useItem(id), attack: () => world.combat.attack(), craft: (id) => world.game.craft(id), equip: (id) => world.game.equip(id) });
+    world.hud.bind({ interact: () => world.game.interact(), drink: () => world.game.drink(), useItem: (id) => world.game.useItem(id), attack: () => world.combat.attack(), dodge: () => world.combat.dodge(), craft: (id) => world.game.craft(id), equip: (id) => world.game.equip(id) });
     $('bContinue').hidden = !world.game.hasSave();
   } catch (err) {
     $('loading').textContent = 'Não foi possível montar a cena. Recarregue a página.';

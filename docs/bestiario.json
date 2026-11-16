@@ -1,8 +1,8 @@
 {
   "escalaDoJogo": {
-    "vidaCriatura": 0.6,
-    "vidaSubchefe": 0.16666666666666666,
-    "vidaChefe": 0.1,
+    "vidaCriatura": 0.9,
+    "vidaSubchefe": 0.6666666666666666,
+    "vidaChefe": 0.35,
     "dano": 0.6
   },
   "regioes": [
@@ -23,7 +23,7 @@
           "fraqueza": "Abdômen exposto quando tombado; fumaça os dispersa",
           "model": "besouro",
           "noJogo": {
-            "hp": 21,
+            "hp": 32,
             "damage": 5,
             "speed": 3.35,
             "armor": 0.851,
@@ -41,7 +41,7 @@
           "fraqueza": "Vibração forte revela sua posição; fogo moderado destrói teias",
           "model": "aranha",
           "noJogo": {
-            "hp": 14,
+            "hp": 22,
             "damage": 4,
             "speed": 5.6,
             "armor": 0.93,
@@ -59,7 +59,7 @@
           "fraqueza": "Isolado perde o bônus de matilha; luz forte pode afastá-lo",
           "model": "lobo",
           "noJogo": {
-            "hp": 25,
+            "hp": 38,
             "damage": 5,
             "speed": 6.05,
             "armor": 0.889,
@@ -78,7 +78,7 @@
         "mecanica": "Atraí-lo para uma trama de raízes entrelaçadas: ao investir contra a trama fica preso por duas rodadas e expõe o ventre.",
         "recompensas": "Fragmento de Âmbar Vivo; mapa de galerias; acesso a rotas de água",
         "noJogo": {
-          "hp": 75,
+          "hp": 300,
           "damage": 11,
           "speed": 4.25,
           "armor": 0.727,
@@ -96,7 +96,7 @@
         "fraqueza": "Expor o núcleo de âmbar e limpar o canal contaminado. Matar a Rainha sem limpar o canal deixa a região vulnerável.",
         "recompensas": "Âmbar Vivo; Botas de Raiz; recuperação progressiva de água",
         "noJogo": {
-          "hp": 180,
+          "hp": 630,
           "damage": 17,
           "speed": 3.8,
           "armor": 0.645,
@@ -121,7 +121,7 @@
           "fraqueza": "Carapaça ventral menos protegida; luz intensa o expõe",
           "model": "escorpiao",
           "noJogo": {
-            "hp": 33,
+            "hp": 50,
             "damage": 8,
             "speed": 5.15,
             "armor": 0.833,
@@ -139,7 +139,7 @@
           "fraqueza": "Perde vigor em frio prolongado e sombra profunda",
           "model": "lagarto",
           "noJogo": {
-            "hp": 29,
+            "hp": 43,
             "damage": 7,
             "speed": 5.6,
             "armor": 0.816,
@@ -156,7 +156,13 @@
           "habilidade": "Mergulho Predatório: bônus de dano se atacar de altitude",
           "fraqueza": "Asas vulneráveis no solo; correntes de vento previsíveis",
           "model": null,
-          "noJogo": null
+          "noJogo": {
+            "hp": 59,
+            "damage": 10,
+            "speed": 6.5,
+            "armor": 0.87,
+            "xp": 22
+          }
         }
       ],
       "subBoss": {
@@ -170,7 +176,7 @@
         "mecanica": "Atrair para uma fenda sombreada e resfriar as placas com água em pulsos curtos.",
         "recompensas": "Ferrão Solar; acesso a um reservatório antigo",
         "noJogo": {
-          "hp": 108,
+          "hp": 433,
           "damage": 14,
           "speed": 5.15,
           "armor": 0.69,
@@ -188,7 +194,7 @@
         "fraqueza": "Água aplicada com controle e correntes frias. Água demais causa erosão.",
         "recompensas": "Cristal Solar; Manto de Casca; oásis reativados",
         "noJogo": {
-          "hp": 240,
+          "hp": 840,
           "damage": 21,
           "speed": 3.35,
           "armor": 0.588,
@@ -212,7 +218,13 @@
           "habilidade": "Mordida em Enxame: dano cresce se três ou mais cercam o alvo",
           "fraqueza": "Ruídos graves e pulsos de luz desorganizam o cardume",
           "model": null,
-          "noJogo": null
+          "noJogo": {
+            "hp": 63,
+            "damage": 11,
+            "speed": 6.5,
+            "armor": 0.851,
+            "xp": 23
+          }
         },
         {
           "id": "caranguejoFossil",
@@ -224,7 +236,13 @@
           "habilidade": "Pinça de Pressão: prende equipamento ou membro",
           "fraqueza": "Articulações laterais frágeis; distraído com alimento",
           "model": null,
-          "noJogo": null
+          "noJogo": {
+            "hp": 99,
+            "damage": 12,
+            "speed": 3.35,
+            "armor": 0.69,
+            "xp": 37
+          }
         },
         {
           "id": "serpenteAguaEscura",
@@ -236,7 +254,13 @@
           "habilidade": "Redemoinho: arrasta o alvo para zona funda",
           "fraqueza": "Luz intensa e corrente contrária quebram a emboscada",
           "model": null,
-          "noJogo": null
+          "noJogo": {
+            "hp": 86,
+            "damage": 14,
+            "speed": 6.05,
+            "armor": 0.8,
+            "xp": 32
+          }
         }
       ],
       "subBoss": {
@@ -250,7 +274,7 @@
         "mecanica": "Três canais alimentam sua barreira; fechá-los na ordem certa reduz a defesa sem destruir o filtro.",
         "recompensas": "Escama Coralina; respiração aquática temporária",
         "noJogo": {
-          "hp": 150,
+          "hp": 600,
           "damage": 15,
           "speed": 3.35,
           "armor": 0.571,
@@ -268,7 +292,7 @@
         "fraqueza": "Remover o núcleo contaminado da garganta. Matar o Leviatã não resolve a falta de oxigênio.",
         "recompensas": "Pérola Abissal; Tridente das Correntes; água limpa",
         "noJogo": {
-          "hp": 300,
+          "hp": 1050,
           "damage": 23,
           "speed": 6.05,
           "armor": 0.667,
@@ -293,7 +317,7 @@
           "fraqueza": "Água em quantidade controlada resfria placas externas",
           "model": "salamandra",
           "noJogo": {
-            "hp": 60,
+            "hp": 90,
             "damage": 15,
             "speed": 4.7,
             "armor": 0.741,
@@ -311,7 +335,7 @@
           "fraqueza": "Juntas e ventre não têm placas de obsidiana",
           "model": "besouroObsidiana",
           "noJogo": {
-            "hp": 78,
+            "hp": 117,
             "damage": 13,
             "speed": 3.8,
             "armor": 0.625,
@@ -329,7 +353,7 @@
           "fraqueza": "Ventilação forte dispersa o corpo particulado",
           "model": "elemental",
           "noJogo": {
-            "hp": 54,
+            "hp": 81,
             "damage": 17,
             "speed": 5.15,
             "armor": 0.8,
@@ -348,7 +372,7 @@
         "mecanica": "Três fornalhas alimentam a armadura. Desativá-las em sequência reduz a defesa; todas de uma vez causam sobrepressão.",
         "recompensas": "Núcleo Incandescente; Martelo de Obsidiana; acesso às chaminés",
         "noJogo": {
-          "hp": 200,
+          "hp": 800,
           "damage": 20,
           "speed": 3.8,
           "armor": 0.615,
@@ -366,7 +390,7 @@
         "fraqueza": "Regular pressão e ventilação. Fechar todas as chaminés pode causar explosão; abrir demais congela câmaras vizinhas.",
         "recompensas": "Núcleo Incandescente estabilizado; resistência ao fogo; barreiras reparadas",
         "noJogo": {
-          "hp": 380,
+          "hp": 1330,
           "damage": 25,
           "speed": 4.7,
           "armor": 0.597,
@@ -391,7 +415,7 @@
           "fraqueza": "Calor constante e separação da matilha",
           "model": "loboBranco",
           "noJogo": {
-            "hp": 72,
+            "hp": 108,
             "damage": 17,
             "speed": 6.5,
             "armor": 0.769,
@@ -408,7 +432,13 @@
           "habilidade": "Visão do Inverno; Mergulho Gelado",
           "fraqueza": "Frágil se obrigada a pousar em área aberta",
           "model": null,
-          "noJogo": null
+          "noJogo": {
+            "hp": 77,
+            "damage": 18,
+            "speed": 6.5,
+            "armor": 0.833,
+            "xp": 28
+          }
         },
         {
           "id": "golemGelo",
@@ -421,7 +451,7 @@
           "fraqueza": "Calor nas juntas e vibração quebram suas articulações",
           "model": "golem",
           "noJogo": {
-            "hp": 108,
+            "hp": 162,
             "damage": 15,
             "speed": 3.35,
             "armor": 0.571,
@@ -440,7 +470,7 @@
         "mecanica": "Enquanto há gelo intacto ela convoca reforços. Derreter só as placas que bloqueiam a nascente reduz sua vantagem.",
         "recompensas": "Cristal Glacial; trilha segura para as torres de circulação",
         "noJogo": {
-          "hp": 233,
+          "hp": 933,
           "damage": 22,
           "speed": 6.05,
           "armor": 0.645,
@@ -458,7 +488,7 @@
         "fraqueza": "Corrigir o regulador térmico, não destruir o núcleo. Destruição total derrete a reserva e inunda as regiões inferiores.",
         "recompensas": "Cristal Glacial; Armadura de Geada; canais descongelados",
         "noJogo": {
-          "hp": 400,
+          "hp": 1400,
           "damage": 27,
           "speed": 4.25,
           "armor": 0.571,
@@ -483,7 +513,7 @@
           "fraqueza": "Áreas abertas e rastreamento revelam sua posição",
           "model": "felino",
           "noJogo": {
-            "hp": 90,
+            "hp": 135,
             "damage": 22,
             "speed": 6.5,
             "armor": 0.727,
@@ -501,7 +531,7 @@
           "fraqueza": "Ventre e articulações têm placas mais finas",
           "model": "besouroColossal",
           "noJogo": {
-            "hp": 132,
+            "hp": 198,
             "damage": 18,
             "speed": 3.8,
             "armor": 0.571,
@@ -519,7 +549,7 @@
           "fraqueza": "Vibrações no solo e calor revelam sua presença",
           "model": "serpente",
           "noJogo": {
-            "hp": 102,
+            "hp": 153,
             "damage": 24,
             "speed": 5.6,
             "armor": 0.714,
@@ -538,7 +568,7 @@
         "mecanica": "Cortar suas raízes de alimentação interrompe a regeneração; destruir toda a planta libera esporos. Podar e conter em vez de exterminar.",
         "recompensas": "Semente Ancestral; caminho até a manada do Rei das Feras",
         "noJogo": {
-          "hp": 283,
+          "hp": 1133,
           "damage": 25,
           "speed": 3.35,
           "armor": 0.588,
@@ -556,7 +586,7 @@
         "fraqueza": "Não precisa ser morto. Restaurar a rota migratória e afastar o Devorador reduz a agressividade. Combate letal desequilibra a vegetação.",
         "recompensas": "Presas Ancestrais; Manto de Camuflagem; aliança com a manada",
         "noJogo": {
-          "hp": 450,
+          "hp": 1575,
           "damage": 29,
           "speed": 5.15,
           "armor": 0.556,
@@ -581,7 +611,7 @@
           "fraqueza": "Sal e calor moderado a fazem soltar o alvo",
           "model": "sanguessuga",
           "noJogo": {
-            "hp": 78,
+            "hp": 117,
             "damage": 17,
             "speed": 4.25,
             "armor": 0.8,
@@ -599,7 +629,7 @@
           "fraqueza": "Vento forte dispersa a nuvem; máscara protege",
           "model": "sapo",
           "noJogo": {
-            "hp": 90,
+            "hp": 135,
             "damage": 19,
             "speed": 4.25,
             "armor": 0.741,
@@ -617,7 +647,7 @@
           "fraqueza": "Remover os fungos expõe o corpo; fogo descontrolado prejudica o ecossistema",
           "model": "golem",
           "noJogo": {
-            "hp": 120,
+            "hp": 180,
             "damage": 22,
             "speed": 3.8,
             "armor": 0.667,
@@ -636,7 +666,7 @@
         "mecanica": "Localizar e drenar três focos fúngicos. Queimar todos os focos espalha esporos e destrói decompositores úteis.",
         "recompensas": "Esporo Primordial; Máscara de Filtragem",
         "noJogo": {
-          "hp": 317,
+          "hp": 1267,
           "damage": 23,
           "speed": 4.25,
           "armor": 0.615,
@@ -654,7 +684,7 @@
         "fraqueza": "Drenagem, ventilação e remoção seletiva de focos. Eliminar todos os fungos interrompe a reciclagem.",
         "recompensas": "Esporo Primordial; Cajado dos Esporos; canais de drenagem restaurados",
         "noJogo": {
-          "hp": 500,
+          "hp": 1750,
           "damage": 30,
           "speed": 3.35,
           "armor": 0.533,
@@ -679,7 +709,7 @@
           "fraqueza": "Vibrações sonoras quebram a teia; juntas frágeis",
           "model": "cristalino",
           "noJogo": {
-            "hp": 120,
+            "hp": 180,
             "damage": 24,
             "speed": 5.6,
             "armor": 0.588,
@@ -696,7 +726,13 @@
           "habilidade": "Eco Prismático: desorienta; Mergulho Sônico",
           "fraqueza": "Silêncio controlado e superfícies absorventes",
           "model": null,
-          "noJogo": null
+          "noJogo": {
+            "hp": 135,
+            "damage": 23,
+            "speed": 6.5,
+            "armor": 0.769,
+            "xp": 50
+          }
         },
         {
           "id": "lagartoMineral",
@@ -709,7 +745,7 @@
           "fraqueza": "Calor moderado fragiliza placas; articulações expostas",
           "model": "lagarto",
           "noJogo": {
-            "hp": 144,
+            "hp": 216,
             "damage": 25,
             "speed": 3.8,
             "armor": 0.556,
@@ -728,7 +764,7 @@
         "mecanica": "O cristal frontal reflete magia. Ativar refletores laterais em sequência divide a energia e expõe o núcleo.",
         "recompensas": "Prisma Antigo; chave das galerias",
         "noJogo": {
-          "hp": 383,
+          "hp": 1533,
           "damage": 27,
           "speed": 4.25,
           "armor": 0.513,
@@ -746,7 +782,7 @@
         "fraqueza": "Frequência original do carvalho. Força bruta quebra cristais condutores.",
         "recompensas": "Prisma Antigo; Espada Prismática; comunicação mágica reativada",
         "noJogo": {
-          "hp": 550,
+          "hp": 1925,
           "damage": 33,
           "speed": 4.7,
           "armor": 0.488,
@@ -770,7 +806,13 @@
           "habilidade": "Mergulho Aéreo: bônus se atacar de altura",
           "fraqueza": "Espaços fechados e redes impedem voo",
           "model": null,
-          "noJogo": null
+          "noJogo": {
+            "hp": 207,
+            "damage": 29,
+            "speed": 6.5,
+            "armor": 0.69,
+            "xp": 77
+          }
         },
         {
           "id": "serpentePlanadora",
@@ -783,7 +825,7 @@
           "fraqueza": "Superfícies sem vegetação reduzem camuflagem",
           "model": "serpente",
           "noJogo": {
-            "hp": 156,
+            "hp": 234,
             "damage": 30,
             "speed": 6.05,
             "armor": 0.645,
@@ -800,7 +842,13 @@
           "habilidade": "Ferrão Paralisante; Enxame",
           "fraqueza": "Fumaça fria e proteção de resina afastam o enxame",
           "model": null,
-          "noJogo": null
+          "noJogo": {
+            "hp": 162,
+            "damage": 25,
+            "speed": 6.5,
+            "armor": 0.727,
+            "xp": 60
+          }
         }
       ],
       "subBoss": {
@@ -814,7 +862,7 @@
         "mecanica": "Usar velas, pontes e correntes para obrigá-la a pousar. Destruir ninhos elimina a chance de aliança.",
         "recompensas": "Pena dos Sete Galhos; rotas de vento mapeadas",
         "noJogo": {
-          "hp": 433,
+          "hp": 1733,
           "damage": 30,
           "speed": 6.5,
           "armor": 0.588,
@@ -832,7 +880,7 @@
         "fraqueza": "Reparar a conexão e libertar o dragão da dor. Cortá-la sem escoramento derruba plataformas.",
         "recompensas": "Pena dos Sete Galhos; Arco dos Sete Galhos; montaria aliada",
         "noJogo": {
-          "hp": 600,
+          "hp": 2100,
           "damage": 36,
           "speed": 6.05,
           "armor": 0.488,
@@ -856,7 +904,13 @@
           "habilidade": "Chama Renovadora; Pluma Ardente",
           "fraqueza": "Água e frio reduzem a regeneração (não congelar ninhos)",
           "model": null,
-          "noJogo": null
+          "noJogo": {
+            "hp": 234,
+            "damage": 31,
+            "speed": 6.5,
+            "armor": 0.667,
+            "xp": 87
+          }
         },
         {
           "id": "guardiaoFloral",
@@ -869,7 +923,7 @@
           "fraqueza": "Raízes expostas podem ser contidas sem destruir a planta",
           "model": "golem",
           "noJogo": {
-            "hp": 192,
+            "hp": 288,
             "damage": 29,
             "speed": 3.8,
             "armor": 0.533,
@@ -886,7 +940,13 @@
           "habilidade": "Ilusão Solar; Pólen Cegante",
           "fraqueza": "Escuridão total interrompe a orientação; não é necessário matá-la",
           "model": null,
-          "noJogo": null
+          "noJogo": {
+            "hp": 171,
+            "damage": 24,
+            "speed": 6.5,
+            "armor": 0.8,
+            "xp": 63
+          }
         }
       ],
       "subBoss": {
@@ -900,7 +960,7 @@
         "mecanica": "Proteger três áreas de reprodução e provar que as flores não serão destruídas.",
         "recompensas": "Pólen Dourado; acesso ao coração mágico",
         "noJogo": {
-          "hp": 500,
+          "hp": 2000,
           "damage": 31,
           "speed": 5.15,
           "armor": 0.556,
@@ -918,7 +978,7 @@
         "fraqueza": "Restaurar os dez reguladores e interromper o ciclo de absorção. Derrotá-lo sem estabilizar o coração pode matar a árvore.",
         "recompensas": "Coroa do Carvalho; Coração de Seiva; final escolhido pelo grupo",
         "noJogo": {
-          "hp": 800,
+          "hp": 2800,
           "damage": 39,
           "speed": 4.25,
           "armor": 0.444,

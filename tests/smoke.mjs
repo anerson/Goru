@@ -179,7 +179,13 @@ const fight = await page.evaluate(async () => {
   window.__oliveira.combat.debug.hurtMob(m, 20, m.pos.clone().setX(m.pos.x + 1));
   const hit = m.hp < hp0;
   await new Promise((r) => setTimeout(r, 5000));          // let it chase and bite
-  return { hit, state: m.state, playerHurt: O.game.state.health < health0, ok: hit && m.state !== 'idle' };
+  // dodge roll: a short dash that leaves the explorer invulnerable while it lasts
+  const x0 = W.x, z0 = W.z;
+  O.combat.dodge();
+  const invulnerable = W.dodgeT > 0;
+  O.step(8);
+  const dodged = +Math.hypot(W.x - x0, W.z - z0).toFixed(2);
+  return { hit, state: m.state, playerHurt: O.game.state.health < health0, dodged, invulnerable, ok: hit && m.state !== 'idle' && dodged > 2.5 && invulnerable };
 });
 
 // ---- 5. the whole campaign, floor 1 to floor 10, every stage through its own action ----

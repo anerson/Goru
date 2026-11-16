@@ -22,6 +22,7 @@ export function createHud(root) {
     <div class="hud-actions">
       <button type="button" id="hudUse" hidden>Interagir</button>
       <button type="button" id="hudAttack">Atacar</button>
+      <button type="button" id="hudDodge">Esquivar (C)</button>
       <button type="button" id="hudDrink">Beber (Q)</button>
       <button type="button" id="hudBag" aria-expanded="false">Mochila (I)</button>
     </div>
@@ -39,12 +40,13 @@ export function createHud(root) {
     <div class="hud-end" id="hudEnd" hidden><div><h2 id="hudEndTitle">Fim do Ato I</h2><p id="hudEndText"></p><div class="row"><button type="button" id="hudEndNext" hidden></button><button type="button" id="hudEndOk">Continuar explorando</button></div></div></div>
   `;
   const $ = (id) => root.querySelector(`#${id}`);
-  let handlers = { interact() {}, drink() {}, useItem() {}, attack() {}, craft() {}, equip() {} };
+  let handlers = { interact() {}, drink() {}, useItem() {}, attack() {}, dodge() {}, craft() {}, equip() {} };
   let choices = [];
   let lastState = null;
 
   $('hudUse').onclick = () => handlers.interact();
   $('hudAttack').onclick = () => handlers.attack();
+  $('hudDodge').onclick = () => handlers.dodge();
   $('hudDrink').onclick = () => handlers.drink();
   $('hudBag').onclick = () => toggleBag();
   $('hudEndOk').onclick = () => { $('hudEnd').hidden = true; };

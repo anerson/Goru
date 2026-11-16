@@ -15,6 +15,7 @@ import {
   NEEDS, FLASK, HAZARD_NAMES, BASE_WEAPON, weaponStats, FRAGMENTS, ENDINGS, guardianName, REGION_NAMES,
 } from './campaign_data.js';
 import { makeNode, makeObject, makeWorkbench } from './looks.js';
+import { sfx, setAmbience } from '../audio.js';
 
 const SAVE_KEY = 'aetherion-campanha-v2';
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
@@ -242,6 +243,7 @@ export function createGame({ scene, biomes, walker, hud }) {
       state.level++;
       state.health = maxHealth();
       hud.toast(`Nível ${state.level}! Vida máxima ${maxHealth()}`);
+      sfx('level');
     }
   }
 
@@ -255,12 +257,14 @@ export function createGame({ scene, biomes, walker, hud }) {
     const st = stage();
     if (st.region !== STAGES[i].region || st.kind === 'talk') state.camp = STAGES[i].region;
     showObjective();
+    sfx(st.region !== STAGES[i].region ? 'floor' : 'objective');
     hud.toast(st.region !== STAGES[i].region && st.kind !== 'end' ? `Andar ${regionIndex()} de 10: ${REGION_NAMES[st.region]}` : 'Novo objetivo');
     save();
     if (st.kind === 'end') finish();
   }
   function finish() {
     ended = true;
+    sfx('ending');
     const how = state.flags.escolha_devoradorSeiva ?? 'destruir';
     const outcome = PLAN.copa.boss.options.find((o) => o[0] === how)?.[2] ?? '';
     hud.ending(ENDINGS[how] ?? 'Fim da campanha', `${outcome}${choicesSummary()}`);
@@ -285,11 +289,13 @@ export function createGame({ scene, biomes, walker, hud }) {
     node.timer = node.respawn;
     node.mesh.visible = false;
     hud.toast(`+1 ${ITEMS[node.item].name}`);
+    sfx('pickup');
   }
   function water() {
     state.thirst = 100;
     state.flask = FLASK.capacity;
     hud.toast('Sede saciada. Cantil cheio (3 goles).');
+    sfx('water');
     hud.inventory(state);
   }
   function drink() {
@@ -308,6 +314,7 @@ export function createGame({ scene, biomes, walker, hud }) {
     if (it.use.hunger) state.hunger = Math.min(100, state.hunger + it.use.hunger);
     if (it.use.health) state.health = Math.min(maxHealth(), state.health + it.use.health);
     hud.toast(`${it.verb}: ${it.name}`);
+    sfx('eat');
   }
 
   // ---- crafting (survival-crafting: recipes as data, crafting is atomic) ----
@@ -321,6 +328,7 @@ export function createGame({ scene, biomes, walker, hud }) {
     for (const [k, v] of Object.entries(rc.inputs)) take(k, v);
     give(rc.output, 1);
     hud.toast(`Criado: ${ITEMS[rc.output].name}`);
+    sfx('craft');
     // a new weapon or outfit is put on at once when it is better than what is worn
     const it = ITEMS[rc.output];
     if (it.weapon && it.weapon.tier > weaponDef().tier) equip(rc.output);
@@ -354,6 +362,7 @@ export function createGame({ scene, biomes, walker, hud }) {
       for (const o of objects) if (o.group === def.group) { delete state.flags[o.flag]; o.done(false); }
       state.count[def.group] = 0;
       hurt(8 + ri * 2);
+      sfx('wrong');
       hud.message(`Ordem errada! Tudo volta ao início. Siga a sequência ${ROMAN.slice(0, def.count).join(', ')}.`);
       return;
     }
@@ -361,6 +370,7 @@ export function createGame({ scene, biomes, walker, hud }) {
     state.count[def.group] = n + 1;
     objects.find((o) => o.flag === flag)?.done(true);
     gainXp(12 + ri * 4);
+    sfx('quest');
     const line = def.done ? `${def.done} (${n + 1}/${def.count})` : `${def.label ?? LABELS[def.look]}: ${n + 1}/${def.count}`;
     if (def.look === 'station' || def.look === 'bones' || def.look === 'rescue') hud.message(line); else hud.toast(line);
   }
@@ -461,6 +471,7 @@ export function createGame({ scene, biomes, walker, hud }) {
     }
     if (ended) return;
     const here = levelOf(me.feet, Math.hypot(me.x, me.z));
+    setAmbience(here?.id ?? 'fora');
 
     if (!dialogue) {
       // needs drain on the game clock
@@ -544,6 +555,7 @@ export function createGame({ scene, biomes, walker, hud }) {
   }
   // the boss yields: the player decides its fate in a conversation
   function bossYield(id) {
+    sfx('yield');
     dialogue = { graph: DIALOGUES[`${id}_rendido`], npc: null };
     goto(dialogue.graph.start);
   }

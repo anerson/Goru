@@ -182,6 +182,7 @@ body.journey .place { display: none !important; }
 @media (prefers-reduced-motion: reduce) { .hud-hurt.on { animation-duration: 0.2s; } }
 .dmg { position: fixed; left: 0; top: 0; font: 800 18px/1 var(--display); white-space: nowrap; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8); pointer-events: none; }
 #hudAttack { background: #8a2a1a; border-color: #c9483a; font-weight: 800; }
+#hudDodge { border-color: #5aa08a; }
 /* crosshair: four ticks and a dot at the centre of the view */
 .hud-aim { position: fixed; left: 50%; top: 50%; width: 28px; height: 28px; margin: -14px 0 0 -14px; pointer-events: none; }
 .hud-aim i { position: absolute; background: rgba(244, 236, 218, 0.85); box-shadow: 0 0 3px rgba(0, 0, 0, 0.8); transition: transform 0.12s, background 0.12s; }
@@ -249,6 +250,7 @@ body.walking .orbit-only { display: none !important; }
   <button id="bPlaces" type="button" aria-expanded="false" aria-controls="places">Lugares</button>
   <button id="bFly" type="button" aria-pressed="false">Voar (F)</button>
   <button id="bGM" class="journey-only" type="button" hidden>Mestre</button>
+  <button id="bSound" class="journey-only" type="button" aria-pressed="true">Som (M)</button>
   <span class="spacer"></span>
   <button id="bExit" type="button">Ver de fora</button>
 </div>
@@ -273,7 +275,7 @@ body.walking .orbit-only { display: none !important; }
   <button id="bDown" type="button" aria-label="Descer">▼</button>
 </div>
 <div id="place" class="place walk-only">Trilha</div>
-<div class="hint walk-only">W A S D andar · mouse gira a câmera · clique ou Espaço ataca · E interagir · Q beber · I mochila · Shift correr · F voar</div>
+<div class="hint walk-only">W A S D andar · mouse gira a câmera · clique ou Espaço ataca · C esquivar · E interagir · Q beber · I mochila · Shift correr · F voar · M som</div>
 <div id="joy" class="joy walk-only" aria-hidden="true"><i id="knob"></i></div>
 
 <div id="hud" class="hud walk-only journey-only"></div>
