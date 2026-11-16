@@ -116,3 +116,27 @@ export function makeWorkbench() {
   );
   return root;
 }
+
+// ---------------------------------------------------------------- treasure chests
+// a chest with gold trim and a glowing seam, and a faint column of light that can be seen from
+// afar (it pulls the explorer off the trail). open(true) lifts the lid and puts the light out.
+export function makeChest() {
+  const wood = mat('#6a3f1f'), gold = mat('#d9a531', { metalness: 0.8, roughness: 0.3 });
+  const lid = group(mesh(new THREE.BoxGeometry(1.2, 0.3, 0.8), wood, 0, 0.15, 0.4), mesh(new THREE.BoxGeometry(1.24, 0.08, 0.84), gold, 0, 0.3, 0.4));
+  lid.position.set(0, 0.62, -0.4);
+  const seam = mesh(new THREE.BoxGeometry(1.18, 0.05, 0.78), glow('#ffd76a', 2.2), 0, 0.62, 0);
+  const beamMat = new THREE.MeshBasicMaterial({ color: '#ffd76a', transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  const beam = mesh(new THREE.CylinderGeometry(0.25, 0.6, 14, 10, 1, true), beamMat, 0, 7, 0);
+  beam.castShadow = false;
+  const root = group(
+    mesh(new THREE.BoxGeometry(1.2, 0.62, 0.8), wood, 0, 0.31, 0),
+    mesh(new THREE.BoxGeometry(1.24, 0.08, 0.84), gold, 0, 0.05, 0),
+    mesh(new THREE.BoxGeometry(0.16, 0.2, 0.06), gold, 0, 0.55, 0.42),
+    seam, lid, beam,
+  );
+  return {
+    root,
+    open(v) { lid.rotation.x = v ? -1.9 : 0; seam.visible = !v; beam.visible = !v; },
+    pulse(t) { beamMat.opacity = 0.12 + Math.sin(t * 2) * 0.06; },
+  };
+}

@@ -15,7 +15,7 @@ import { mulberry32 } from '../noise.js';
 import { BIOMES, DISK_R } from '../tree/layout.js';
 import { CREATURES, FAUNA } from './creatures.js';
 import { UNDER_TIER } from './campaign_data.js';
-import { sfx } from '../audio.js';
+import { sfx, setBattle } from '../audio.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 // Weapons. The explorer's staff is a melee weapon. The Cajado do GM belongs to the Game Master
@@ -27,7 +27,7 @@ export const WEAPONS = {
 };
 const CHASE_IN = 12, CHASE_OUT = 20, LEASH = 32, BOSS_LEASH = 46;
 
-export function createCombat({ scene, camera, walker, character, biomes, game, hud, reduceMotion }) {
+export function createCombat({ scene, camera, walker, character, biomes, game, hud, reduceMotion, fx }) {
   const rand = mulberry32(4242);
   const mobs = [];
   const bosses = {};
@@ -98,9 +98,9 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     if (T[1] && now > stopUntil) stopUntil = now + T[1];   // skip a new stop during one
   }
   const numbers = [];
-  function popNumber(pos, text, color) {
+  function popNumber(pos, text, color, cls = '') {
     const el = document.createElement('div');
-    el.className = 'dmg';
+    el.className = `dmg ${cls}`;
     el.textContent = text;
     el.style.color = color;
     document.getElementById('hud').append(el);
@@ -108,7 +108,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   }
 
   // ---------- damage ----------
-  function hurtMob(m, amount, from) {
+  function hurtMob(m, amount, from, crit = false) {
     if (m.state === 'dead' || m.state === 'dormant' || !(amount > 0)) return;
     // armour from the bestiary's Defesa (and a boss's own mechanics); the GM's staff ignores it
     if (amount < 1e6) amount *= (m.def.armor ?? 1) * (rulesOf(m).armorMul ?? 1);
@@ -129,7 +129,10 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     const away = m.pos.clone().sub(from).setY(0).normalize();
     m.knock.copy(away).multiplyScalar(m.boss ? 2 : 7);
     const huge = amount >= 1e6;
-    popNumber(m.pos.clone().setY(m.pos.y + m.model.height + 0.6), Math.round(amount).toLocaleString('pt-BR'), huge ? '#ffd76a' : '#ffe9a8');
+    const top = m.pos.clone().setY(m.pos.y + m.model.height + 0.6);
+    popNumber(top, `${crit ? 'CRÍTICO ' : ''}${Math.max(1, Math.round(amount)).toLocaleString('pt-BR')}`, huge || crit ? '#ffd76a' : weakHit ? '#9a9a9a' : '#ffe9a8', crit ? 'crit' : '');
+    const mid = m.pos.clone().setY(m.pos.y + m.model.height * 0.6);
+    if (crit) { fx?.crit(mid); sfx('crit'); } else if (!weakHit) fx?.hit(mid, !!m.boss);
     feedback(m.boss ? 'large' : 'medium');
     if (m.state === 'idle' || m.state === 'alert' || m.state === 'return') { m.state = 'chase'; m.timer = 0; }
     if (m.hp <= 0) { die(m); return; }
@@ -140,12 +143,15 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
       m.knock.set(0, 0, 0);
       lane.visible = ring.visible = false;
       hud.boss(`${m.def.name} · rendido`, m.hp / m.def.hp);
+      fx?.yield(m.pos.clone().setY(m.pos.y + 0.3));
       game.bossYield(m.boss);
     }
   }
   function die(m) {
     m.state = 'dead';
     m.timer = 0;
+    fx?.kill(m.pos.clone().setY(m.pos.y + m.model.height * 0.5), m.boss ? '#ffcf4a' : '#ff9a6a');
+    if (!m.boss) sfx('kill');
     lane.visible = ring.visible = false;
     if (m.boss !== 'gm' && !m.temp) game.gainXp(m.def.xp ?? 10);
     if (m.boss) {
@@ -157,9 +163,10 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     }
   }
   function hurtPlayer(amount) {
-    if (walker.state.dodgeT > 0) { popNumber(V(walker.state.x, walker.state.feet + 2.2, walker.state.z), 'esquivou', '#9dffcf'); return; }
+    if (walker.state.dodgeT > 0) { fx?.dodge(V(walker.state.x, walker.state.feet + 1, walker.state.z)); popNumber(V(walker.state.x, walker.state.feet + 2.2, walker.state.z), 'esquivou', '#9dffcf'); return; }
     game.hurt(amount);
     sfx('hurt');
+    dropCombo();
     feedback(amount >= 20 ? 'large' : 'medium');
   }
 
@@ -214,6 +221,18 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   const rulesOf = (m) => (m.boss && m.boss !== 'gm' ? game.bossRules(m.boss) : {});
 
   // ---------- the explorer attacks ----------
+  // combo: hits within 2.2 s of each other chain; each link adds 5% damage, up to +50%.
+  // crit: 12% of hits (20% at a combo of 10) do 1.8x, with a gold number and a burst.
+  let combo = 0, comboT = 0;
+  function strike(m, w, from) {
+    if (w.reach) { hurtMob(m, rollDamage(w), from); return; }
+    combo = comboT > 0 ? combo + 1 : 1;
+    comboT = 2.2;
+    hud.combo(combo);
+    const crit = rand() < (combo >= 10 ? 0.2 : 0.12);
+    hurtMob(m, rollDamage(w) * game.power() * (1 + Math.min(combo - 1, 10) * 0.05) * (crit ? 1.8 : 1), from, crit);
+  }
+  function dropCombo() { if (combo) { combo = 0; hud.combo(0); } }
   function attack() {
     if (attackCd > 0 || game.busy || walker.state.flying) return;
     const PLAYER = cur();
@@ -234,7 +253,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
       const end = target ? V(target.pos.x, target.pos.y + target.model.height * 0.5, target.pos.z) : camera.position.clone().addScaledVector(camDir, PLAYER.reach);
       fireBeam(tip, end);
       if (target && target.pos.distanceTo(V(me.x, me.feet, me.z)) > PLAYER.range + target.model.radius) {
-        hurtMob(target, rollDamage(PLAYER) * (PLAYER.reach ? 1 : game.power()), V(me.x, me.feet, me.z));
+        strike(target, PLAYER, V(me.x, me.feet, me.z));
         return;
       }
     }
@@ -249,7 +268,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
       const dist = d.length();
       if (dist > PLAYER.range + m.model.radius || Math.abs(m.pos.y - me.feet) > 3) continue;
       if (dist > 0.6 && d.normalize().dot(fwd) < PLAYER.cone) continue;
-      hurtMob(m, rollDamage(PLAYER) * (PLAYER.reach ? 1 : game.power()), from);
+      strike(m, PLAYER, from);
     }
   }
 
@@ -462,7 +481,9 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     b.state = 'rise';
     b.timer = 1.6;
     b.model.root.visible = true;
-    hud.toast(`${b.def.name} desperta!`);
+    const info = game.bossList.find((x) => x.id === id);
+    hud.banner(info?.kind === 'sub' ? 'Subchefe' : 'Guardião do andar', b.def.name,
+      game.bossTier(id) > cur().tier ? 'Sua arma é fraca demais: crie a arma deste andar na bancada' : 'Ataque, encadeie golpes e esquive do que brilhar em vermelho', 'boss');
     sfx('boss');
     feedback('large');
   }
@@ -514,6 +535,8 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     const now = performance.now() / 1000;
     const sim = now < stopUntil ? dt * 0.05 : dt;           // hit-stop slows combat only
     attackCd -= dt;
+    comboT -= dt;
+    if (comboT <= 0 && combo) dropCombo();
     const me = walker.state;
     const r = Math.hypot(me.x, me.z);
     const here = levelOf(me.feet, r);
@@ -560,6 +583,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
       m.model.animate(sim, speed, windup);
       if (m.boss && !m.ally && !m.yielded && m.state !== 'lurk' && m.state !== 'return') fighting = m;
     }
+    setBattle(!!fighting);
     if (fighting) hud.boss(fighting.def.name, Math.max(0, fighting.hp) / fighting.def.hp);
     else if (!game.busy) hud.boss(null);
 
@@ -598,6 +622,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
 
   function dodge() {
     if (game.busy || !walker.dodge()) return;
+    fx?.dodge(V(walker.state.x, walker.state.feet + 0.5, walker.state.z));
     character.roll();
     sfx('dodge');
   }

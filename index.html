@@ -167,6 +167,37 @@ body.flying .hud-actions { bottom: calc(190px + env(safe-area-inset-bottom, 0px)
 .hud-dialogue .choices { display: flex; flex-wrap: wrap; gap: 6px; }
 .hud-toasts { position: fixed; left: 50%; transform: translateX(-50%); top: calc(110px + env(safe-area-inset-top, 0px)); display: grid; gap: 6px; justify-items: center; pointer-events: none; }
 .hud-toasts div { background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font: 500 12px/1.2 var(--mono); }
+.hud-toasts div { animation: toastIn 0.25s ease-out; }
+.hud-toasts .loot { border-color: #6ad08a; color: #c8ffd8; }
+.hud-toasts .rare { border-color: #7fb8ff; color: #d8ecff; box-shadow: 0 0 14px rgba(127, 184, 255, 0.5); }
+.hud-toasts .epic { border-color: #ffcf4a; color: #fff2c8; box-shadow: 0 0 18px rgba(255, 207, 74, 0.6); font-weight: 700; }
+.hud-toasts .xp { border-color: var(--accent); color: var(--accent); }
+@keyframes toastIn { from { transform: translateY(-8px) scale(0.92); opacity: 0; } }
+.qbar { position: relative; height: 14px; border-radius: 7px; background: rgba(244, 236, 218, 0.1); overflow: hidden; }
+.qbar i { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #8a6a1a, var(--accent)); transition: width 0.5s cubic-bezier(.2,1.4,.4,1); }
+.qbar span { position: relative; display: block; text-align: center; font: 700 10px/14px var(--mono); color: var(--ink); }
+.hud-banner { position: fixed; left: 50%; top: 30%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; display: grid; gap: 6px; width: min(640px, calc(100vw - 32px)); opacity: 0; }
+.hud-banner.on { animation: bannerIn 3s ease-out forwards; }
+.hud-banner small { font: 700 12px/1 var(--mono); letter-spacing: 0.3em; text-transform: uppercase; color: var(--accent); }
+.hud-banner b { font: 800 clamp(26px, 6vw, 46px)/1.05 var(--display); color: #fff6dc; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.8), 0 0 30px rgba(217, 180, 92, 0.45); letter-spacing: -0.01em; }
+.hud-banner span { font-size: 15px; color: var(--ink); text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9); }
+.hud-banner.boss small { color: #ff8a7a; }
+.hud-banner.boss b { color: #ffd0c8; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.8), 0 0 34px rgba(255, 80, 60, 0.6); }
+.hud-banner.level b { color: #fff2a8; }
+@keyframes bannerIn { 0% { opacity: 0; transform: translate(-50%, -40%) scale(1.15); letter-spacing: 0.1em; } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -54%); } }
+.hud-reveal { position: fixed; left: 50%; bottom: 26%; transform: translateX(-50%); min-width: 260px; max-width: calc(100vw - 32px); box-sizing: border-box; padding: 14px 20px; display: grid; gap: 4px; text-align: center; background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--glow) 35%, transparent), var(--panel) 70%); border: 1px solid var(--glow); border-radius: 12px; box-shadow: 0 0 30px color-mix(in srgb, var(--glow) 45%, transparent); pointer-events: none; }
+.hud-reveal.on { animation: revealIn 0.5s cubic-bezier(.2,1.6,.4,1); }
+.hud-reveal small { font: 700 11px/1 var(--mono); letter-spacing: 0.25em; text-transform: uppercase; color: var(--glow); }
+.hud-reveal b { font: 800 22px/1.15 var(--display); color: #fff6dc; }
+.hud-reveal span { font: 500 12.5px/1.4 var(--mono); color: var(--ink); }
+@keyframes revealIn { from { transform: translateX(-50%) scale(0.6); opacity: 0; } }
+.hud-combo { position: fixed; right: max(20px, env(safe-area-inset-right, 0px)); top: 44%; display: grid; justify-items: end; pointer-events: none; }
+.hud-combo b { font: 800 34px/1 var(--display); color: #ffd76a; text-shadow: 0 0 16px rgba(255, 180, 60, 0.7), 0 2px 6px #000; }
+.hud-combo small { font: 700 11px/1 var(--mono); letter-spacing: 0.25em; text-transform: uppercase; color: #ffcf8a; }
+.hud-combo.pop b { animation: comboPop 0.25s ease-out; }
+@keyframes comboPop { from { transform: scale(1.5); } }
+.dmg.crit { font-size: 26px !important; font-weight: 800; text-shadow: 0 0 12px rgba(255, 200, 60, 0.9), 0 2px 4px #000; }
+@media (prefers-reduced-motion: reduce) { .hud-banner.on, .hud-reveal.on, .hud-combo.pop b, .hud-toasts div { animation-duration: 0.01s; } .hud-banner.on { animation: none; opacity: 1; } }
 .hud-end { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(10, 12, 8, 0.72); padding: 16px; }
 .hud-end > div { max-width: 520px; background: var(--panel); border: 1px solid var(--accent); border-radius: 12px; padding: 22px; display: grid; gap: 12px; text-align: center; }
 .hud-end h2 { margin: 0; font-size: 28px; letter-spacing: -0.01em; }

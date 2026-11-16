@@ -14,7 +14,7 @@ import {
   REGIONS_PLAN, ITEMS, RECIPES, RESOURCES, STAGES, stageIndex, DIALOGUES, dialogueFor, SPEAKERS, STRINGS, BOSSES,
   NEEDS, FLASK, HAZARD_NAMES, BASE_WEAPON, weaponStats, FRAGMENTS, ENDINGS, guardianName, REGION_NAMES,
 } from './campaign_data.js';
-import { makeNode, makeObject, makeWorkbench } from './looks.js';
+import { makeNode, makeObject, makeWorkbench, makeChest } from './looks.js';
 import { sfx, setAmbience } from '../audio.js';
 
 const SAVE_KEY = 'aetherion-campanha-v2';
@@ -34,11 +34,13 @@ function freshState() {
     equip: { weapon: null, outfit: null },
     camp: 'raizes',          // where you wake after fainting
     xp: 0, level: 1,
+    bonus: { hp: 0, dmg: 0 }, // permanent upgrades from legendary chests
+    chestsSinceEpic: 0,
     pos: null,
   };
 }
 
-export function createGame({ scene, biomes, walker, hud }) {
+export function createGame({ scene, biomes, walker, hud, fx }) {
   const rand = mulberry32(777);
   const h = (id, x, z) => biomes.terrains[id](x, z);
   let state = freshState();
@@ -203,6 +205,59 @@ export function createGame({ scene, biomes, walker, hud }) {
     }
   }
 
+  // treasure chests: three per floor, off the trail, each with a column of light. Variable
+  // reward: common (the floor's materials), rare (a potion and the creatures' material) or
+  // legendary (a permanent upgrade). A legendary is guaranteed within every 6 chests.
+  const chests = [];
+  for (const [ri, r] of REGIONS_PLAN.entries()) {
+    [[0.49, 11], [0.69, -11], [0.97, 11]].forEach(([f, side], k) => {
+      const p = spot(r.id, loopOf(r.id), f, side);
+      const c = makeChest();
+      c.root.rotation.y = rand() * 6.28;
+      put(c.root, p);
+      const id = `bau_${r.id}_${k}`;
+      chests.push({ id, c });
+      add({ id, kind: 'chest', pos: p.clone().setY(p.y + 1), radius: 3, label: () => 'Abrir o baú', enabled: () => !state.flags[id], use: () => openChest(id, r, ri, p) });
+    });
+  }
+  const LEGENDS = [
+    { name: 'Semente de Vigor', line: '+20 de vida máxima, para sempre', apply: () => { state.bonus.hp += 20; } },
+    { name: 'Pedra de Afiar Ancestral', line: '+6% de dano, para sempre', apply: () => { state.bonus.dmg += 0.06; } },
+  ];
+  function openChest(id, r, ri, p) {
+    state.flags[id] = true;
+    state.bonus = state.bonus ?? { hp: 0, dmg: 0 };
+    chests.find((x) => x.id === id)?.c.open(true);
+    const roll = rand();
+    const epic = roll < 0.14 || (state.chestsSinceEpic ?? 0) >= 5;
+    gainXp(20 + ri * 10);
+    sfx('chest');
+    if (epic) {
+      state.chestsSinceEpic = 0;
+      const L = LEGENDS[Object.keys(state.flags).filter((k) => k.startsWith('bau_')).length % 2];
+      L.apply();
+      state.health = maxHealth();
+      fx?.chest(p.clone().setY(p.y + 0.6), '#ffcf4a');
+      sfx('epic');
+      hud.reveal('Achado lendário', L.name, [L.line], '#ffcf4a');
+    } else if (roll < 0.5) {
+      state.chestsSinceEpic = (state.chestsSinceEpic ?? 0) + 1;
+      give('pocao', 1); give(r.mats.drop[0], 2);
+      fx?.chest(p.clone().setY(p.y + 0.6), '#7fb8ff');
+      sfx('rare');
+      hud.toast(`Baú raro: Poção de Seiva + 2 ${ITEMS[r.mats.drop[0]].name}`, 'rare');
+    } else {
+      state.chestsSinceEpic = (state.chestsSinceEpic ?? 0) + 1;
+      for (const [item] of r.mats.nodes) give(item, 2);
+      give('erva', 1);
+      fx?.chest(p.clone().setY(p.y + 0.6), '#9dffcf');
+      hud.toast(`Baú: 2 ${ITEMS[r.mats.nodes[0][0]].name}, 2 ${ITEMS[r.mats.nodes[1][0]].name} e 1 erva`, 'loot');
+    }
+    const opened = Object.keys(state.flags).filter((k) => k.startsWith('bau_')).length;
+    hud.toast(`Baús encontrados: ${opened}/${chests.length}`, 'xp');
+    save();
+  }
+
   // every boss in the story: where it waits and the stage that wakes it
   const bossList = BOSSES.map((b) => ({ ...b, lair: lairs[b.id] }));
   for (const b of bossList) add({ id: b.id, kind: 'marker', pos: b.lair.clone().setY(b.lair.y + 1), radius: 0, label: () => '', enabled: () => false, use: () => {} });
@@ -234,15 +289,16 @@ export function createGame({ scene, biomes, walker, hud }) {
 
   // ---------- levels ----------
   const xpNeed = (L) => Math.round(60 * L ** 1.35);
-  const maxHealth = () => 100 + 10 * (state.level - 1);
-  const power = () => 1 + 0.05 * (state.level - 1);
+  const maxHealth = () => 100 + 10 * (state.level - 1) + (state.bonus?.hp ?? 0);
+  const power = () => (1 + 0.05 * (state.level - 1)) * (1 + (state.bonus?.dmg ?? 0));
   function gainXp(n) {
     state.xp += Math.round(n);
     while (state.xp >= xpNeed(state.level)) {
       state.xp -= xpNeed(state.level);
       state.level++;
       state.health = maxHealth();
-      hud.toast(`Nível ${state.level}! Vida máxima ${maxHealth()}`);
+      hud.banner('Subiu de nível', `Nível ${state.level}`, `Vida máxima ${maxHealth()} · dano +${Math.round((power() - 1) * 100)}%`, 'level');
+      fx?.levelUp(V(walker.state.x, walker.state.feet + 0.2, walker.state.z));
       sfx('level');
     }
   }
@@ -258,9 +314,15 @@ export function createGame({ scene, biomes, walker, hud }) {
     if (st.region !== STAGES[i].region || st.kind === 'talk') state.camp = STAGES[i].region;
     showObjective();
     sfx(st.region !== STAGES[i].region ? 'floor' : 'objective');
+    if (st.region !== STAGES[i].region && st.kind !== 'end') floorBanner();
     hud.toast(st.region !== STAGES[i].region && st.kind !== 'end' ? `Andar ${regionIndex()} de 10: ${REGION_NAMES[st.region]}` : 'Novo objetivo');
     save();
     if (st.kind === 'end') finish();
+  }
+  function floorBanner() {
+    const r = PLAN[stage().region];
+    const name = REGION_NAMES[r.id];
+    hud.banner(`Andar ${regionIndex()} de 10`, name[0].toUpperCase() + name.slice(1).replace(/^(A|O) /, ''), `Missão: ${r.mission}`);
   }
   function finish() {
     ended = true;
@@ -268,6 +330,15 @@ export function createGame({ scene, biomes, walker, hud }) {
     const how = state.flags.escolha_devoradorSeiva ?? 'destruir';
     const outcome = PLAN.copa.boss.options.find((o) => o[0] === how)?.[2] ?? '';
     hud.ending(ENDINGS[how] ?? 'Fim da campanha', `${outcome}${choicesSummary()}`);
+  }
+  // how far the current objective is: [done, total]
+  function stageProgress() {
+    const st = stage();
+    if (st.kind === 'craft') return [Object.keys(st.need).filter((k) => state.inv[k]).length, Object.keys(st.need).length];
+    const g = st.kind === 'group' ? st.target : st.group;
+    if (!g) return [0, 0];
+    const n = st.need[g] ?? 3;
+    return [Math.min(n, state.count[g] ?? 0), n];
   }
   const intact = () => FRAGMENTS.filter((f) => state.flags[`intacto_${f}`]).length;
   const held = () => FRAGMENTS.filter((f) => state.inv[f]).length;
@@ -288,7 +359,8 @@ export function createGame({ scene, biomes, walker, hud }) {
     give(node.item, 1);
     node.timer = node.respawn;
     node.mesh.visible = false;
-    hud.toast(`+1 ${ITEMS[node.item].name}`);
+    hud.toast(`+1 ${ITEMS[node.item].name}  (${state.inv[node.item]})`, 'loot');
+    fx?.pickup(node.mesh.position.clone().setY(node.mesh.position.y + 0.5), ITEMS[node.item].material ? '#ffd76a' : '#9dffcf');
     sfx('pickup');
   }
   function water() {
@@ -327,10 +399,19 @@ export function createGame({ scene, biomes, walker, hud }) {
     if ((rc.kind === 'arma' || rc.kind === 'roupa') && state.inv[rc.output]) { hud.toast('Você já tem isso.'); return false; }
     for (const [k, v] of Object.entries(rc.inputs)) take(k, v);
     give(rc.output, 1);
-    hud.toast(`Criado: ${ITEMS[rc.output].name}`);
     sfx('craft');
-    // a new weapon or outfit is put on at once when it is better than what is worn
+    fx?.craft(V(walker.state.x, walker.state.feet + 1, walker.state.z));
     const it = ITEMS[rc.output];
+    const before = { w: weapon(), o: outfitDef() };
+    if (it.weapon) {
+      const now = weaponStats(it.weapon), avg = (w) => (w.damage[0] + w.damage[1]) / 2;
+      const up = Math.round((avg(now) / avg(before.w) - 1) * 100);
+      hud.reveal('Nova arma', it.name, [`Dano ${Math.round(avg(before.w))} → ${Math.round(avg(now))}  (+${up}%)`, `Nível ${it.weapon.tier}: fere de verdade os guardiões de ${REGION_NAMES[ORDER[it.weapon.tier - 1]]}`], it.weapon.look.tip);
+    } else if (it.outfit) {
+      const pct = (o) => Math.round((o?.guard ?? 0) * 100);
+      hud.reveal('Nova roupa', it.name, [`Proteção ${pct(before.o)}% → ${pct(it.outfit)}%`, it.outfit.resist ? `Protege do ${it.outfit.resist}` : 'Visual novo no explorador'], it.outfit.look.glow ?? it.outfit.look.shirt);
+    } else hud.toast(`Criado: ${it.name}`, 'loot');
+    // a new weapon or outfit is put on at once when it is better than what is worn
     if (it.weapon && it.weapon.tier > weaponDef().tier) equip(rc.output);
     if (it.outfit && it.outfit.guard > (outfitDef()?.guard ?? 0)) equip(rc.output);
     gainXp(10 + 6 * ORDER.indexOf(rc.region ?? 'raizes'));
@@ -369,6 +450,8 @@ export function createGame({ scene, biomes, walker, hud }) {
     state.flags[flag] = true;
     state.count[def.group] = n + 1;
     objects.find((o) => o.flag === flag)?.done(true);
+    const it = items.find((x) => x.id === flag);
+    if (it) fx?.quest(it.pos.clone().setY(it.pos.y - 0.5));
     gainXp(12 + ri * 4);
     sfx('quest');
     const line = def.done ? `${def.done} (${n + 1}/${def.count})` : `${def.label ?? LABELS[def.look]}: ${n + 1}/${def.count}`;
@@ -376,6 +459,7 @@ export function createGame({ scene, biomes, walker, hud }) {
   }
   function applyWorld() {
     for (const o of objects) o.done(!!state.flags[o.flag]);
+    for (const ch of chests) ch.c.open(!!state.flags[ch.id]);
     applyGear();
   }
 
@@ -463,6 +547,8 @@ export function createGame({ scene, biomes, walker, hud }) {
   let current = null;
   function update(dt, t, { running, flying, camYaw }) {
     flames.forEach((f, i) => { f.scale.y = 1 + Math.sin(t * 9 + i) * 0.15; });
+    for (const ch of chests) ch.c.pulse(t);
+    hud.progress(...stageProgress());
     for (const n of nodes) if (n.timer > 0) { n.timer -= dt; if (n.timer <= 0) n.mesh.visible = true; }
     const me = walker.state;
     for (const n of Object.values(npcs)) {
@@ -533,7 +619,7 @@ export function createGame({ scene, biomes, walker, hud }) {
   function loot(biome) {
     const item = PLAN[biome]?.mats.drop[0] ?? 'erva';
     give(item, 1);
-    hud.toast(`A criatura deixou: ${ITEMS[item].name}`);
+    hud.toast(`A criatura deixou: ${ITEMS[item].name}`, 'loot');
   }
   // the guardian's fragment: intact when the guardian was restored or spared, cracked when destroyed
   function fragmentOf(id, how) {
@@ -542,7 +628,7 @@ export function createGame({ scene, biomes, walker, hud }) {
     const [fid] = b.fragment;
     if (!state.inv[fid]) give(fid, 1);
     if (how !== 'destruir') state.flags[`intacto_${fid}`] = true;
-    hud.toast(`Fragmento obtido: ${ITEMS[fid].name}${how === 'destruir' ? ' (rachado)' : ''}`);
+    hud.reveal(how === 'destruir' ? 'Fragmento rachado' : 'Fragmento do Coração', ITEMS[fid].name, [ITEMS[fid].fragment, `Fragmentos: ${held()}/10 · intactos ${intact()}/10`], how === 'destruir' ? '#a8a8a8' : '#9dffcf');
   }
   // killed outright (no yield, e.g. by the GM's staff): counts as destroying it
   function bossDefeated(id) {
@@ -636,6 +722,7 @@ export function createGame({ scene, biomes, walker, hud }) {
     if (continueGame && state.pos) walker.teleport({ x: state.pos.x, z: state.pos.z, feet: state.pos.feet, yaw: state.pos.yaw, pitch: -0.15 });
     else spawnAtCamp();
     if (stage().kind === 'end') finish();
+    else floorBanner();
   }
 
   applyWorld();

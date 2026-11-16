@@ -57,6 +57,22 @@ do andar 1 ao 10; um chefe derruba o explorador em 7 a 12 mordidas (a roupa do a
 **Esquiva** (C, Ctrl ou o botão): um rolamento curto na direção do movimento (para trás se parado),
 invulnerável enquanto dura, com 0,7 s de recarga. É a resposta aos golpes avisados dos chefes.
 
+**Recompensa e impacto** (`src/fx.js`, `hud.js`):
+- **Combo:** golpes em até 2,2 s um do outro encadeiam; cada elo dá +5% de dano (até +50%). Levar dano zera o combo.
+- **Crítico:** 12% dos golpes (20% com combo 10+) causam 1,8× o dano, com número dourado, faíscas e som próprio.
+- **Partículas:** faíscas nos acertos, explosão ao matar, brilho ao coletar e ao concluir uma etapa, anéis ao subir de nível.
+- **Momentos:** cartão de chegada em cada andar (com o nome da missão), apresentação do guardião quando
+  ele acorda (avisa se a sua arma é fraca demais) e banner de nível.
+- **Revelação de equipamento:** ao criar uma arma, aparece o dano antes → depois (+%); numa roupa, a proteção
+  antes → depois; num fragmento, quantos você tem.
+- **Barra de progresso** da etapa atual (2/3 nascentes, 1/2 equipamentos...).
+- **Baús escondidos:** 3 por andar, fora da trilha, com uma coluna de luz visível de longe. Recompensa
+  variável: comum (materiais do andar), raro (Poção de Seiva + material das criaturas) ou **lendário**,
+  que dá melhoria permanente (**Semente de Vigor**: +20 de vida máxima; **Pedra de Afiar Ancestral**:
+  +6% de dano). Um lendário sai pelo menos a cada 6 baús.
+- **Música adaptativa:** explorando, acordes lentos e notas soltas na escala de cada andar; com um
+  guardião acordado, entra a batalha (bumbo, chimbal, baixo e acordes tensos).
+
 **Som** (`src/audio.js`): todos os efeitos são sintetizados no navegador, sem arquivos: golpe, acerto,
 arranhão de arma fraca, dano, esquiva, coleta, bigorna da bancada, missão, novo andar, nível, rugido
 do chefe, rendição, final, e um vento ambiente que muda de cor a cada andar. M liga e desliga.
@@ -158,7 +174,8 @@ src/biomes/common.js  terreno, trilhas, teto de cada andar (raízes, musgo, sol)
 src/geom.js           faixas, placas e instâncias usadas em todo lugar
 src/landscape.js      chão, grama, oliveiras normais e pessoas para dar escala
 src/particles.js      folhas caindo da copa
-src/audio.js          sons sintetizados (Web Audio) e ambiente de cada andar
+src/audio.js          sons e música adaptativa sintetizados (Web Audio), ambiente de cada andar
+src/fx.js             partículas de impacto, coleta, nível, baú e criação (um só InstancedMesh)
 src/player.js         movimento, esquiva, voo e câmera em 3ª pessoa (braço de mola); colisão com troncos, raízes, pisos, água e lava
 src/character.js      o explorador e os moradores: modelo e animação
 src/game/campaign_data.js a campanha inteira como dados: 10 andares, materiais, receitas, armas, roupas, etapas, diálogos

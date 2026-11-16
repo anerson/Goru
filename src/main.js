@@ -15,6 +15,7 @@ import { createWalker } from './player.js';
 import { createInput } from './input.js';
 import { createCharacter } from './character.js';
 import { createGame } from './game/game.js';
+import { createFx } from './fx.js';
 import { startAudio, toggleMute, isMuted } from './audio.js';
 import { STAGES, RECIPES } from './game/campaign_data.js';
 import { createHud } from './game/hud.js';
@@ -94,8 +95,9 @@ function buildWorld() {
   character.root.visible = false;
   scene.add(character.root);
   const hud = createHud($('hud'));
-  const game = createGame({ scene, biomes, walker, hud });
-  const combat = createCombat({ scene, camera, walker, character, biomes, game, hud, reduceMotion });
+  const fx = createFx(scene, reduceMotion);
+  const game = createGame({ scene, biomes, walker, hud, fx });
+  const combat = createCombat({ scene, camera, walker, character, biomes, game, hud, reduceMotion, fx });
   game.onFaint(() => combat.resetBosses());
   // crafted gear shows on the explorer: the weapon recolours the staff, the outfit the clothes
   game.onGear((w, o) => { character.setWeaponLook(w.look, w.tier); character.setOutfit(o?.look ?? null); });
@@ -106,7 +108,7 @@ function buildWorld() {
   $('sCrown').textContent = `${(canopy.crownR * 2 / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`;
   $('sPaths').textContent = `${((paths.totalLength + biomes.trailLength) / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`;
   const gm = createGM({ root: $('gmPanel'), game, combat, hud, isJourney: () => journey && mode === 'walk' });
-  return { walker, character, canopy, game, hud, combat, gm, updateParticles, updateBiomes: biomes.update, paths: biomes.paths };
+  return { walker, character, canopy, game, hud, combat, gm, fx, updateParticles, updateBiomes: biomes.update, paths: biomes.paths };
 }
 
 // ---------- places you can jump to ----------
@@ -288,6 +290,7 @@ renderer.setAnimationLoop(() => {
         world.game.update(dt, t, { running: s.running && s.moving, flying: s.flying, camYaw: s.yaw });
         world.combat.update(dt, t);
         world.combat.shake(dt);
+        world.fx.update(dt);
       }
       world.character.update(dt, { x: s.x, y: s.feet, z: s.z, speed: s.speed, flying: s.flying, moveYaw: s.moveYaw });
       env.setShadowFocus(shadowCenter.set(s.x, s.feet, s.z), 220);

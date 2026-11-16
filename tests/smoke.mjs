@@ -234,6 +234,8 @@ const act = await page.evaluate(() => {
       converse(st.target);
     } else if (st.kind === 'craft') {
       const outs = Object.keys(st.need);
+      // the floor's three treasure chests (variable reward; a legendary within every 6)
+      D.items.filter((i) => i.kind === 'chest' && i.id.startsWith(`bau_${region}_`) && i.enabled()).forEach((i) => i.use());
       if (region === 'raizes') {
         // the tier gate: the starting branch barely scratches the floor's sub-boss
         const b = C.bosses.escavadorAmbar;
@@ -281,9 +283,12 @@ const act = await page.evaluate(() => {
   }).map((i) => i.id);
   const endTitle = document.getElementById('hudEndTitle').textContent;
   const ending = document.getElementById('hudEndText').textContent;
+  const chestsOpened = Object.keys(G.state.flags).filter((k) => k.startsWith('bau_')).length;
+  checks.chests = { opened: chestsOpened, bonus: G.state.bonus, maxHealth: G.maxHealth() };
+  checks.juice = { banner: !!document.getElementById('hudBanner'), progressBar: !!document.getElementById('hudQBar') };
   const allYielded = Object.values(bosses).every((b) => b.yielded) && Object.keys(bosses).length === 20;
   const ok = G.state.stage === 'campanha_fim' && misplaced.length === 0 && allYielded && endTitle.includes('Final B') && D.intact() === 10
-    && checks.gateWeak < checks.gateStrong * 0.25 && checks.benchShown !== undefined && checks.wrongOrder?.reset && checks.wrongOrder?.hurt;
+    && checks.gateWeak < checks.gateStrong * 0.25 && checks.benchShown !== undefined && checks.wrongOrder?.reset && checks.wrongOrder?.hurt && chestsOpened === 30 && (G.state.bonus.hp + G.state.bonus.dmg * 100) >= 5 * 6;
   return { log, checks, bosses, misplaced, endTitle, ending, intact: D.intact(), level: G.state.level, equip: G.state.equip, ok };
 });
 

@@ -16,6 +16,7 @@ export function createHud(root) {
     <div class="hud-quest" aria-live="polite">
       <small id="hudAct">Andar 1 de 10 · Floresta das Raízes</small>
       <strong id="hudObjective"></strong>
+      <div class="qbar" id="hudQBar" hidden><i id="hudQFill"></i><span id="hudQText"></span></div>
       <div class="guide" id="hudGuide"><span class="arrow" id="hudArrow">▲</span><span id="hudDist"></span><em id="hudHint"></em></div>
     </div>
     <div class="hud-prompt" id="hudPrompt" hidden><kbd>E</kbd><span></span></div>
@@ -34,6 +35,9 @@ export function createHud(root) {
       <div class="choices" id="hudChoices"></div>
     </div>
     <div class="hud-toasts" id="hudToasts" aria-live="polite"></div>
+    <div class="hud-banner" id="hudBanner" hidden><small></small><b></b><span></span></div>
+    <div class="hud-reveal" id="hudReveal" hidden></div>
+    <div class="hud-combo" id="hudCombo" hidden><b></b><small>combo</small></div>
     <div class="hud-boss" id="hudBoss" hidden><b id="hudBossName"></b><i><span id="hudBossBar"></span></i></div>
     <div class="hud-hurt" id="hudHurt"></div>
     <div class="hud-aim" id="hudAim" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b><span id="hudAimLabel"></span></div>
@@ -91,6 +95,21 @@ export function createHud(root) {
     el.querySelector('[data-close]').onclick = () => { el.hidden = true; };
   }
 
+  const bannerQ = [];
+  let bannerBusy = false, revealT = 0;
+  function nextBanner() {
+    const b = bannerQ.shift();
+    const el = $('hudBanner');
+    if (!b) { bannerBusy = false; el.hidden = true; return; }
+    bannerBusy = true;
+    el.className = `hud-banner ${b.tone}`;
+    el.querySelector('small').textContent = b.kicker;
+    el.querySelector('b').textContent = b.title;
+    el.querySelector('span').textContent = b.sub;
+    el.hidden = false;
+    void el.offsetWidth; el.classList.add('on');
+    setTimeout(nextBanner, 3000);
+  }
   function close() { $('hudDialogue').hidden = true; choices = []; }
 
   const hud = {
@@ -100,6 +119,35 @@ export function createHud(root) {
       $('hudAct').textContent = `Ato ${['I', 'II', 'III'][act - 1] ?? 'I'} · Andar ${floor} de 10${place ? ` · ${place[0].toUpperCase()}${place.slice(1)}` : ''}`;
     },
     workbench: renderBench,
+    // quest progress under the objective (3/3 springs...)
+    progress(done, total) {
+      $('hudQBar').hidden = !total || total < 2;
+      if (!total) return;
+      $('hudQFill').style.width = `${Math.round((done / total) * 100)}%`;
+      $('hudQText').textContent = `${done}/${total}`;
+    },
+    // big centred title for moments: a new floor, a guardian waking, a level up. Queued.
+    banner(kicker, title, sub = '', tone = '') {
+      bannerQ.push({ kicker, title, sub, tone });
+      if (!bannerBusy) nextBanner();
+    },
+    // a new weapon or outfit: name, what it does, and how it compares with what you had
+    reveal(kind, name, lines, color = '#ffd76a') {
+      const el = $('hudReveal');
+      el.style.setProperty('--glow', color);
+      el.innerHTML = `<small>${kind}</small><b>${name}</b>${lines.map((l) => `<span>${l}</span>`).join('')}`;
+      el.hidden = false;
+      el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+      clearTimeout(revealT);
+      revealT = setTimeout(() => { el.hidden = true; }, 4200);
+    },
+    combo(n) {
+      const el = $('hudCombo');
+      el.hidden = n < 3;
+      if (n < 3) return;
+      el.querySelector('b').textContent = `×${n}`;
+      el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+    },
     get benchOpen() { return !$('hudBench').hidden; },
     needs(state, { maxHealth = 100, xpFrac = 0 } = {}) {
       for (const k of ['health', 'thirst', 'hunger']) {
@@ -126,9 +174,10 @@ export function createHud(root) {
       $('hudDist').textContent = dist < 1000 ? `${Math.round(dist)} m` : `${(dist / 1000).toFixed(1).replace('.', ',')} km`;
       $('hudHint').textContent = hint ?? '';
     },
-    toast(msg) {
+    toast(msg, kind = '') {
       const t = document.createElement('div');
       t.textContent = msg;
+      if (kind) t.className = kind;
       $('hudToasts').append(t);
       setTimeout(() => t.remove(), 3500);
     },
@@ -185,7 +234,7 @@ export function createHud(root) {
       if (next) { b.textContent = next.label; b.onclick = () => { $('hudEnd').hidden = true; next.run(); }; }
       $('hudEnd').hidden = false;
     },
-    reset() { close(); $('hudEnd').hidden = true; $('hudBench').hidden = true; toggleBag(false); $('hudToasts').innerHTML = ''; },
+    reset() { close(); $('hudEnd').hidden = true; $('hudBench').hidden = true; toggleBag(false); $('hudToasts').innerHTML = ''; $('hudReveal').hidden = true; $('hudCombo').hidden = true; bannerQ.length = 0; },
   };
   return hud;
 }
