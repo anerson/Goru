@@ -186,7 +186,7 @@ body.flying .hud-actions { bottom: calc(190px + env(safe-area-inset-bottom, 0px)
 .hud-banner.boss b { color: #ffd0c8; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.8), 0 0 34px rgba(255, 80, 60, 0.6); }
 .hud-banner.level b { color: #fff2a8; }
 @keyframes bannerIn { from { transform: scale(1.25); letter-spacing: 0.08em; } }
-.hud-reveal { position: fixed; left: 50%; bottom: 26%; transform: translateX(-50%); min-width: 260px; max-width: calc(100vw - 32px); box-sizing: border-box; padding: 14px 20px; display: grid; gap: 4px; text-align: center; background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--glow) 35%, transparent), var(--panel) 70%); border: 1px solid var(--glow); border-radius: 12px; box-shadow: 0 0 30px color-mix(in srgb, var(--glow) 45%, transparent); pointer-events: none; }
+.hud-reveal { position: fixed; left: 50%; top: 22%; transform: translateX(-50%); min-width: 260px; max-width: calc(100vw - 32px); box-sizing: border-box; padding: 14px 20px; display: grid; gap: 4px; text-align: center; background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--glow) 35%, transparent), var(--panel) 70%); border: 1px solid var(--glow); border-radius: 12px; box-shadow: 0 0 30px color-mix(in srgb, var(--glow) 45%, transparent); pointer-events: none; }
 .hud-reveal.on { animation: revealIn 0.5s cubic-bezier(.2,1.6,.4,1); }
 .hud-reveal small { font: 700 11px/1 var(--mono); letter-spacing: 0.25em; text-transform: uppercase; color: var(--glow); }
 .hud-reveal b { font: 800 22px/1.15 var(--display); color: #fff6dc; }

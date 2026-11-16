@@ -407,7 +407,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     if (it.weapon) {
       const now = weaponStats(it.weapon), avg = (w) => (w.damage[0] + w.damage[1]) / 2;
       const up = Math.round((avg(now) / avg(before.w) - 1) * 100);
-      hud.reveal('Nova arma', it.name, [`Dano ${Math.round(avg(before.w))} → ${Math.round(avg(now))}  (+${up}%)`, `Nível ${it.weapon.tier}: fere de verdade os guardiões de ${REGION_NAMES[ORDER[it.weapon.tier - 1]]}`], it.weapon.look.tip);
+      hud.reveal('Nova arma', it.name, [`Dano ${Math.round(avg(before.w))} → ${Math.round(avg(now))}  (+${up}%)`, `Nível ${it.weapon.tier}: fere de verdade os guardiões do andar ${it.weapon.tier}`], it.weapon.look.tip);
     } else if (it.outfit) {
       const pct = (o) => Math.round((o?.guard ?? 0) * 100);
       hud.reveal('Nova roupa', it.name, [`Proteção ${pct(before.o)}% → ${pct(it.outfit)}%`, it.outfit.resist ? `Protege do ${it.outfit.resist}` : 'Visual novo no explorador'], it.outfit.look.glow ?? it.outfit.look.shirt);
