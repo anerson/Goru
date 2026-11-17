@@ -207,6 +207,28 @@ export function makeWagon() {
 
 // ---- the root portal: two pillars of rounded stones, an arch, vines and a swirling veil ----
 // open(t) runs the dissolve (0 = sealed, 1 = gone); spin(t) turns the veil
+// a soft cloud puff for fog: overlapping blurred blobs, white with a soft edge
+let cloudTex = null;
+function cloudTexture() {
+  if (cloudTex) return cloudTex;
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d');
+  for (let k = 0; k < 14; k++) {
+    const cx = 64 + Math.cos(k * 2.4) * (8 + (k % 4) * 6), cy = 64 + Math.sin(k * 2.4) * (8 + (k % 3) * 6), r = 26 + (k % 5) * 5;
+    const gr = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+    gr.addColorStop(0, 'rgba(255,255,255,0.55)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = gr; x.fillRect(0, 0, 128, 128);
+  }
+  // a round mask so the puff fades out well before the canvas edge (no square)
+  x.globalCompositeOperation = 'destination-in';
+  const mask = x.createRadialGradient(64, 64, 20, 64, 64, 62);
+  mask.addColorStop(0, 'rgba(0,0,0,1)'); mask.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = mask; x.fillRect(0, 0, 128, 128);
+  cloudTex = new THREE.CanvasTexture(c);
+  cloudTex.colorSpace = THREE.SRGBColorSpace;
+  return cloudTex;
+}
+
 export function makePortal() {
   const g = new THREE.Group();
   const stone = mat('#8a8070', { roughness: 0.95 }), moss = mat('#4f7a35', { roughness: 1 });
@@ -235,7 +257,7 @@ export function makePortal() {
   x.strokeStyle = 'rgba(255,255,230,0.55)'; x.lineWidth = 5;
   for (let k = 0; k < 6; k++) { x.beginPath(); for (let t = 0; t < 1; t += 0.01) { const a = k + t * 7, r = t * 120; x.lineTo(128 + Math.cos(a) * r, 128 + Math.sin(a) * r); } x.stroke(); }
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
-  const veilMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending });
+  const veilMat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: THREE.DoubleSide });
   const veil = new THREE.Mesh(new THREE.CircleGeometry(4.2, 48), veilMat);
   veil.position.y = 6.2; veil.scale.y = 1.45;
   g.add(veil);
@@ -243,10 +265,39 @@ export function makePortal() {
   g.add(veil2);
   const runes = part(g, new THREE.TorusGeometry(4.25, 0.07, 6, 64), glow('#ffcf7a', 2), 0, 6.2, 0);
   runes.scale.y = 1.45; runes.castShadow = false;
+  // the fog behind the portal: a dense bank of soft clouds filling the arch and the passage
+  // behind it, layered so nothing of the inside shows through; it drifts slowly and clears
+  // when the seal breaks
+  const fog = new THREE.Group();
+  g.add(fog);
+  const fogTex = cloudTexture();
+  const puffs = [];
+  for (let k = 0; k < 0; k++) {   // the opaque mist wall (makeMistWall) does the hiding now
+    const layer = k % 6;                                  // 0 at the arch, 5 deep inside
+    // pale warm mist, not tinted by the scene's own fog (inside the trunk it is dark)
+    const m = new THREE.SpriteMaterial({ map: fogTex, color: new THREE.Color().setHSL(0.12, 0.3, 0.85), transparent: true, depthWrite: false, opacity: 0.45, fog: false, toneMapped: false, blending: THREE.AdditiveBlending });
+    const sp = new THREE.Sprite(m);
+    const x = ((k * 7.31) % 1 - 0.5) * 10, y = 1.5 + ((k * 3.17) % 1) * 10, z = -0.6 - layer * 2.2;
+    const sz = 6 + ((k * 5.13) % 1) * 4 + layer * 0.8;
+    sp.scale.set(sz, sz, 1);
+    sp.position.set(x, y, z);
+    sp.userData = { base: sp.position.clone(), phase: k * 1.7, size: sz };
+    fog.add(sp);
+    puffs.push(sp);
+  }
   let openT = 0;
   return {
     root: g,
-    spin(t) { veil.rotation.z = t * 0.6; veil2.rotation.z = -t * 0.9; veilMat.opacity = 0.75 + Math.sin(t * 2) * 0.15; },
+    spin(t) {
+      veil.rotation.z = t * 0.6; veil2.rotation.z = -t * 0.9; veilMat.opacity = 0.85 + Math.sin(t * 2) * 0.1;
+      for (const p of puffs) {                            // the fog breathes; once open it lifts and spreads
+        const b = p.userData.base, o = openT;
+        p.position.set(b.x * (1 + o * 1.5) + Math.sin(t * 0.3 + p.userData.phase) * 0.6, b.y + o * 9 + Math.sin(t * 0.4 + p.userData.phase) * 0.3, b.z - o * 4);
+        p.material.opacity = 0.45 * Math.max(0, 1 - o * 1.15);
+        p.material.rotation = t * 0.03 + p.userData.phase;
+      }
+      fog.visible = openT < 0.98;
+    },
     open(k) {                                                // 0 sealed .. 1 open
       openT = k;
       const v = Math.max(0, 1 - k);
@@ -254,5 +305,48 @@ export function makePortal() {
       veil.scale.set(v, 1.45 * v, 1); veil2.scale.set(0.8 * v, 1.2 * v, 1); runes.scale.set(v, 1.45 * v, 1);
     },
     get openness() { return openT; },
+  };
+}
+
+// ---- a wall of mist that closes a whole opening in the trunk (opaque, so nothing of the inside
+// shows through and the scene's ambient shading cannot darken it); fade(k) clears it
+let mistTex = null;
+function mistTexture() {
+  if (mistTex) return mistTex;
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+  const x = c.getContext('2d');
+  x.fillStyle = '#d8d0bc'; x.fillRect(0, 0, 512, 256);
+  for (let k = 0; k < 160; k++) {                          // soft swirls of lighter and darker mist
+    const cx = (k * 97.3) % 512, cy = (k * 53.7) % 256, r = 18 + (k % 7) * 9;
+    const light = k % 3 !== 0;
+    const gr = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+    gr.addColorStop(0, light ? 'rgba(255,252,240,0.5)' : 'rgba(170,160,140,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = gr; x.fillRect(cx - r, cy - r, r * 2, r * 2);
+  }
+  mistTex = new THREE.CanvasTexture(c);
+  mistTex.colorSpace = THREE.SRGBColorSpace;
+  mistTex.wrapS = THREE.RepeatWrapping;
+  return mistTex;
+}
+export function makeMistWall({ radius = 103, angle = 0, halfWidth = 0.42, height = 36, y = 0 } = {}) {
+  const tex = mistTexture().clone();
+  tex.needsUpdate = true;
+  tex.repeat.set(3, 1);
+  const m = new THREE.MeshBasicMaterial({ map: tex, color: '#b9ae98', side: THREE.DoubleSide, fog: false, transparent: false });
+  const theta = Math.atan2(Math.cos(angle), Math.sin(angle));          // three's cylinder: x = r sin(t), z = r cos(t)
+  const wall = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, 32, 1, true, theta - halfWidth, halfWidth * 2), m);
+  wall.position.y = y + height / 2 - 1;
+  wall.raycast = () => {};
+  wall.userData.noToon = true;
+  return {
+    root: wall,
+    drift(t) { tex.offset.x = t * 0.01; },
+    fade(k) {                                                // 0 = solid mist, 1 = gone
+      const o = Math.max(0, 1 - k);
+      m.transparent = o < 1;
+      m.opacity = o;
+      m.depthWrite = o >= 1;
+      wall.visible = o > 0.01;
+    },
   };
 }

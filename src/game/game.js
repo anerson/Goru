@@ -16,7 +16,7 @@ import {
   FLOOR_IDS, levelCap, xpNeed, bandXp, XP_SHARE, CLASSES, STORIES, MAX_LEVEL, DEFAULT_APPEARANCE, SIDES, SIDE_BONUS,
 } from './campaign_data.js';
 import { makeNode, makeObject, makeWorkbench, makeChest } from './looks.js';
-import { makeHut, makeTent, makeCampfire, makeWagon, makePortal } from './props.js';
+import { makeHut, makeTent, makeCampfire, makeWagon, makePortal, makeMistWall } from './props.js';
 import { sfx, setAmbience } from '../audio.js';
 
 const SAVE_PREFIX = 'aetherion-v3-vaga-';   // one save per character slot (4 slots)
@@ -957,6 +957,10 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     pt.root.position.set(x, walker.floorAt(x, z, 20), z);
     pt.root.rotation.y = Math.atan2(Math.cos(a), Math.sin(a));
     scene.add(pt.root);
+    // the mist that fills the whole opening behind it, so the inside cannot be seen
+    const mist = makeMistWall({ radius: 101, angle: a, y: walker.floorAt(Math.cos(a) * 101, Math.sin(a) * 101, 20) });
+    scene.add(mist.root);
+    pt.mist = mist;
     return pt;
   });
   {
@@ -980,7 +984,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     }
     if (state.flags.portal_aberto && portalOpen < 1) portalOpen = portalOpen === 0 ? 1 : Math.min(1, portalOpen + dt / 1.5);
     if (!state.flags.portal_aberto) portalOpen = 0;
-    for (const pt of portals) { pt.spin(t); pt.open(portalOpen); }
+    for (const pt of portals) { pt.spin(t); pt.open(portalOpen); pt.mist.drift(t); pt.mist.fade(Math.min(1, portalOpen * 1.2)); }
   }
 
   // every kill: XP as a share of the place's band, and kill counters for objectives
