@@ -16,6 +16,7 @@ import {
   FLOOR_IDS, levelCap, xpNeed, bandXp, XP_SHARE, CLASSES, STORIES, MAX_LEVEL, DEFAULT_APPEARANCE, SIDES, SIDE_BONUS,
 } from './campaign_data.js';
 import { makeNode, makeObject, makeWorkbench, makeChest } from './looks.js';
+import { makeHut, makeTent, makeCampfire, makeWagon, makePortal } from './props.js';
 import { sfx, setAmbience } from '../audio.js';
 
 const SAVE_PREFIX = 'aetherion-v3-vaga-';   // one save per character slot (4 slots)
@@ -98,33 +99,27 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     npcs[id] = { c, pos };
     add({ id, kind: 'npc', pos: pos.clone().setY(pos.y + 1), radius: 4, label: () => `Falar com ${SPEAKERS[id]}`, use: () => talk(id) });
   }
-  const hutMat = new THREE.MeshStandardMaterial({ color: '#7a5a3a', roughness: 0.9 });
-  const roofMat = new THREE.MeshStandardMaterial({ color: '#8a6a3a', roughness: 1, flatShading: true });
-  const tentMat = new THREE.MeshStandardMaterial({ color: '#c9a36a', roughness: 1, side: THREE.DoubleSide, flatShading: true });
+  // camp props (props.js): rounded, layered models instead of plain cones and boxes
+  const TENT_COLORS = ['#c9a36a', '#b8834a', '#8a9a6a', '#a86a5a'];
   function hut(pos, r = 3) {
-    const wall = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.05, 2.6, 12), hutMat);
-    wall.position.copy(pos).setY(pos.y + 1.3);
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(r * 1.35, 2.4, 12), roofMat);
-    roof.position.copy(pos).setY(pos.y + 3.8);
-    wall.castShadow = roof.castShadow = true;
-    scene.add(wall, roof);
+    const h = makeHut(r);
+    h.position.copy(pos);
+    h.rotation.y = Math.atan2(-pos.x, -pos.z) + Math.PI;   // door toward the middle of the floor
+    scene.add(h);
   }
   function tent(pos, rot) {
-    const t = new THREE.Mesh(new THREE.ConeGeometry(2.6, 3, 4, 1, true), tentMat);
-    t.position.copy(pos).setY(pos.y + 1.5);
+    const t = makeTent(TENT_COLORS[Math.floor(rand() * TENT_COLORS.length)]);
+    t.position.copy(pos);
     t.rotation.y = rot;
-    t.castShadow = true;
     scene.add(t);
   }
   const flames = [];
   function fire(pos) {
-    const logs = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 1, 0.3, 10), hutMat);
-    logs.position.copy(pos).setY(pos.y + 0.15);
-    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.3, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffb347').multiplyScalar(2) }));
-    flame.position.copy(pos).setY(pos.y + 0.9);
+    const { root, flame } = makeCampfire();
+    root.position.copy(pos);
     const light = new THREE.PointLight('#ffb062', 120, 25, 2);
     light.position.copy(pos).setY(pos.y + 2);
-    scene.add(logs, flame, light);
+    scene.add(root, light);
     flames.push(flame);
   }
   function label(text, pos, color = '#ffd76a') {
@@ -159,16 +154,38 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     mirror: 'Ativar o refletor', brace: 'Instalar a escora', sail: 'Armar a vela', flower: 'Restaurar as flores',
   };
 
-  // the clearing's camp: Thalor the guide, a fire, a water barrel
+  // the clearing (prologue): one straight trail from far out to the tree, and each mission a
+  // little closer to it. Fractions run along the approach, 0 = 1000 m out, 1 = the ring trail.
+  const along0 = (r) => (1000 - r) / (1000 - LOOP_R - 2);
+  const foraObjects = [];
   {
-    const L = 'fora', f = (1000 - 600) / (1000 - LOOP_R - 2);
+    const L = 'fora', f = along0(940);
     camps.fora = spot(L, 0, f, 0);
-    tent(spot(L, 0, f - 0.01, 9), 0.6); tent(spot(L, 0, f + 0.012, -10), 2.1);
+    tent(spot(L, 0, f - 0.012, 9), 0.6); tent(spot(L, 0, f + 0.014, -10), 2.1); tent(spot(L, 0, f + 0.03, 10), 4.0);
     fire(spot(L, 0, f, 4));
     villager('thalor', spot(L, 0, f + 0.004, -3.5), { shirt: '#5a4a2a', pants: '#3a3020', hat: '#7a5a2a', skin: '#a87a58' });
     const barrel = spot(L, 0, f - 0.006, -5);
     put(makeObject('barrel').root, barrel);
     add({ id: 'agua_fora', kind: 'water', pos: barrel.clone().setY(barrel.y + 1), radius: 3, label: () => 'Beber e encher o cantil', use: () => water() });
+    // 3. the caravan tipped over on the trail, its crates scattered
+    const wagon = makeWagon();
+    wagon.position.copy(spot(L, 0, along0(690), 9));
+    wagon.rotation.y = 0.7;
+    scene.add(wagon);
+    const crates = [[700, 6], [684, 11], [672, 5]].map(([r, sd]) => spot(L, 0, along0(r), sd));
+    // 5. the lanterns along the last stretch to the ring trail
+    const lamps = [470, 410, 352].map((r, k) => spot(L, 0, along0(r), k % 2 ? -3.2 : 3.2));
+    for (const [def, list] of [[{ group: 'caixote', count: 3, look: 'crate', label: 'Recuperar os mantimentos', done: 'Caixote recuperado.' }, crates],
+      [{ group: 'lanterna', count: 3, look: 'lantern', label: 'Acender a lanterna', done: 'A lanterna ilumina a trilha.' }, lamps]]) {
+      list.forEach((p, i) => {
+        const obj = makeObject(def.look);
+        put(obj.root, p);
+        const flag = `${def.group}_${i}`;
+        objects.push({ group: def.group, i, done: obj.done, flag });
+        add({ id: flag, group: def.group, kind: 'quest', pos: p.clone().setY(p.y + 1), radius: 3.8, label: () => def.label,
+          enabled: () => stageIndex(state.stage) >= stageIndex(stageOfGroup[def.group]) && !state.flags[flag], use: () => useObject(def, i, 0) });
+      });
+    }
   }
   for (const [ri, r] of REGIONS_PLAN.entries()) {
     const L = r.id, lo = loopOf(L), pl = plazaOf(L);
@@ -226,7 +243,11 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   for (const res of RESOURCES) {
     const ls = lines[res.biome];
     for (let k = 0; k < res.count; k++) {
-      const li = k % ls.length, frac = 0.14 + ((k * 0.37 + res.item.length * 0.11) % 0.74), side = (k % 2 ? 1 : -1) * (2.4 + (k % 3));
+      const FORA_SPAN = { erva: [0.12, 0.3], cogumelo: [0.3, 0.44], madeira: [0.5, 0.62] };
+      const span = res.biome === 'fora' ? FORA_SPAN[res.item] ?? [0.1, 0.9] : null;
+      const li = span ? 0 : k % ls.length;
+      const frac = span ? span[0] + (span[1] - span[0]) * (k / Math.max(1, res.count - 1)) : 0.14 + ((k * 0.37 + res.item.length * 0.11) % 0.74);
+      const side = (k % 2 ? 1 : -1) * (span ? 4 + (k % 3) : 2.4 + (k % 3));
       const pos = spot(res.biome, li, frac, side);
       const mesh = makeNode(res.item, lookOf[res.item]);
       put(mesh, pos);
@@ -371,6 +392,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   function advance() {
     const i = stageIndex(state.stage);
     if (STAGES[i].kind === 'side') bless(STAGES[i].region);
+    if (STAGES[i].region === 'fora' && STAGES[i].kind !== 'level') gainXp(xpFor('stage', 'fora'));   // prologue: each step pays
     if (i < STAGES.length - 1) state.stage = STAGES[i + 1].id;
     const st = stage();
     if (st.region !== STAGES[i].region || st.kind === 'talk') state.camp = STAGES[i].region;
@@ -681,7 +703,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   function update(dt, t, { running, flying, camYaw }) {
     flames.forEach((f, i) => { f.scale.y = 1 + Math.sin(t * 9 + i) * 0.15; });
     for (const ch of chests) ch.c.pulse(t);
-    updateSeals(t);
+    updateSeals(t, dt);
     hud.progress(...stageProgress());
     for (const n of nodes) if (n.timer > 0) { n.timer -= dt; if (n.timer <= 0) n.mesh.visible = true; }
     const me = walker.state;
@@ -928,17 +950,37 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     label(`Selo · nível ${(n - 1) * 10}`, wall.position.clone().setY(y + 7), '#ffcf8a');
     seals.push({ n, wall });
   }
-  for (const a of ENTRANCES) {
-    const ringM = new THREE.Mesh(new THREE.TorusGeometry(9, 0.25, 8, 48), sealMat);
-    ringM.position.set(Math.cos(a) * 102, 6, Math.sin(a) * 102);
-    ringM.rotation.y = -a;
-    scene.add(ringM);
-    seals.push({ n: 1, wall: ringM });
+  // the Portal das Raízes at every way into the trunk: sealed until level 5, then it dissolves
+  const portals = ENTRANCES.map((a) => {
+    const pt = makePortal();
+    const r = 107, x = Math.cos(a) * r, z = Math.sin(a) * r;
+    pt.root.position.set(x, walker.floorAt(x, z, 20), z);
+    pt.root.rotation.y = Math.atan2(Math.cos(a), Math.sin(a));
+    scene.add(pt.root);
+    return pt;
+  });
+  {
+    const a = ENTRANCES[0], p = V(Math.cos(a) * 112, 0, Math.sin(a) * 112);
+    p.y = walker.floorAt(p.x, p.z, 20);
+    label('Portal das Raízes · nível 5', p.clone().setY(p.y + 13.5), '#ffcf8a');
+    add({ id: 'portal', kind: 'quest', pos: p.clone().setY(p.y + 1), radius: 7, label: () => (openFloors() ? 'Atravessar o portal' : `Portal selado: nível 5 (você está no ${state.level})`), enabled: () => openFloors() === 0, use: () => hud.message(`${sealReason(1)}. Cace criaturas e abra o baú da clareira para ganhar experiência.`) });
   }
-  function updateSeals(t) {
+  let portalOpen = 0;
+  function updateSeals(t, dt = 0.016) {
     const open = openFloors();
     for (const s of seals) s.wall.visible = s.n > open;
     sealMat.opacity = 0.25 + Math.sin(t * 2) * 0.1;
+    // the portal: when the seal breaks it dissolves over 1.5 s, with a burst and a title card
+    if (open >= 1 && portalOpen === 0 && !state.flags.portal_aberto) {
+      state.flags.portal_aberto = true;
+      portalOpen = 0.0001;
+      for (const pt of portals) fx?.chest(pt.root.position.clone().setY(pt.root.position.y + 6), '#ffcf7a');
+      sfx('epic');
+      hud.banner('Portal das Raízes', 'O selo se abriu', 'Você é forte o bastante: entre na árvore', 'level');
+    }
+    if (state.flags.portal_aberto && portalOpen < 1) portalOpen = portalOpen === 0 ? 1 : Math.min(1, portalOpen + dt / 1.5);
+    if (!state.flags.portal_aberto) portalOpen = 0;
+    for (const pt of portals) { pt.spin(t); pt.open(portalOpen); }
   }
 
   // every kill: XP as a share of the place's band, and kill counters for objectives

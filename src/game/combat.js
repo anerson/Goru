@@ -12,7 +12,7 @@
 // the large tier. Shake writes only the camera offset, after the camera has been placed.
 import * as THREE from 'three';
 import { mulberry32 } from '../noise.js';
-import { BIOMES, DISK_R } from '../tree/layout.js';
+import { BIOMES, DISK_R, APPROACH } from '../tree/layout.js';
 import { CREATURES, FAUNA } from './creatures.js';
 import { UNDER_TIER } from './campaign_data.js';
 import { sfx, setBattle } from '../audio.js';
@@ -56,7 +56,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   }
   const ok = (biome, x, z) => {
     const r = Math.hypot(x, z);
-    if (biome === 'fora') return r > 170 && r < 560 && Math.abs(walker.floorAt(x, z, 30)) < 3 && !game.nearSafeZone(biome, x, z, 24);
+    if (biome === 'fora') return r > 170 && r < 760 && Math.abs(walker.floorAt(x, z, 30)) < 3 && !game.nearSafeZone(biome, x, z, 24);
     if (r < 18 || r > DISK_R - 5) return false;
     const b = BIOMES.find((v) => v.id === biome);
     return biomes.terrains[biome](x, z) > b.level - 0.5 && !game.nearSafeZone(biome, x, z, 18);
@@ -64,7 +64,9 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   for (const [biome, list] of Object.entries(FAUNA)) {
     for (const [type, n] of list) {
       for (let k = 0, tries = 0; k < n && tries < 200; tries++) {
-        const a = rand() * 6.28, r = biome === 'fora' ? 170 + rand() * 390 : 20 + rand() * 40, x = Math.cos(a) * r, z = Math.sin(a) * r;
+        // in the clearing most creatures roam near the one trail toward the tree (the missions' way)
+        const a = biome === 'fora' && k % 3 !== 2 ? APPROACH.angle + (rand() - 0.5) * 0.5 : rand() * 6.28;
+        const r = biome === 'fora' ? 170 + rand() * 560 : 20 + rand() * 40, x = Math.cos(a) * r, z = Math.sin(a) * r;
         if (ok(biome, x, z)) { spawn(type, biome, x, z); k++; }
       }
     }

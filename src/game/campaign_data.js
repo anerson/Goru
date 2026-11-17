@@ -307,11 +307,16 @@ DIALOGUES.thalor_chegada = { start: 'a', nodes: {
   c: { speaker: 'thalor', line: 'FORA_3', choices: [{ text: 'OPT_SEGUIR', to: 'fim', do: { advance: true } }] },
   fim: { end: true } } };
 DIALOGUES.thalor_geral = { start: 'a', nodes: { a: { speaker: 'thalor', line: 'FORA_G', next: 'fim' }, fim: { end: true } } };
+// each mission a little closer to the tree, along the one trail: the camp far out (940 m), the
+// herbs (900-800 m), the tipped caravan (690 m), the wolves around it, the lanterns of the last
+// stretch (470-350 m) and the Portal das Raízes at the trunk, open from level 5
 STAGES.push(
   { id: 'fora_chegada', act: 0, region: 'fora', text: 'Fale com Thalor, o guia, no acampamento (siga a trilha de luz)', target: 'thalor', kind: 'talk' },
-  { id: 'fora_ervas', act: 0, region: 'fora', text: 'Colete 3 ervas medicinais perto do acampamento', target: 'node:erva', kind: 'collect', need: { erva: 3 } },
-  { id: 'fora_caca', act: 0, region: 'fora', text: 'Derrote 5 criaturas da clareira (clique ou Espaço para atacar)', target: 'mob:fora', kind: 'kill', need: { abate_fora: 5 } },
-  { id: 'fora_nivel', act: 0, region: 'fora', text: 'Alcance o nível 5: cace criaturas e abra o baú escondido', target: 'mob:fora', kind: 'level', need: { nivel: 5 } },
+  { id: 'fora_ervas', act: 0, region: 'fora', text: 'Siga a trilha rumo à árvore e colete 3 ervas medicinais pelo caminho', target: 'node:erva', kind: 'collect', need: { erva: 3 } },
+  { id: 'fora_caravana', act: 0, region: 'fora', text: 'Uma caravana tombou mais adiante na trilha: recupere 3 caixotes de mantimentos', target: 'caixote', kind: 'group', need: { caixote: 3 } },
+  { id: 'fora_caca', act: 0, region: 'fora', text: 'Lobos rondam a caravana: derrote 5 criaturas perto da trilha (clique ou Espaço)', target: 'mob:fora', kind: 'kill', need: { abate_fora: 5 } },
+  { id: 'fora_lanternas', act: 0, region: 'fora', text: 'Acenda as 3 lanternas do último trecho, até o anel da árvore', target: 'lanterna', kind: 'group', need: { lanterna: 3 } },
+  { id: 'fora_portal', act: 0, region: 'fora', text: 'Chegue ao nível 5 e atravesse o Portal das Raízes (cace criaturas e abra o baú)', target: 'portal', kind: 'level', need: { nivel: 5 } },
 );
 
 for (const [ri, r] of REGIONS_PLAN.entries()) {
@@ -448,7 +453,7 @@ export function bandXp(region) {
 }
 // what each action is worth, as a share of the floor's band (about: 40% quests and bosses,
 // 10% crafting and chests, the rest creatures, about 25-30 kills a floor)
-export const XP_SHARE = { object: 0.035, craft: 0.04, chest: 0.035, sub: 0.1, boss: 0.16, mob: 0.022, party: 0.25 };
+export const XP_SHARE = { stage: 0.12, object: 0.035, craft: 0.04, chest: 0.035, sub: 0.1, boss: 0.16, mob: 0.022, party: 0.25 };
 
 // the player's own look, chosen when the character is made (skin, hair, shirt, trousers)
 export const APPEARANCE = {

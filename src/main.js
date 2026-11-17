@@ -137,7 +137,7 @@ const onLevel = (b) => () => {
 };
 const PLACES = {
   fora() {
-    const p = at(600, APPROACH.angle);
+    const p = at(955, APPROACH.angle);
     return { ...p, feet: 0, yaw: yawToward(-p.x, -p.z), pitch: 0.05, label: 'Clareira de Aetherion' };
   },
   trilha() {

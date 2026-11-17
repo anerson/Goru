@@ -4,6 +4,7 @@
 // (rubble, ice, blockages) and parts that appear once done (a woven web, a raised sail).
 // Built from primitives, shared materials, no textures.
 import * as THREE from 'three';
+import { makeBarrel, makeChestModel, makeCrate, makeLantern, makeWorkbench as detailedBench } from './props.js';
 
 const cache = new Map();
 const mat = (c, o = {}) => {
@@ -72,7 +73,7 @@ const OBJECTS = {
   rescue: () => ({ always: [], before: [rubble('#4a3a30')], after: [mesh(new THREE.TorusGeometry(0.9, 0.06, 6, 20), glow('#7fe08a', 1.4), 0, 0.05, 0, Math.PI / 2)] }),
   web: () => ({ always: [mesh(new THREE.CylinderGeometry(0.12, 0.15, 3, 6), mat('#5a3a1a'), -1.4, 1.5, 0), mesh(new THREE.CylinderGeometry(0.12, 0.15, 3, 6), mat('#5a3a1a'), 1.4, 1.5, 0)], before: [], after: [mesh(new THREE.TorusGeometry(1.2, 0.08, 6, 6), mat('#8a6a3a'), 0, 1.5, 0), mesh(new THREE.TorusGeometry(0.6, 0.06, 6, 6), mat('#8a6a3a'), 0, 1.5, 0)] }),
   canal: () => ({ always: [mesh(new THREE.BoxGeometry(4, 0.3, 1.4), mat('#5a4a3a'), 0, 0.15, 0)], before: [mesh(new THREE.BoxGeometry(3.6, 0.2, 1), new THREE.MeshStandardMaterial({ color: '#4a5a1a', emissive: '#3a5a0a', emissiveIntensity: 0.5 }), 0, 0.32, 0)], after: [mesh(new THREE.BoxGeometry(3.6, 0.15, 1), new THREE.MeshStandardMaterial({ color: '#3a8fb0', emissive: '#0f3a55', emissiveIntensity: 0.7, roughness: 0.05 }), 0, 0.3, 0)] }),
-  barrel: () => ({ always: [mesh(new THREE.CylinderGeometry(0.45, 0.5, 1, 10), mat('#7a5a3a'), 0, 0.5, 0)], before: [mesh(new THREE.CircleGeometry(0.42, 12), new THREE.MeshStandardMaterial({ color: '#3a8fb0', emissive: '#0f3a55', emissiveIntensity: 0.8 }), 0, 1.01, 0, -Math.PI / 2)], after: [] }),
+  barrel: () => ({ always: [makeBarrel()], before: [mesh(new THREE.CircleGeometry(0.42, 16), new THREE.MeshStandardMaterial({ color: '#3a8fb0', emissive: '#0f3a55', emissiveIntensity: 0.8 }), 0, 1.07, 0, -Math.PI / 2)], after: [] }),
   sand: () => ({ always: [mesh(new THREE.CylinderGeometry(1.2, 1.4, 0.6, 12), mat('#7d7a70', { flatShading: true }), 0, 0.3, 0)], before: [mesh(new THREE.SphereGeometry(1.1, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), mat('#d0a060', { flatShading: true }), 0, 0.55, 0)], after: [mesh(new THREE.CircleGeometry(1, 14), new THREE.MeshStandardMaterial({ color: '#3a8fb0', emissive: '#0f3a55', emissiveIntensity: 0.7 }), 0, 0.62, 0, -Math.PI / 2)] }),
   valve: () => ({ always: [mesh(new THREE.CylinderGeometry(0.15, 0.15, 1.2, 8), mat('#5a5a5a', { metalness: 0.6 }), 0, 0.6, 0)], before: [mesh(new THREE.TorusGeometry(0.5, 0.07, 6, 16), mat('#8a3a2a', { metalness: 0.5 }), 0, 1.25, 0)], after: [mesh(new THREE.TorusGeometry(0.5, 0.07, 6, 16), glow('#7fe3ff', 1.3), 0, 1.25, 0)] }),
   sample: () => ({ always: [mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.8, 10), mat('#6a5a4a'), 0, 0.4, 0)], before: [mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.4, 8), glow('#9a9a5a', 1), 0, 1, 0)], after: [mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.4, 8), glow('#7fe08a', 1.4), 0, 1, 0)] }),
@@ -95,45 +96,29 @@ const OBJECTS = {
   sail: () => ({ always: [mesh(new THREE.CylinderGeometry(0.1, 0.12, 4, 6), mat('#6a4a2a'), 0, 2, 0)], before: [mesh(new THREE.CylinderGeometry(0.2, 0.2, 1.2, 6), mat('#e8e2d0'), 0, 0.8, 0)], after: [mesh(new THREE.PlaneGeometry(2.2, 2.8), mat('#f4f0e2', { side: THREE.DoubleSide }), 1.1, 2.4, 0)] }),
   flower: () => ({ always: [mesh(new THREE.CylinderGeometry(0.08, 0.12, 1.6, 6), mat('#3f7a2a'), 0, 0.8, 0)], before: [mesh(new THREE.SphereGeometry(0.4, 10, 8), mat('#8a6a4a'), 0, 1.75, 0)], after: [group([0, 1, 2, 3, 4, 5].map((k) => scaled(mesh(new THREE.SphereGeometry(0.4, 8, 6), mat('#ff9ad0', { emissive: '#ff6ab0', emissiveIntensity: 0.4 }), Math.cos(k * 1.05) * 0.5, 1.8, Math.sin(k * 1.05) * 0.5), 1, 0.3, 1))), mesh(new THREE.SphereGeometry(0.22, 8, 6), glow('#ffd76a', 1.6), 0, 1.85, 0)] }),
 };
+OBJECTS.crate = () => ({ always: [], before: [makeCrate(), (() => { const c = makeCrate(); c.position.set(0.5, 0.7, 0.1); c.rotation.y = 0.5; c.scale.setScalar(0.8); return c; })()], after: [mesh(new THREE.TorusGeometry(0.9, 0.05, 6, 24), glow('#7fe08a', 1.4), 0, 0.05, 0, Math.PI / 2)] });
+OBJECTS.lantern = () => { const l = makeLantern(); const off = new THREE.Group(), on = new THREE.Group(); return { always: [l.root], before: [off], after: [on], lit: l.lit }; };
 export function makeObject(look) {
   const def = (OBJECTS[look] ?? OBJECTS.sample)();
   const root = group(...def.always, ...def.before, ...def.after);
-  const done = (v) => { def.before.forEach((o) => { o.visible = !v; }); def.after.forEach((o) => { o.visible = v; }); };
+  const done = (v) => { def.before.forEach((o) => { o.visible = !v; }); def.after.forEach((o) => { o.visible = v; }); def.lit?.(v); };
   done(false);
   return { root, done };
 }
 
 // ---------------------------------------------------------------- the camp's workbench
-export function makeWorkbench() {
-  const wood = mat('#7a5a3a'), dark = mat('#4a3a2a');
-  const root = group(
-    mesh(new THREE.BoxGeometry(2.4, 0.18, 1.1), wood, 0, 0.95, 0),
-    ...[[-1, -0.4], [1, -0.4], [-1, 0.4], [1, 0.4]].map(([x, z]) => mesh(new THREE.BoxGeometry(0.14, 0.95, 0.14), dark, x, 0.47, z)),
-    mesh(new THREE.BoxGeometry(0.5, 0.35, 0.4), mat('#5a5a5a', { metalness: 0.6, roughness: 0.4 }), -0.6, 1.2, 0),      // anvil
-    mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.6, 6), dark, 0.5, 1.1, 0.1, 0, 0, Math.PI / 2),                       // hammer
-    mesh(new THREE.BoxGeometry(0.2, 0.14, 0.12), mat('#5a5a5a', { metalness: 0.6 }), 0.78, 1.1, 0.1),
-    mesh(new THREE.TorusGeometry(0.22, 0.04, 6, 14), glow('#ffd76a', 1.4), 0.1, 1.3, -0.2, Math.PI / 2),
-  );
-  return root;
-}
+export const makeWorkbench = detailedBench;
 
 // ---------------------------------------------------------------- treasure chests
 // a chest with gold trim and a glowing seam, and a faint column of light that can be seen from
 // afar (it pulls the explorer off the trail). open(true) lifts the lid and puts the light out.
 export function makeChest() {
-  const wood = mat('#6a3f1f'), gold = mat('#d9a531', { metalness: 0.8, roughness: 0.3 });
-  const lid = group(mesh(new THREE.BoxGeometry(1.2, 0.3, 0.8), wood, 0, 0.15, 0.4), mesh(new THREE.BoxGeometry(1.24, 0.08, 0.84), gold, 0, 0.3, 0.4));
-  lid.position.set(0, 0.62, -0.4);
-  const seam = mesh(new THREE.BoxGeometry(1.18, 0.05, 0.78), glow('#ffd76a', 2.2), 0, 0.62, 0);
+  const { root, lid } = makeChestModel();
+  const seam = mesh(new THREE.BoxGeometry(1.18, 0.05, 0.78), glow('#ffd76a', 2.2), 0, 0.63, 0);
   const beamMat = new THREE.MeshBasicMaterial({ color: '#ffd76a', transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
-  const beam = mesh(new THREE.CylinderGeometry(0.25, 0.6, 14, 10, 1, true), beamMat, 0, 7, 0);
+  const beam = mesh(new THREE.CylinderGeometry(0.25, 0.6, 14, 16, 1, true), beamMat, 0, 7, 0);
   beam.castShadow = false;
-  const root = group(
-    mesh(new THREE.BoxGeometry(1.2, 0.62, 0.8), wood, 0, 0.31, 0),
-    mesh(new THREE.BoxGeometry(1.24, 0.08, 0.84), gold, 0, 0.05, 0),
-    mesh(new THREE.BoxGeometry(0.16, 0.2, 0.06), gold, 0, 0.55, 0.42),
-    seam, lid, beam,
-  );
+  root.add(seam, beam);
   return {
     root,
     open(v) { lid.rotation.x = v ? -1.9 : 0; seam.visible = !v; beam.visible = !v; },
