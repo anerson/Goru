@@ -16,6 +16,7 @@ import { BIOMES, DISK_R } from '../tree/layout.js';
 import { CREATURES, FAUNA } from './creatures.js';
 import { UNDER_TIER } from './campaign_data.js';
 import { sfx, setBattle } from '../audio.js';
+import { toonify } from '../toon.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 // Weapons. The explorer's staff is a melee weapon. The Cajado do GM belongs to the Game Master
@@ -40,6 +41,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   function spawn(type, biome, x, z, opts = {}) {
     const def = CREATURES[type];
     const model = def.build();
+    toonify(model.root, { outline: !!def.boss, thickness: 0.05 });
     const level = biome === 'fora' ? 0 : BIOMES.find((b) => b.id === biome).level;
     const y = groundAt(biome, x, z);
     model.root.position.set(x, y, z);

@@ -13,7 +13,7 @@ import { createCharacter } from '../character.js';
 import {
   REGIONS_PLAN, ITEMS, RECIPES, RESOURCES, STAGES, stageIndex, DIALOGUES, dialogueFor, SPEAKERS, STRINGS, BOSSES,
   NEEDS, FLASK, HAZARD_NAMES, BASE_WEAPON, weaponStats, FRAGMENTS, ENDINGS, guardianName, REGION_NAMES,
-  FLOOR_IDS, levelCap, xpNeed, bandXp, XP_SHARE, CLASSES, STORIES, MAX_LEVEL, DEFAULT_APPEARANCE,
+  FLOOR_IDS, levelCap, xpNeed, bandXp, XP_SHARE, CLASSES, STORIES, MAX_LEVEL, DEFAULT_APPEARANCE, SIDES, SIDE_BONUS,
 } from './campaign_data.js';
 import { makeNode, makeObject, makeWorkbench, makeChest } from './looks.js';
 import { sfx, setAmbience } from '../audio.js';
@@ -144,7 +144,11 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   const lairs = {};          // boss id -> position
   const objects = [];        // { group, i, done(bool), flag }
   const stageOfGroup = {};   // group -> the stage from which its objects can be used
-  for (const st of STAGES) if (st.kind === 'group') stageOfGroup[st.target] = st.id; else if (st.group) stageOfGroup[st.group] = st.id;
+  for (const st of STAGES) {
+    if (st.kind === 'group') stageOfGroup[st.target] = st.id;
+    else if (st.kind === 'side') for (const g of Object.values(st.groups)) stageOfGroup[g] = st.id;
+    else if (st.group) stageOfGroup[st.group] = st.id;
+  }
   const LABELS = {
     spring: 'Examinar a nascente', tracks: 'Examinar as marcas', tracksRed: 'Examinar a marca de ferrão', rescue: 'Remover os escombros',
     web: 'Tecer a trama de raízes', canal: 'Limpar o canal', barrel: 'Levar o jarro de água', sand: 'Desobstruir o reservatório',
@@ -196,12 +200,18 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
         add({
           id: flag, group: def.group, kind: 'quest', pos: p.clone().setY(p.y + 1), radius: def.look === 'station' ? 5 : 3.8,
           label: () => `${def.label ?? LABELS[def.look] ?? 'Examinar'}${def.ordered ? ` ${ROMAN[i]}` : ''}`,
-          enabled: () => stageIndex(state.stage) >= stageIndex(stageOfGroup[def.group]) && !state.flags[flag],
+          enabled: () => stageIndex(state.stage) >= stageIndex(stageOfGroup[def.group]) && !state.flags[flag] && (!def.side || state.flags[`lado_${L}`] === def.side),
           use: () => useObject(def, i, ri),
         });
       }
     };
     for (const s of r.steps) place(s, () => { const k = si++; return k < slots.length ? spot(L, lo, slots[k], k % 2 ? -6 : 6) : spot(L, (k % 3) + (L === 'raizes' ? 0 : 1), 0.35, 4); });
+    // the dilemma's two tasks: the A side's spots out on the loop, the B side's on the spokes
+    const sd = SIDES[L];
+    if (sd) {
+      place({ group: `${L}_lado_a`, count: 3, look: sd.a.look, label: sd.a.label, side: 'a' }, (i) => spot(L, lo, [0.17, 0.53, 0.63][i], 14));
+      place({ group: `${L}_lado_b`, count: 3, look: sd.b.look, label: sd.b.label, side: 'b' }, (i) => (L === 'raizes' ? spot(L, pl, 0.3 + i * 0.3, -6) : spot(L, 1 + i, 0.5, -4)));
+    }
     // the sub-boss waits on the loop, its mechanic around it; the guardian waits on the plaza
     lairs[r.sub.type] = spot(L, lo, 0.6, 0);
     if (r.sub.mechanic) place(r.sub.mechanic, (i) => spot(L, lo, 0.55 + i * 0.05, i % 2 ? -8 : 8));
@@ -356,9 +366,11 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   // =================== rules ===================
   const stage = () => STAGES[stageIndex(state.stage)];
   const regionIndex = () => ORDER.indexOf(stage().region) + 1;   // 0 = the clearing outside
-  const showObjective = () => hud.objective(stage().text, stage().act, regionIndex(), REGION_NAMES[stage().region]);
+  const stageText = (st = stage()) => (st.textBySide ? st.textBySide[state.flags[`lado_${st.region}`]] ?? 'Cumpra a tarefa do lado que você escolheu' : st.text);
+  const showObjective = () => hud.objective(stageText(), stage().act, regionIndex(), REGION_NAMES[stage().region]);
   function advance() {
     const i = stageIndex(state.stage);
+    if (STAGES[i].kind === 'side') bless(STAGES[i].region);
     if (i < STAGES.length - 1) state.stage = STAGES[i + 1].id;
     const st = stage();
     if (st.region !== STAGES[i].region || st.kind === 'talk') state.camp = STAGES[i].region;
@@ -369,6 +381,20 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     else hud.toast('Novo objetivo');
     save();
     if (st.kind === 'end') finish();
+  }
+  // the side's blessing: permanent, shown like a legendary find
+  function bless(P) {
+    const side = state.flags[`lado_${P}`];
+    if (!side || state.flags[`bencao_${P}`]) return;
+    state.flags[`bencao_${P}`] = true;
+    const b = SIDE_BONUS[side], sd = SIDES[P][side];
+    state.bonus = state.bonus ?? { hp: 0, dmg: 0 };
+    if (b.dmg) state.bonus.dmg += b.dmg;
+    if (b.hp) { state.bonus.hp += b.hp; state.health = maxHealth(); }
+    gainXp(xpFor('craft'));
+    sfx('epic');
+    fx?.levelUp(V(walker.state.x, walker.state.feet + 0.2, walker.state.z));
+    hud.reveal(`Bênção · ${sd.who}`, sd.bless, [b.dmg ? `+${Math.round(b.dmg * 100)}% de dano, para sempre` : `+${b.hp} de vida máxima, para sempre`, sd.after], side === 'a' ? '#ff8a5a' : '#7fe0b0');
   }
   function floorBanner() {
     if (stage().region === 'fora') { hud.banner('Prólogo', 'Clareira de Aetherion', 'Chegue ao nível 5 para entrar na árvore'); return; }
@@ -387,6 +413,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   function stageProgress() {
     const st = stage();
     if (st.kind === 'craft') return [Object.keys(st.need).filter((k) => state.inv[k]).length, Object.keys(st.need).length];
+    if (st.kind === 'side') { const g = st.groups[state.flags[`lado_${st.region}`]]; return [Math.min(3, state.count[g] ?? 0), 3]; }
     if (st.kind === 'level') return [Math.round(state.xp / xpNeed(state.level) * 100), 100, `Nível ${state.level}/${st.need.nivel}`];
     if (st.kind === 'kill' || st.kind === 'collect') { const [k, n] = Object.entries(st.need)[0]; return [Math.min(n, (ITEMS[k] ? state.inv[k] : state.count[k]) ?? 0), n]; }
     const g = st.kind === 'group' ? st.target : st.group;
@@ -397,7 +424,9 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   const intact = () => FRAGMENTS.filter((f) => state.flags[`intacto_${f}`]).length;
   const held = () => FRAGMENTS.filter((f) => state.inv[f]).length;
   function needsMet() {
-    const n = stage().need;
+    const st0 = stage();
+    if (st0.kind === 'side') { const g = st0.groups[state.flags[`lado_${st0.region}`]]; return !!g && (state.count[g] ?? 0) >= 3; }
+    const n = st0.need;
     if (!n) return false;
     return Object.entries(n).every(([k, v]) => {
       if (k.startsWith('boss_')) return !!state.flags[k];
@@ -527,6 +556,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   }
   function applyEffects(fx) {
     if (!fx) return;
+    if (fx.side) { const [P, side] = fx.side; state.flags[`lado_${P}`] = side; hud.toast(`Você ficou com ${SIDES[P][side].who}`, 'xp'); }
     if (fx.resolve) resolveBoss(...fx.resolve);
     if (fx.advance) advance();
   }
@@ -560,7 +590,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   }
   function targetPos() {
     const st = stage();
-    if (!st.target) return null;
+    if (!st.target && st.kind !== 'side') return null;
     if (st.kind === 'craft') {
       // materials still missing for this floor's gear: point at the nearest node of one of them
       const missing = new Set();
@@ -573,6 +603,11 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
         const node = nearestOf((it) => it.kind === 'resource' && missing.has(it.group) && it.id.startsWith(`node_${st.region}_`));
         if (node) return node.pos;
       }
+    }
+    if (st.kind === 'side') {
+      const g = st.groups[state.flags[`lado_${st.region}`]];
+      const it = g && nearestOf((x) => x.group === g);
+      return it ? it.pos : null;
     }
     if (st.target.startsWith('node:')) {
       const it = nearestOf((x) => x.kind === 'resource' && x.id.startsWith(`node_${st.region}_${st.target.slice(5)}_`));
@@ -764,7 +799,8 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   const CHOICE_NAMES = { destruir: 'destruído', poupar: 'poupado', restaurar: 'restaurado', simbiose: 'em simbiose' };
   function choicesSummary() {
     const rows = bossList.filter((b) => b.kind === 'boss' && state.flags[`escolha_${b.id}`]).map((b) => `${bossName(b.id)}: ${CHOICE_NAMES[state.flags[`escolha_${b.id}`]]}`);
-    return rows.length ? ` ${STRINGS.ESCOLHAS} ${rows.join(' · ')}. Fragmentos intactos: ${intact()}/10.` : '';
+    const sides = Object.keys(SIDES).filter((P) => state.flags[`lado_${P}`]).map((P) => SIDES[P][state.flags[`lado_${P}`]].after);
+    return (rows.length ? ` ${STRINGS.ESCOLHAS} ${rows.join(' · ')}. Fragmentos intactos: ${intact()}/10.` : '') + (sides.length ? ` Pelos andares: ${sides.join(' ')}` : '');
   }
   // each guardian's special rules, from its mechanic (counted in state.count)
   const mechDone = (m) => (state.count[m.group] ?? 0) >= m.count;
@@ -953,6 +989,12 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
       const f = state.flags;
       state.count = {};
       for (const k of Object.keys(f)) if (k !== 'cantil') delete f[k];
+      for (const st of STAGES.slice(0, i)) if (st.kind === 'side') {
+        const side = f[`lado_${st.region}`] ?? 'a';
+        f[`lado_${st.region}`] = side;
+        state.count[st.groups[side]] = 3;
+        for (let n = 0; n < 3; n++) f[`${st.groups[side]}_${n}`] = true;
+      }
       for (const st of STAGES.slice(0, i)) for (const [k, v] of Object.entries(st.need ?? {})) {
         if (k.startsWith('boss_')) {
           const bid = k.slice(5), b = bossList.find((x) => x.id === bid);

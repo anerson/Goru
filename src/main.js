@@ -17,6 +17,7 @@ import { createCharacter } from './character.js';
 import { createGame } from './game/game.js';
 import { createFx } from './fx.js';
 import { createParty } from './party.js';
+import { toonify } from './toon.js';
 import { startAudio, toggleMute, isMuted, sfx } from './audio.js';
 import { CLASSES as CLASSES_PLAN, APPEARANCE, DEFAULT_APPEARANCE } from './game/campaign_data.js';
 import { STAGES, RECIPES } from './game/campaign_data.js';
@@ -115,6 +116,11 @@ function buildWorld() {
   $('sCrown').textContent = `${(canopy.crownR * 2 / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`;
   $('sPaths').textContent = `${((paths.totalLength + biomes.trailLength) / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`;
   const gm = createGM({ root: $('gmPanel'), game, combat, hud, isJourney: () => journey && mode === 'walk' });
+  // the cartoon look: banded light everywhere, an outline on every character
+  toonify(scene);
+  const people = [];
+  scene.traverse((o) => { if (o.userData.character) people.push(o); });
+  for (const o of people) toonify(o, { outline: true });
   return { walker, character, canopy, game, hud, combat, gm, fx, updateParticles, updateBiomes: biomes.update, paths: biomes.paths };
 }
 

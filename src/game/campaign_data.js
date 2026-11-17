@@ -258,6 +258,43 @@ export const STRINGS = {
 export const SPEAKERS = { narrador: '' };
 export const BOSSES = [];        // { id, type, biome, act, kind, wakeFrom, mechanic }
 
+// ---- choosing a side: on every floor two groups of the community disagree on how to face the
+// crisis. You hear both, pick one, do that side's task and earn its blessing (A: more damage,
+// B: more health, both permanent). The ending remembers who you sided with.
+export const SIDES = {
+  raizes: { q: 'A vila está dividida. Os coletores querem quebrar as barragens de raiz agora; as guardiãs da nascente querem filtrar a água antes de abrir.',
+    a: { who: 'Coletores de Brin', say: 'A vila tem sede hoje. Quebre as barragens e a água volta.', task: 'Quebre 3 barragens de raiz para os coletores', look: 'logs', label: 'Quebrar a barragem', bless: 'Força dos Coletores', after: 'A água voltou rápido às casas, ainda turva.' },
+    b: { who: 'Guardiãs da Nascente', say: 'Água suja mata devagar. Plante filtros de musgo antes de abrir.', task: 'Plante 3 filtros de musgo nas nascentes', look: 'flower', label: 'Plantar o filtro de musgo', bless: 'Bênção da Nascente', after: 'A água voltou devagar, mas limpa.' } },
+  deserto: { q: 'Tarek quer a água para a caravana atravessar a casca; os eremitas querem guardá-la nos reservatórios antigos para a próxima seca.',
+    a: { who: 'Caravana de Tarek', say: 'Sem água a caravana morre no meio do caminho. Leve os jarros.', task: 'Leve 3 jarros de água até a caravana', look: 'barrel', label: 'Entregar o jarro', bless: 'Força da Caravana', after: 'A caravana atravessou e o comércio voltou.' },
+    b: { who: 'Eremitas da Casca', say: 'Gastar tudo agora é morrer na próxima seca. Sele os reservatórios.', task: 'Sele 3 reservatórios antigos', look: 'valve', label: 'Selar o reservatório', bless: 'Paciência dos Eremitas', after: 'Os reservatórios guardaram água para o próximo ano.' } },
+  oceano: { q: 'Os pescadores querem limpar a zona morta com redes; os mergulhadores querem alimentar os filtros vivos do fundo.',
+    a: { who: 'Pescadores de Ilian', say: 'Tire o lixo da água e os peixes respiram.', task: 'Recolha 3 redes cheias de lodo', look: 'algae', label: 'Puxar a rede de lodo', bless: 'Braço dos Pescadores', after: 'A superfície clareou e os barcos voltaram.' },
+    b: { who: 'Mergulhadores do Fundo', say: 'Os filtros vivos limpam tudo, se tiverem alimento.', task: 'Leve alimento a 3 colônias de filtro', look: 'sample', label: 'Alimentar a colônia', bless: 'Fôlego do Fundo', after: 'O fundo voltou a filtrar sozinho.' } },
+  fornalha: { q: 'Os mineiros querem reforçar as barreiras com obsidiana; os forjadores querem abrir respiros para o calor sair.',
+    a: { who: 'Mineiros de Kaela', say: 'Barreira forte segura qualquer calor. Reforce com obsidiana.', task: 'Reforce 3 barreiras térmicas', look: 'crack', label: 'Reforçar a barreira', bless: 'Fúria da Forja', after: 'As barreiras aguentam, mas a pressão continua lá dentro.' },
+    b: { who: 'Forjadores', say: 'Calor preso explode. Abra respiros e deixe a fornalha respirar.', task: 'Abra 3 respiros de calor', look: 'vent', label: 'Abrir o respiro', bless: 'Pele de Brasa', after: 'O calor sai devagar e as câmaras esfriaram.' } },
+  niveria: { q: 'A expedição quer derreter o gelo para a água correr; os guardiões do gelo querem preservar a reserva intacta.',
+    a: { who: 'Expedição de Sora', say: 'Água parada não mata a sede de ninguém. Acenda as pedras de calor.', task: 'Acenda 3 pedras de calor', look: 'crystal', label: 'Acender a pedra de calor', bless: 'Chama da Expedição', after: 'A água corre de novo pelos canais.' },
+    b: { who: 'Guardiões do Gelo', say: 'Essa reserva é a água de mil anos. Sele as fendas.', task: 'Sele 3 fendas da reserva', look: 'brace', label: 'Selar a fenda', bless: 'Couraça de Geada', after: 'A reserva ficou intacta para as próximas secas.' } },
+  selva: { q: 'Os caçadores querem cercar as aldeias contra as panteras; os pastores querem abrir clareiras para a manada voltar.',
+    a: { who: 'Caçadores de Yara', say: 'Primeiro as crianças. Cerque as aldeias.', task: 'Arme 3 cercas de cipó', look: 'brace', label: 'Armar a cerca', bless: 'Instinto do Caçador', after: 'As aldeias estão seguras, a selva ficou mais fechada.' },
+    b: { who: 'Pastores da Manada', say: 'Sem manada as panteras caçam gente. Abra as clareiras.', task: 'Abra 3 clareiras para a manada', look: 'logs', label: 'Abrir a clareira', bless: 'Vigor da Manada', after: 'A manada voltou e as panteras se afastaram.' } },
+  pantano: { q: 'Os curandeiros querem queimar o mofo perto da vila; os fungicultores querem plantar fungos que reciclam.',
+    a: { who: 'Curandeiros de Doran', say: 'O gás está matando a vila. Limpe os focos agora.', task: 'Limpe 3 focos de mofo perto da vila', look: 'sporeFocus', label: 'Limpar o foco de mofo', bless: 'Mão do Curandeiro', after: 'A vila respira, mas o solo ficou pobre.' },
+    b: { who: 'Fungicultores', say: 'Fungo bom come fungo ruim. Plante os canteiros.', task: 'Plante 3 canteiros de fungo reciclador', look: 'flower', label: 'Plantar o canteiro', bless: 'Raiz do Ciclo', after: 'O pântano voltou a reciclar.' } },
+  cristais: { q: 'Os artífices querem afinar os cristais da cidade; os silenciosos querem cobrir os cristais falsos até tudo se acalmar.',
+    a: { who: 'Artífices de Lira', say: 'Cristal afinado fala a verdade. Afine-os.', task: 'Afine 3 cristais da cidade', look: 'crystal', label: 'Afinar o cristal', bless: 'Eco Afinado', after: 'As mensagens voltaram a chegar inteiras.' },
+    b: { who: 'Os Silenciosos', say: 'Sinal falso engana mais que silêncio. Cubra-os.', task: 'Cubra 3 cristais falsos', look: 'crystalDark', label: 'Cobrir o cristal falso', bless: 'Calma do Silêncio', after: 'O reino ficou quieto e seguro, mas isolado.' } },
+  suspensa: { q: 'Os vigias querem reforçar as pontes; os ninheiros querem proteger os ninhos ancestrais primeiro.',
+    a: { who: 'Vigias de Ravi', say: 'Ponte caída é aldeia caída. Reforce as pontes.', task: 'Reforce 3 pontes de cipó', look: 'brace', label: 'Reforçar a ponte', bless: 'Passo do Vigia', after: 'As pontes aguentam o vento.' },
+    b: { who: 'Ninheiros', say: 'Sem os ninhos, a Guardiã nunca vai confiar em nós.', task: 'Proteja 3 ninhos com velas de vento', look: 'sail', label: 'Proteger o ninho', bless: 'Pluma Ancestral', after: 'Os ninhos sobreviveram e a Guardiã baixou as asas.' } },
+  copa: { q: 'Os jardineiros querem semear flores para os polinizadores; os guardiões da luz querem acender os faróis de pólen do coração.',
+    a: { who: 'Jardineiros de Elowen', say: 'Flores primeiro: sem polinizador, nenhuma luz basta.', task: 'Semeie 3 canteiros de flores', look: 'flower', label: 'Semear o canteiro', bless: 'Pólen Vivo', after: 'Os polinizadores voltaram à copa.' },
+    b: { who: 'Guardiões da Luz', say: 'O coração precisa de luz agora. Acenda os faróis.', task: 'Acenda 3 faróis de pólen', look: 'mirror', label: 'Acender o farol', bless: 'Luz do Coração', after: 'O coração mágico recebeu luz de novo.' } },
+};
+export const SIDE_BONUS = { a: { dmg: 0.04 }, b: { hp: 15 } };
+
 // ---- the prologue, outside the tree (levels 1-5): a guided start ----
 SPEAKERS.thalor = 'Thalor, o guia';
 STRINGS.FORA_1 = 'Você chegou, viajante. Aquele é Aetherion: um único carvalho, doze mil anos, um mundo inteiro dentro dele.';
@@ -289,6 +326,20 @@ for (const [ri, r] of REGIONS_PLAN.entries()) {
     c: { speaker: r.npc.id, line: L('NPC3', `Missão: ${r.mission}.`), next: 'fim', do: { advance: true } },
     fim: { end: true } } };
   DIALOGUES[`${r.npc.id}_geral`] = { start: 'a', nodes: { a: { speaker: r.npc.id, line: L('NPCG', r.npc.lines[1]), next: 'fim' }, fim: { end: true } } };
+  // the floor's dilemma: hear both sides, pick one, do its task
+  const sd = SIDES[P];
+  if (sd) {
+    STAGES.push({ id: `${P}_lado`, act: r.act, region: P, text: `Ouça ${r.npc.name}: a comunidade está dividida. Escolha um lado`, target: r.npc.id, kind: 'talk' });
+    DIALOGUES[`${r.npc.id}_lado`] = { start: 'a', nodes: {
+      a: { speaker: r.npc.id, line: L('LADO_Q', sd.q), next: 'b' },
+      b: { speaker: r.npc.id, line: L('LADO_AB', `${sd.a.who}: "${sd.a.say}" ${sd.b.who}: "${sd.b.say}"`), choices: [
+        { text: L('LADO_A', `Ficar com ${sd.a.who}`), to: 'ca', do: { side: [P, 'a'] } },
+        { text: L('LADO_B', `Ficar com ${sd.b.who}`), to: 'cb', do: { side: [P, 'b'] } }] },
+      ca: { speaker: r.npc.id, line: L('LADO_CA', `Então vá: ${sd.a.task.toLowerCase()}.`), next: 'fim', do: { advance: true } },
+      cb: { speaker: r.npc.id, line: L('LADO_CB', `Então vá: ${sd.b.task.toLowerCase()}.`), next: 'fim', do: { advance: true } },
+      fim: { end: true } } };
+    STAGES.push({ id: `${P}_tarefa`, act: r.act, region: P, text: '', textBySide: { a: sd.a.task, b: sd.b.task }, target: null, kind: 'side', groups: { a: `${P}_lado_a`, b: `${P}_lado_b` } });
+  }
   // 2. craft the region's weapon and outfit
   STAGES.push({ id: `${P}_bancada`, act: r.act, region: P, text: `Colete materiais e crie na bancada: ${r.weapon.name} e ${r.outfit.name}`, target: `bancada_${P}`, kind: 'craft', need: { [r.weapon.id]: 1, [r.outfit.id]: 1 } });
   // 3. the manual's investigation steps
@@ -320,6 +371,7 @@ export function dialogueFor(npc, stage) {
   if (npc === 'thalor') return stage === 'fora_chegada' ? 'thalor_chegada' : 'thalor_geral';
   const r = REGIONS_PLAN.find((x) => x.npc.id === npc);
   if (!r) return null;
+  if (stage === `${r.id}_lado`) return `${npc}_lado`;
   return stage === `${r.id}_chegada` ? `${npc}_chegada` : `${npc}_geral`;
 }
 

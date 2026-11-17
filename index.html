@@ -156,7 +156,7 @@ body:not(.journey) .journey-only { display: none !important; }
 .story small { font: 700 11px/1 var(--mono); letter-spacing: 0.25em; text-transform: uppercase; color: var(--accent); }
 .story-box p { margin: 0 0 10px; font-size: 15px; line-height: 1.6; color: var(--ink); }
 .story-box button { justify-self: end; }
-.hud-skills { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 32px); }
+.hud-skills { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(66px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 32px); }
 .hud-skills[hidden] { display: none; }
 .hud-skills button { display: grid; gap: 2px; min-width: 96px; padding: 6px 8px; border-color: #9a8aff; text-align: left; }
 .hud-skills kbd { font: 700 11px/1 var(--mono); color: #9a8aff; }
@@ -196,6 +196,7 @@ body:not(.journey) .journey-only { display: none !important; }
 .hud-actions { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; max-width: 60vw; }
 .hud-actions button { background: var(--panel); }
 #hudUse { background: var(--accent); color: var(--accent-ink); font-weight: 800; }
+body.journey .hint { display: none; }
 body.flying .hud-actions { bottom: calc(190px + env(safe-area-inset-bottom, 0px)); }
 .hud-bag { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(64px + env(safe-area-inset-bottom, 0px)); width: min(300px, calc(100vw - 32px)); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
 .hud-bag h3 { margin: 0 0 6px; font-size: 14px; }

@@ -259,6 +259,7 @@ const act = await page.evaluate(() => {
       }
       checks[`equip_${region}`] = `${G.state.equip.weapon}/${G.state.equip.outfit}`;
     } else {
+      if (st.kind === 'side') { useGroup(st.groups[G.state.flags[`lado_${region}`]], 3); tick(); log.push(`${before} -> ${G.state.stage}`); if (G.state.stage === before) { log.push('STUCK at ' + before); break; } continue; }
       const need = st.need ?? {};
       // levels, kills and collects of the clearing and of the level gates are earned in play:
       // the test sets what the explorer would have reached, then the game's own rules advance

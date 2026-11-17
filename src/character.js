@@ -6,6 +6,7 @@ import * as THREE from 'three';
 export function createCharacter({ name = 'player', skin: skinC = '#c99674', shirt: shirtC = '#2f7f86', pants: pantsC = '#3a3226', hat = '#7a4b2a', light = true, pack = true, scale = 1 } = {}) {
   const root = new THREE.Group();
   root.name = name;
+  root.userData.character = true;   // the cartoon pass gives characters an outline
   root.scale.setScalar(scale);
   const skin = new THREE.MeshStandardMaterial({ color: skinC, roughness: 0.75 });
   const shirt = new THREE.MeshStandardMaterial({ color: shirtC, roughness: 0.8 });

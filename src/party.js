@@ -8,6 +8,7 @@
 // State is only ever shared, never trusted: every name and value that arrives is display data.
 import * as THREE from 'three';
 import { createCharacter } from './character.js';
+import { toonify } from './toon.js';
 import { CLASSES } from './game/campaign_data.js';
 
 const CODE = /^[a-z0-9]{4,12}$/;
@@ -44,6 +45,7 @@ export async function createParty({ scene, getState, onBoss, onMembers, onPing, 
         const c = createCharacter({ name: `amigo_${m.name}`, light: false, pack: false, shirt: CLASS_TINT[m.cls] ?? '#4a4a4a', hat: '#c9b07a', pants: '#2a2a2a' });
         const tag = labelSprite(m.name, CLASSES[m.cls]?.color ?? '#ffd76a');
         c.root.add(tag);
+        toonify(c.root, { outline: true });
         scene.add(c.root);
         avatars.set(m.id, { c, tag, x: m.x ?? 0, z: m.z ?? 0, feet: m.feet ?? 0, yaw: m.yaw ?? 0, place: m.place });
       }
