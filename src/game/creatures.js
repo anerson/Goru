@@ -300,7 +300,15 @@ Object.assign(CREATURES, {
   reiFeras: bossOf('selva', R.selva.boss, 'boss', () => decorate(quadruped({ color: '#7a5a3a', belly: '#c9a87a', size: 4 }), { horns: '#efe6d0', size: 4 }), 4.4),
 });
 
+// the clearing outside the tree (levels 1-5): weak creatures for the first steps
+Object.assign(CREATURES, {
+  besouroMusgo: { name: 'Besouro-de-Musgo', region: 'fora', hp: 24, damage: 3, speed: 3.2, armor: 1, xp: 8, range: 1.5, build: () => arthropod({ color: '#2a3a22', shell: '#5a7a3a', mandibles: true, size: 0.7 }) },
+  loboJovem: { name: 'Lobo Jovem', region: 'fora', hp: 34, damage: 4, speed: 4.6, armor: 1, xp: 12, range: 1.6, build: () => quadruped({ color: '#7a6a58', belly: '#b8a88a', size: 0.8 }) },
+  javaliCasca: { name: 'Javali de Casca', region: 'fora', hp: 52, damage: 6, speed: 4.2, armor: 0.9, xp: 18, range: 1.8, build: () => decorate(quadruped({ color: '#5a3a22', belly: '#8a6a4a', size: 1, snout: true }), { horns: '#efe6d0', size: 1 }) },
+});
+
 // which creatures live on each level, from the manual (flyers and swimmers not in the game yet)
 const COUNTS = { raizes: 3, deserto: 3, fornalha: 3, niveria: 3, selva: 3, pantano: 2, cristais: 3, suspensa: 4, copa: 2 };
 export const FAUNA = Object.fromEntries(REGIONS.map((r) => [r.id, r.mobs.filter((e) => e.model).map((e) => [e.id, COUNTS[r.id] ?? 0])]));
 FAUNA.oceano = [];
+FAUNA.fora = [['besouroMusgo', 6], ['loboJovem', 5], ['javaliCasca', 4]];

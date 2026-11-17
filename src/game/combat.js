@@ -31,14 +31,17 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   const rand = mulberry32(4242);
   const mobs = [];
   const bosses = {};
-  const levelOf = (feet, r) => (r > DISK_R + 20 ? null : BIOMES.filter((b) => feet > b.level - 1.5 && feet < b.level + 26).pop() ?? null);
+  // outside the trunk, near the ground, is the clearing ('fora'), levels 1-5
+  const FORA = { id: 'fora', level: 0, name: 'Clareira de Aetherion' };
+  const levelOf = (feet, r) => (r > DISK_R + 20 ? (feet < 30 ? FORA : null) : BIOMES.filter((b) => feet > b.level - 1.5 && feet < b.level + 26).pop() ?? null);
+  const groundAt = (biome, x, z) => (biome === 'fora' ? walker.floorAt(x, z, 30) : biomes.terrains[biome](x, z));
 
   // ---------- spawning ----------
   function spawn(type, biome, x, z, opts = {}) {
     const def = CREATURES[type];
     const model = def.build();
-    const level = BIOMES.find((b) => b.id === biome).level;
-    const y = biomes.terrains[biome](x, z);
+    const level = biome === 'fora' ? 0 : BIOMES.find((b) => b.id === biome).level;
+    const y = groundAt(biome, x, z);
     model.root.position.set(x, y, z);
     scene.add(model.root);
     const m = {
@@ -51,6 +54,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   }
   const ok = (biome, x, z) => {
     const r = Math.hypot(x, z);
+    if (biome === 'fora') return r > 170 && r < 560 && Math.abs(walker.floorAt(x, z, 30)) < 3 && !game.nearSafeZone(biome, x, z, 24);
     if (r < 18 || r > DISK_R - 5) return false;
     const b = BIOMES.find((v) => v.id === biome);
     return biomes.terrains[biome](x, z) > b.level - 0.5 && !game.nearSafeZone(biome, x, z, 18);
@@ -58,7 +62,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   for (const [biome, list] of Object.entries(FAUNA)) {
     for (const [type, n] of list) {
       for (let k = 0, tries = 0; k < n && tries < 200; tries++) {
-        const a = rand() * 6.28, r = 20 + rand() * 40, x = Math.cos(a) * r, z = Math.sin(a) * r;
+        const a = rand() * 6.28, r = biome === 'fora' ? 170 + rand() * 390 : 20 + rand() * 40, x = Math.cos(a) * r, z = Math.sin(a) * r;
         if (ok(biome, x, z)) { spawn(type, biome, x, z); k++; }
       }
     }
@@ -153,7 +157,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     fx?.kill(m.pos.clone().setY(m.pos.y + m.model.height * 0.5), m.boss ? '#ffcf4a' : '#ff9a6a');
     if (!m.boss) sfx('kill');
     lane.visible = ring.visible = false;
-    if (m.boss !== 'gm' && !m.temp) game.gainXp(m.def.xp ?? 10);
+    if (m.boss !== 'gm' && !m.temp) game.onKill(m.biome, m.boss ?? null);
     if (m.boss) {
       hud.boss(null);
       if (m.boss !== 'gm') game.bossDefeated(m.boss);   // a boss the GM summoned is not the story's
@@ -163,6 +167,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     }
   }
   function hurtPlayer(amount) {
+    if (bastiao > 0) amount *= 0.4;
     if (walker.state.dodgeT > 0) { fx?.dodge(V(walker.state.x, walker.state.feet + 1, walker.state.z)); popNumber(V(walker.state.x, walker.state.feet + 2.2, walker.state.z), 'esquivou', '#9dffcf'); return; }
     game.hurt(amount);
     sfx('hurt');
@@ -224,13 +229,46 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   // combo: hits within 2.2 s of each other chain; each link adds 5% damage, up to +50%.
   // crit: 12% of hits (20% at a combo of 10) do 1.8x, with a gold number and a burst.
   let combo = 0, comboT = 0;
+  // class effects: Ladino's crits, Sábio's bonus against guardians, Mago's and Arqueiro's
+  // area burst (the ability is their ranged hit with a splash), the Ladino's sure crit after
+  // Golpe Preciso and the Guerreiro's bastion (less damage taken, see hurtPlayer)
+  let preciso = 0, bastiao = 0;
   function strike(m, w, from) {
-    if (w.reach) { hurtMob(m, rollDamage(w), from); return; }
+    const c = game.cls;
     combo = comboT > 0 ? combo + 1 : 1;
     comboT = 2.2;
     hud.combo(combo);
-    const crit = rand() < (combo >= 10 ? 0.2 : 0.12);
-    hurtMob(m, rollDamage(w) * game.power() * (1 + Math.min(combo - 1, 10) * 0.05) * (crit ? 1.8 : 1), from, crit);
+    const boss = !!(m.boss && m.boss !== 'gm');
+    const crit = preciso > 0 || rand() < (combo >= 10 ? 0.2 : 0.12) + (c.crit ?? 0);
+    if (preciso > 0) preciso = 0;
+    const bonus = boss && c.bossBonus ? 1 + c.bossBonus : 1;
+    hurtMob(m, rollDamage(w) * game.power() * (1 + Math.min(combo - 1, 10) * 0.05) * (crit ? 1.8 : 1) * bonus, from, crit);
+  }
+  // the class ability (R): a short window of change, with a cooldown shown in the HUD
+  let abilityCd = 0;
+  function ability() {
+    if (abilityCd > 0 || game.busy || walker.state.flying) return;
+    const a = game.cls.ability;
+    if (!a) return;
+    abilityCd = a.cd;
+    hud.ability(a.name, 0);
+    sfx('craft');
+    const me = walker.state, from = V(me.x, me.feet, me.z);
+    if (a.id === 'bastiao') bastiao = 6;
+    if (a.id === 'preciso') preciso = 1;
+    if (a.id === 'remedio') { game.healPct(0.4); fx?.pickup(V(me.x, me.feet + 1, me.z), '#7fe0b0'); }
+    if (a.id === 'projetil' || a.id === 'chuva') {
+      const splash = a.id === 'projetil' ? 6 : 8, mult = a.id === 'projetil' ? 4 : 2.5;
+      const target = findAim() ?? mobs.filter((x) => !['dead', 'dormant'].includes(x.state)).sort((p, q) => p.pos.distanceTo(from) - q.pos.distanceTo(from))[0];
+      const center = target ? target.pos : from;
+      fx?.ring(V(center.x, center.y + 0.2, center.z), a.id === 'projetil' ? '#9a8aff' : '#b0e07a', splash, 0.6);
+      for (const m of mobs) {
+        if (['dead', 'dormant', 'rise', 'gone', 'retreat'].includes(m.state) || m.ally) continue;
+        if (m.pos.distanceTo(center) > splash) continue;
+        hurtMob(m, rollDamage(cur()) * game.power() * mult, center);
+      }
+    }
+    hud.toast(`${a.name}!`, 'epic');
   }
   function dropCombo() { if (combo) { combo = 0; hud.combo(0); } }
   function attack() {
@@ -291,6 +329,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   }
   const gm = {
     setWeapon(id) { gmOn = id === 'gm'; character.setWeapon(gmOn ? 'gm' : 'cajado'); },
+    ability,
     get weapon() { return cur(); },
     // Onda de Seiva: everything within the radius falls
     wave(radius = 18) {
@@ -345,8 +384,8 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     if (l < 1e-4) return 0;
     const step = Math.min(l, speed * dt);
     const nx = m.pos.x + (dx / l) * step, nz = m.pos.z + (dz / l) * step;
-    const y = biomes.terrains[m.biome](nx, nz);
-    if (Math.hypot(nx, nz) > DISK_R - 3 || y < m.level - 0.6) return 0;   // edge, water or lava
+    const y = groundAt(m.biome, nx, nz);
+    if (m.biome === 'fora' ? Math.hypot(nx, nz) < 150 || Math.abs(y) > 3 : Math.hypot(nx, nz) > DISK_R - 3 || y < m.level - 0.6) return 0;   // edge, water, lava, trunk
     m.pos.set(nx, y, nz);
     return step / dt;
   }
@@ -535,6 +574,9 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     const now = performance.now() / 1000;
     const sim = now < stopUntil ? dt * 0.05 : dt;           // hit-stop slows combat only
     attackCd -= dt;
+    abilityCd -= dt;
+    if (game.cls.ability) hud.ability(game.cls.ability.name, Math.max(0, abilityCd));
+    bastiao -= dt;
     comboT -= dt;
     if (comboT <= 0 && combo) dropCombo();
     const me = walker.state;
@@ -621,13 +663,13 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   }
 
   function dodge() {
-    if (game.busy || !walker.dodge()) return;
+    if (game.busy || !walker.dodge(game.cls.dodgeCd)) return;
     fx?.dodge(V(walker.state.x, walker.state.feet + 0.5, walker.state.z));
     character.roll();
     sfx('dodge');
   }
   return {
-    dodge,
+    dodge, ability,
     update, attack, shake, resetBosses, gm, syncBossesWithStory,
     debug: {
       mobs, bosses, wake,

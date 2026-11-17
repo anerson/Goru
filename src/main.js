@@ -16,7 +16,9 @@ import { createInput } from './input.js';
 import { createCharacter } from './character.js';
 import { createGame } from './game/game.js';
 import { createFx } from './fx.js';
-import { startAudio, toggleMute, isMuted } from './audio.js';
+import { createParty } from './party.js';
+import { startAudio, toggleMute, isMuted, sfx } from './audio.js';
+import { CLASSES as CLASSES_PLAN } from './game/campaign_data.js';
 import { STAGES, RECIPES } from './game/campaign_data.js';
 import { createHud } from './game/hud.js';
 import { createCombat } from './game/combat.js';
@@ -97,12 +99,12 @@ function buildWorld() {
   const hud = createHud($('hud'));
   const fx = createFx(scene, reduceMotion);
   const game = createGame({ scene, biomes, walker, hud, fx });
+  // the seals: the walker cannot step through a locked floor's ramp or the trunk's mouth
+  biomes.noGo.push((x, z, fl) => !!game.blockedAt(x, z, fl));
   const combat = createCombat({ scene, camera, walker, character, biomes, game, hud, reduceMotion, fx });
   game.onFaint(() => combat.resetBosses());
   // crafted gear shows on the explorer: the weapon recolours the staff, the outfit the clothes
   game.onGear((w, o) => { character.setWeaponLook(w.look, w.tier); character.setOutfit(o?.look ?? null); });
-  // XP a guardian is worth when it is spared or restored instead of killed
-  for (const b of game.bossList) game.setBossXp(b.id, combat.debug.bosses[b.id]?.def.xp ?? 200);
 
   $('sHeight').textContent = `${Math.round(canopy.maxY)} m`;
   $('sCrown').textContent = `${(canopy.crownR * 2 / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`;
@@ -123,6 +125,10 @@ const onLevel = (b) => () => {
   return { ...p, feet: b.level + 0.5, yaw: yawToward(-p.x, -p.z), pitch: -0.18, label: `${Math.round(b.level)} m · ${b.name}` };
 };
 const PLACES = {
+  fora() {
+    const p = at(600, APPROACH.angle);
+    return { ...p, feet: 0, yaw: yawToward(-p.x, -p.z), pitch: 0.05, label: 'Clareira de Aetherion' };
+  },
   trilha() {
     const p = at(700, APPROACH.angle);
     return { ...p, feet: 0, yaw: yawToward(-p.x, -p.z), pitch: 0.2, label: 'Trilha de chegada' };
@@ -144,6 +150,12 @@ const PLACES = {
 };
 
 function goTo(name) {
+  // in the journey, the seals decide: you can only jump to floors you have unlocked
+  const floorIdx = BIOMES.findIndex((b) => b.id === name);
+  if (journey && floorIdx >= 0 && world && floorIdx >= world.game.openFloors()) {
+    world.hud.toast('Este andar está selado. Suba de nível e vença o guardião do andar anterior.', 'xp');
+    return;
+  }
   const spot = PLACES[name]();
   world.walker.teleport(spot); // hard cut: no smoothing to whip across the map
   $('place').textContent = spot.label;
@@ -166,7 +178,6 @@ function exitWalk() {
   document.body.classList.remove('walking', 'journey');
   if (world) { world.character.root.visible = false; if (journey) world.game.save(); }
   journey = false;
-  $('bContinue').hidden = !world?.game.hasSave();
   input.releaseLock();
   setFly(false);
 }
@@ -196,6 +207,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyE') g.interact();
   if (e.code === 'KeyJ' || (e.code === 'Space' && !world.walker.state.flying)) { world.combat.attack(); e.preventDefault(); }
   if ((e.code === 'KeyC' || e.code === 'ControlLeft') && !e.repeat) { world.combat.dodge(); e.preventDefault(); }
+  if (e.code === 'KeyR' && !e.repeat && journey) { world.combat.ability(); e.preventDefault(); }
   if (e.code === 'KeyM' && !e.repeat) setMute(toggleMute());
   if (e.code === 'KeyQ') g.drink();
   if (e.code === 'KeyI') h.toggleBag();
@@ -218,27 +230,197 @@ renderer.domElement.addEventListener('wheel', (e) => {
   world.walker.zoom(e.deltaY * 0.0015);
 }, { passive: false });
 
+// ---------- friends: the group panel, pings and the shared guardians ----------
+let party = null;
+function partyState() {
+  const s = world.walker.state;
+  return { ...world.game.partySnapshot(), x: s.x, z: s.z, feet: s.feet, yaw: s.yaw };
+}
+function renderParty(members, code) {
+  $('partyIdle').hidden = !!code;
+  $('partyIn').hidden = !code;
+  if (!code) return;
+  $('partyCodeText').textContent = code.replace(/^aeth-/, '');
+  const list = $('partyList');
+  list.innerHTML = '';
+  for (const m of members) {
+    const li = document.createElement('li');
+    if (m.mine) li.className = 'me';
+    const name = document.createElement('b');
+    name.textContent = `${m.mine ? 'Você · ' : ''}${m.name ?? 'Alguém'}`;
+    const info = document.createElement('small');
+    info.textContent = `${CLASSES_NAME[m.cls] ?? ''} · nível ${m.level ?? 1} · ${m.place === 'fora' ? 'fora da árvore' : `andar ${(['fora', ...REGION_ORDER].indexOf(m.place))}`}${m.mine ? '' : ` · ${Math.round(m.dist ?? 0)} m`}`;
+    const bar = document.createElement('div'); bar.className = 'bar'; bar.innerHTML = '<i></i>';
+    bar.firstChild.style.width = `${Math.max(0, Math.min(100, m.hp ?? 0))}%`;
+    li.append(name, info, bar);
+    if (!m.mine && m.place === world.game.partySnapshot().place) {
+      const go = document.createElement('button');
+      go.type = 'button'; go.textContent = 'Ir até';
+      go.onclick = () => {
+        const f = m.x !== undefined ? m : null;
+        if (f) world.walker.teleport({ x: f.x + 2, z: f.z + 2, feet: f.feet ?? 0, yaw: 0, pitch: -0.15 });
+        $('party').hidden = true;
+      };
+      li.append(go);
+    }
+    list.append(li);
+  }
+}
+const REGION_ORDER = ['raizes', 'deserto', 'oceano', 'fornalha', 'niveria', 'selva', 'pantano', 'cristais', 'suspensa', 'copa'];
+function markPing(p) {
+  const floor = world.walker.floorAt(p.x, p.z, world.walker.state.feet);
+  world.fx.ring(V3(p.x, floor + 0.2, p.z), '#ffd76a', 5, 2.2);
+  world.hud.toast(`${p.name} marcou um ponto`, 'xp');
+  sfx('quest');
+}
+const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+async function connectParty() {
+  party = await createParty({
+    scene, getState: partyState, walker: world.walker,
+    onBoss: (id, how) => { world.game.remoteBoss(id, how); world.combat.syncBossesWithStory(); },
+    onMembers: renderParty,
+    onPing: markPing,
+  });
+  if (!party.available) return;
+  world.party = party;
+  world.game.onBossEvent((id, how) => party.bossDown(id, how));
+  $('bParty').hidden = false;
+}
+function partyErr(msg) { $('partyErr').textContent = msg; $('partyErr').hidden = !msg; }
+$('bParty').onclick = () => { const open = $('party').hidden; $('party').hidden = !open; $('bParty').setAttribute('aria-expanded', String(open)); };
+$('partyClose').onclick = () => { $('party').hidden = true; $('bParty').setAttribute('aria-expanded', 'false'); };
+$('partyNew').onclick = async () => {
+  const code = Math.random().toString(36).slice(2, 8);
+  try { partyErr(''); await party.join(code); } catch { partyErr('Não foi possível criar o grupo agora. Tente de novo.'); }
+};
+$('partyJoin').onclick = async () => {
+  const code = $('partyCode').value.trim().toLowerCase();
+  try { partyErr(''); await party.join(code); $('partyCode').value = ''; } catch { partyErr('Código inválido. Use letras e números (4 a 12).'); }
+};
+$('partyLeave').onclick = () => party.leave();
+$('partyPing').onclick = () => pingHere();
+$('partyCopy').onclick = () => { navigator.clipboard?.writeText($('partyCodeText').textContent).catch(() => {}); world.hud.toast('Código copiado', 'xp'); };
+function pingHere() {
+  if (!party?.code) return;
+  const s = world.walker.state;
+  party.ping({ x: s.x, z: s.z, name: world.game.state.name });
+  markPing({ x: s.x, z: s.z, name: 'Você' });
+}
+
+// ---------- the objective marker: over its target, or an arrow on the edge of the screen ----------
+const markerV = new THREE.Vector3();
+function placeMarker() {
+  const tp = world.game.targetPoint?.();
+  if (!tp) { world.hud.marker(null); return; }
+  markerV.set(tp.x, tp.y + 2.2, tp.z).project(camera);
+  const W = innerWidth, H = innerHeight, cx = W / 2, cy = H / 2;
+  let sx = (markerV.x * 0.5 + 0.5) * W, sy = (-markerV.y * 0.5 + 0.5) * H;
+  const behind = markerV.z > 1;
+  const onScreen = !behind && sx > 40 && sx < W - 40 && sy > 90 && sy < H - 180;
+  const dist = Math.hypot(tp.x - world.walker.state.x, tp.z - world.walker.state.z, tp.y - world.walker.state.feet);
+  if (!onScreen) {
+    let dx = sx - cx, dy = sy - cy;
+    if (behind) { dx = -dx; dy = -dy; }
+    const k = Math.min((W / 2 - 48) / (Math.abs(dx) || 1e-6), (H / 2 - 120) / (Math.abs(dy) || 1e-6));
+    sx = cx + dx * k; sy = cy + dy * k;
+    world.hud.marker(sx, sy, false, Math.atan2(dy, dx), dist);
+  } else world.hud.marker(sx, sy, true, 0, dist);
+}
+
 // ---------- UI ----------
 let journey = false;
-function startJourney(continueGame) {
+// slot = which of the four characters (0-3); profile = a new character's name and class
+function startJourney(slot, profile = null) {
   if (!world) return;
   startAudio();
   journey = true;
   document.body.classList.add('journey');
-  enterWalk('trilha');
+  $('slots').hidden = true;
+  enterWalk('fora');
   world.hud.reset();
-  world.game.start(continueGame);
-  // a new journey brings every boss back; a continued one puts them where the choices left them
-  if (continueGame) world.combat.resetBosses(); else world.combat.gm.reviveBosses();
+  world.game.start(slot, profile);
+  world.game.setSeals(true);
+  // a new character brings every boss back; a continued one puts them where its choices left them
+  if (profile) world.combat.gm.reviveBosses(); else world.combat.resetBosses();
   world.combat.syncBossesWithStory();
+}
+
+// ---------- the four character slots (with the five classes of the manual) ----------
+const CLASS_KEYS = ['guerreiro', 'mago', 'sabio', 'ladino', 'arqueiro'];
+const CLASS_COLOR = { guerreiro: '#ff8a5a', mago: '#9a8aff', sabio: '#7fe0b0', ladino: '#c0c0d0', arqueiro: '#b0e07a' };
+let pickedClass = null;
+function renderSlots() {
+  const grid = $('slotGrid');
+  grid.innerHTML = '';
+  const profiles = world.game.profiles();
+  profiles.forEach((p, n) => {
+    const el = document.createElement('div');
+    el.className = `slot ${p ? 'filled' : 'empty'}`;
+    if (p) {
+      el.innerHTML = `<b></b><small></small><div class="row"><button class="primary" type="button">Continuar</button><button type="button" data-del>Apagar</button></div>`;
+      el.querySelector('b').textContent = `${p.name} · ${CLASSES_NAME[p.cls] ?? p.cls}`;
+      el.querySelector('small').textContent = `Nível ${p.level} · ${p.place}${p.done ? ' · campanha concluída' : ''}`;
+      el.querySelector('.primary').onclick = () => startJourney(n);
+      el.querySelector('[data-del]').onclick = () => {
+        if (!window.confirm(`Apagar ${p.name}? O progresso dessa vaga some.`)) return;
+        world.game.deleteSlot(n); renderSlots();
+      };
+    } else {
+      el.innerHTML = `<small>Vaga ${n + 1} livre</small><button class="primary" type="button">Criar personagem</button>`;
+      el.querySelector('button').onclick = () => openNewCharacter(n);
+    }
+    grid.append(el);
+  });
+}
+const CLASSES_NAME = { guerreiro: 'Guerreiro', mago: 'Mago', sabio: 'Sábio', ladino: 'Ladino', arqueiro: 'Arqueiro' };
+let newSlot = 0;
+function openNewCharacter(n) {
+  newSlot = n;
+  pickedClass = null;
+  $('pName').value = '';
+  $('pickTitle').textContent = `Novo personagem · vaga ${n + 1}`;
+  $('classPick').hidden = false;
+  $('slotGrid').hidden = true;
+  $('slotsFoot').hidden = true;
+  const box = $('classes');
+  box.innerHTML = '';
+  for (const k of CLASS_KEYS) {
+    const c = CLASSES_PLAN[k];
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'cls';
+    b.setAttribute('aria-pressed', 'false');
+    b.style.setProperty('--cls', CLASS_COLOR[k]);
+    b.innerHTML = `<b></b><small></small><em></em>`;
+    b.querySelector('b').textContent = c.name;
+    b.querySelector('small').textContent = `${c.title} · ${c.role}`;
+    b.querySelector('em').textContent = `Habilidade (R): ${c.ability.name}. ${c.ability.text}`;
+    b.onclick = () => { pickedClass = k; box.querySelectorAll('.cls').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); checkGo(); };
+    box.append(b);
+  }
+  checkGo();
+  $('pName').focus();
+}
+function checkGo() { $('pGo').disabled = !(pickedClass && $('pName').value.trim().length >= 2); }
+$('pName').addEventListener('input', checkGo);
+$('pBack').onclick = () => { $('classPick').hidden = true; $('slotGrid').hidden = false; $('slotsFoot').hidden = false; };
+$('pGo').onclick = () => {
+  if ($('pGo').disabled) return;
+  startJourney(newSlot, { name: $('pName').value.trim().slice(0, 14), cls: pickedClass });
+};
+$('slotsBack').onclick = () => { $('slots').hidden = true; };
+function openSlots() {
+  if (!world) return;
+  $('classPick').hidden = true; $('slotGrid').hidden = false; $('slotsFoot').hidden = false;
+  renderSlots();
+  $('slots').hidden = false;
 }
 // sound: starts inside the first click (browser rule); M or the button mutes it
 function setMute(m) { $('bSound').setAttribute('aria-pressed', String(!m)); $('bSound').textContent = m ? 'Som: não (M)' : 'Som (M)'; }
 setMute(isMuted());
 $('bSound').onclick = () => { startAudio(); setMute(toggleMute()); };
-$('bStart').onclick = () => startJourney(false);
-$('bContinue').onclick = () => startJourney(true);
-$('bWalk').onclick = () => { journey = false; document.body.classList.remove('journey'); enterWalk('trilha'); };
+$('bStart').onclick = () => { startAudio(); openSlots(); };
+$('bWalk').onclick = () => { journey = false; document.body.classList.remove('journey'); world?.game.setSeals(false); enterWalk('trilha'); };
 $('bExit').onclick = exitWalk;
 // the GM's door: only shown when the page is opened with #mestre
 $('bGM').hidden = location.hash !== '#mestre';
@@ -288,6 +470,8 @@ renderer.setAnimationLoop(() => {
       const s = world.walker.state;
       if (journey) {
         world.game.update(dt, t, { running: s.running && s.moving, flying: s.flying, camYaw: s.yaw });
+        placeMarker();
+        if (party?.available) { party.update(dt); world.game.setPartyNear(party.nearCount); }
         world.combat.update(dt, t);
         world.combat.shake(dt);
         world.fx.update(dt);
@@ -309,8 +493,8 @@ requestAnimationFrame(() => setTimeout(() => {
   try {
     world = buildWorld();
     $('loading').hidden = true;
-    world.hud.bind({ interact: () => world.game.interact(), drink: () => world.game.drink(), useItem: (id) => world.game.useItem(id), attack: () => world.combat.attack(), dodge: () => world.combat.dodge(), craft: (id) => world.game.craft(id), equip: (id) => world.game.equip(id) });
-    $('bContinue').hidden = !world.game.hasSave();
+    connectParty();
+    world.hud.bind({ interact: () => world.game.interact(), drink: () => world.game.drink(), useItem: (id) => world.game.useItem(id), attack: () => world.combat.attack(), dodge: () => world.combat.dodge(), ability: () => world.combat.ability(), craft: (id) => world.game.craft(id), equip: (id) => world.game.equip(id) });
   } catch (err) {
     $('loading').textContent = 'Não foi possível montar a cena. Recarregue a página.';
     console.error(err);

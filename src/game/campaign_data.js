@@ -197,7 +197,7 @@ export const REGIONS_PLAN = [
   },
 ];
 
-export const REGION_NAMES = { raizes: 'a Floresta das Raízes', deserto: 'o Deserto da Casca', oceano: 'o Oceano Interior', fornalha: 'a Fornalha de Ignar', niveria: 'Nivéria', selva: 'a Selva dos Gigantes', pantano: 'o Pântano da Decomposição', cristais: 'o Reino dos Cristais', suspensa: 'a Floresta Suspensa', copa: 'o Jardim da Copa' };
+export const REGION_NAMES = { fora: 'a Clareira de Aetherion', raizes: 'a Floresta das Raízes', deserto: 'o Deserto da Casca', oceano: 'o Oceano Interior', fornalha: 'a Fornalha de Ignar', niveria: 'Nivéria', selva: 'a Selva dos Gigantes', pantano: 'o Pântano da Decomposição', cristais: 'o Reino dos Cristais', suspensa: 'a Floresta Suspensa', copa: 'o Jardim da Copa' };
 
 // ---------------------------------------------------------------- needs
 // survival-crafting: attrition, warnings at 30%, no instant death. Thirst empties in 10 min,
@@ -238,6 +238,9 @@ export const FRAGMENTS = REGIONS_PLAN.flatMap((r) => [r.sub.fragment, r.boss.fra
 
 // food and herbs in every region, so the needs never stall the climb
 export const RESOURCES = [
+  { biome: 'fora', item: 'erva', count: 6, respawn: 90 },
+  { biome: 'fora', item: 'cogumelo', count: 6, respawn: 90 },
+  { biome: 'fora', item: 'madeira', count: 4, respawn: 120 },
   ...REGIONS_PLAN.flatMap((r) => r.mats.nodes.map(([item]) => ({ biome: r.id, item, count: 7, respawn: 90 }))),
   ...REGIONS_PLAN.map((r) => ({ biome: r.id, item: r.mats.drop[0], count: 3, respawn: 120 })),
   ...REGIONS_PLAN.map((r) => ({ biome: r.id, item: 'cogumelo', count: r.id === 'raizes' ? 8 : 4, respawn: 120 })),
@@ -255,12 +258,31 @@ export const STRINGS = {
 export const SPEAKERS = { narrador: '' };
 export const BOSSES = [];        // { id, type, biome, act, kind, wakeFrom, mechanic }
 
+// ---- the prologue, outside the tree (levels 1-5): a guided start ----
+SPEAKERS.thalor = 'Thalor, o guia';
+STRINGS.FORA_1 = 'Você chegou, viajante. Aquele é Aetherion: um único carvalho, doze mil anos, um mundo inteiro dentro dele.';
+STRINGS.FORA_2 = 'Antes de entrar, aprenda a sobreviver aqui fora. Colete ervas, enfrente as criaturas da clareira e volte mais forte. Nível 5, e as raízes deixam você passar.';
+STRINGS.FORA_3 = 'Siga a trilha de luz no chão: ela sempre leva ao próximo objetivo.';
+STRINGS.FORA_G = 'A trilha de luz no chão mostra o caminho. Ervas curam, cogumelos matam a fome, e o barril enche o cantil.';
+DIALOGUES.thalor_chegada = { start: 'a', nodes: {
+  a: { speaker: 'thalor', line: 'FORA_1', next: 'b' },
+  b: { speaker: 'thalor', line: 'FORA_2', next: 'c' },
+  c: { speaker: 'thalor', line: 'FORA_3', choices: [{ text: 'OPT_SEGUIR', to: 'fim', do: { advance: true } }] },
+  fim: { end: true } } };
+DIALOGUES.thalor_geral = { start: 'a', nodes: { a: { speaker: 'thalor', line: 'FORA_G', next: 'fim' }, fim: { end: true } } };
+STAGES.push(
+  { id: 'fora_chegada', act: 0, region: 'fora', text: 'Fale com Thalor, o guia, no acampamento (siga a trilha de luz)', target: 'thalor', kind: 'talk' },
+  { id: 'fora_ervas', act: 0, region: 'fora', text: 'Colete 3 ervas medicinais perto do acampamento', target: 'node:erva', kind: 'collect', need: { erva: 3 } },
+  { id: 'fora_caca', act: 0, region: 'fora', text: 'Derrote 5 criaturas da clareira (clique ou Espaço para atacar)', target: 'mob:fora', kind: 'kill', need: { abate_fora: 5 } },
+  { id: 'fora_nivel', act: 0, region: 'fora', text: 'Alcance o nível 5: cace criaturas e abra o baú escondido', target: 'mob:fora', kind: 'level', need: { nivel: 5 } },
+);
+
 for (const [ri, r] of REGIONS_PLAN.entries()) {
   const P = r.id;
   SPEAKERS[r.npc.id] = r.npc.name;
   const L = (k, text) => { const id = `${P.toUpperCase()}_${k}`; STRINGS[id] = text; return id; };
   // 1. meet the community
-  STAGES.push({ id: `${P}_chegada`, act: r.act, region: P, text: ri === 0 ? `Fale com ${r.npc.name} na vila` : `Suba até ${REGION_NAMES[P]} e fale com ${r.npc.name}`, target: r.npc.id, kind: 'talk' });
+  STAGES.push({ id: `${P}_chegada`, act: r.act, region: P, text: ri === 0 ? `Entre na árvore por uma abertura entre as raízes e fale com ${r.npc.name}` : `Suba até ${REGION_NAMES[P]} e fale com ${r.npc.name}`, target: r.npc.id, kind: 'talk' });
   DIALOGUES[`${r.npc.id}_chegada`] = { start: 'a', nodes: {
     a: { speaker: r.npc.id, line: L('NPC1', r.npc.lines[0]), next: 'b' },
     b: { speaker: r.npc.id, line: L('NPC2', r.npc.lines[1]), choices: [{ text: 'OPT_SEGUIR', to: 'c' }] },
@@ -288,11 +310,14 @@ for (const [ri, r] of REGIONS_PLAN.entries()) {
       ...Object.fromEntries(options.map(([, , out], k) => [`o${k}`, { speaker: 'narrador', line: L(`${kind}_X${k}`, out), next: 'fim' }])),
       fim: { end: true } } };
   }
+  // 6. the seal to the next floor opens at level 10 x floor
+  if (ri < REGIONS_PLAN.length - 1) STAGES.push({ id: `${P}_nivel`, act: r.act, region: P, text: `Alcance o nível ${(ri + 1) * 10} para abrir o selo do próximo andar (cace criaturas, abra baús)`, target: `mob:${P}`, kind: 'level', need: { nivel: (ri + 1) * 10 } });
 }
 STAGES.push({ id: 'campanha_fim', act: 3, region: 'copa', text: 'A campanha terminou', target: null, kind: 'end' });
 export const stageIndex = (id) => STAGES.findIndex((s) => s.id === id);
 
 export function dialogueFor(npc, stage) {
+  if (npc === 'thalor') return stage === 'fora_chegada' ? 'thalor_chegada' : 'thalor_geral';
   const r = REGIONS_PLAN.find((x) => x.npc.id === npc);
   if (!r) return null;
   return stage === `${r.id}_chegada` ? `${npc}_chegada` : `${npc}_geral`;
@@ -331,7 +356,7 @@ export function validateCampaign() {
   }
   for (const st of STAGES) if (st.kind === 'talk') {
     const g = DIALOGUES[dialogueFor(st.target, st.id)];
-    if (!g || !Object.values(g.nodes).some((n) => n.do?.advance)) problems.push(`stage ${st.id}: never advanced`);
+    if (!g || !Object.values(g.nodes).some((n) => n.do?.advance || n.choices?.some((c) => c.do?.advance))) problems.push(`stage ${st.id}: never advanced`);
   }
   for (const b of BOSSES) if (!DIALOGUES[`${b.id}_rendido`]) problems.push(`boss ${b.id}: no yield dialogue`);
   if (FRAGMENTS.length !== 10) problems.push(`expected 10 fragments, found ${FRAGMENTS.length}`);
@@ -351,3 +376,99 @@ export function validateRecipes() {
   for (const st of STAGES) if (st.kind === 'craft') for (const item of Object.keys(st.need)) if (!RECIPES.some((r) => r.output === item)) problems.push(`stage ${st.id}: no recipe for ${item}`);
   return problems;
 }
+
+// ---------------------------------------------------------------- levels 1-100
+// Each place has a level band (classic MMO zoning): the clearing outside goes to 5, floor N to
+// 10 x N. XP stops at the band's top until you climb (the seal opens with that level and the
+// floor's guardian). Thresholds grow in linear steps (Game Developer, "Quantitative design: how
+// to define XP thresholds"): need(L) = 40 + 12 L, so level 99 -> 100 is 1228, never a wall.
+export const FLOOR_IDS = ['fora', ...REGIONS_PLAN.map((r) => r.id)];
+export const MAX_LEVEL = 100;
+export const levelCap = (region) => (region === 'fora' ? 5 : (FLOOR_IDS.indexOf(region)) * 10);
+export const xpNeed = (L) => 40 + 12 * L;
+// the XP a whole band takes; rewards are fractions of it, so every floor paces the same
+export function bandXp(region) {
+  const i = FLOOR_IDS.indexOf(region);
+  const from = i === 0 ? 1 : i === 1 ? 5 : (i - 1) * 10, to = levelCap(region);
+  let sum = 0;
+  for (let L = from; L < to; L++) sum += xpNeed(L);
+  return sum;
+}
+// what each action is worth, as a share of the floor's band (about: 40% quests and bosses,
+// 10% crafting and chests, the rest creatures, about 25-30 kills a floor)
+export const XP_SHARE = { object: 0.035, craft: 0.04, chest: 0.035, sub: 0.1, boss: 0.16, mob: 0.022, party: 0.25 };
+
+// ---------------------------------------------------------------- the five classes (manual, ch. 3)
+// stats are multipliers on the base explorer; `ranged` classes attack what the crosshair aims at
+export const CLASSES = {
+  guerreiro: { name: 'Guerreiro', title: 'Vanguarda do Tronco', role: 'Tanque e dano corpo a corpo',
+    hp: 1.4, dmg: 1.0, guard: 0.15, range: 3, cooldown: 0.5, crit: 0, dodgeCd: 0.9,
+    ability: { id: 'bastiao', name: 'Bastião Vivo', cd: 20, text: 'Por 6 s recebe 60% menos dano e empurra criaturas próximas.' },
+    look: { shirt: '#7a3a2a', pants: '#3a3a3a', hat: '#8a8a8a', gear: 'shield' }, color: '#ff8a5a' },
+  mago: { name: 'Mago', title: 'Tecelão da Seiva Arcana', role: 'Dano mágico à distância e controle',
+    hp: 0.8, dmg: 1.0, guard: 0, range: 2.6, reach: 24, cooldown: 0.6, crit: 0.03, dodgeCd: 0.7,
+    ability: { id: 'projetil', name: 'Projétil Elemental', cd: 10, text: 'Explosão no alvo da mira: 4x dano em tudo a 6 m.' },
+    look: { shirt: '#3a3a8a', pants: '#2a2a4a', hat: '#5a3a9a', gear: 'orb' }, color: '#9a8aff' },
+  sabio: { name: 'Sábio', title: 'Cartógrafo dos Ciclos', role: 'Suporte, cura e estratégia',
+    hp: 1.0, dmg: 0.85, guard: 0.05, range: 2.8, cooldown: 0.5, crit: 0, dodgeCd: 0.7, bossBonus: 0.2, regen: 2,
+    ability: { id: 'remedio', name: 'Remédio de Campo', cd: 18, text: 'Cura 40% da vida sua e de amigos a 15 m. Passiva: chefes levam +20% de dano.' },
+    look: { shirt: '#2a6a5a', pants: '#3a3a2a', hat: '#c9b07a', gear: 'book' }, color: '#7fe0b0' },
+  ladino: { name: 'Ladino', title: 'Sombra das Fendas', role: 'Dano de precisão e mobilidade',
+    hp: 0.9, dmg: 0.9, guard: 0, range: 2.4, cooldown: 0.32, crit: 0.13, dodgeCd: 0.4,
+    ability: { id: 'preciso', name: 'Golpe Preciso', cd: 8, text: 'O próximo golpe é crítico e causa 3x dano.' },
+    look: { shirt: '#2a2a2a', pants: '#1a1a1a', hat: '#3a2a3a', gear: 'daggers' }, color: '#c0c0d0' },
+  arqueiro: { name: 'Arqueiro', title: 'Vigia dos Galhos', role: 'Dano à distância e reconhecimento',
+    hp: 0.9, dmg: 0.95, guard: 0, range: 2.6, reach: 28, cooldown: 0.5, crit: 0.06, dodgeCd: 0.6,
+    ability: { id: 'chuva', name: 'Chuva dos Galhos', cd: 14, text: 'Chuva de flechas no alvo da mira: 2,5x dano em tudo a 8 m.' },
+    look: { shirt: '#4a6a2a', pants: '#3a3020', hat: '#5a7a3a', gear: 'bow' }, color: '#b0e07a' },
+};
+
+// ---------------------------------------------------------------- stories before each place
+// Shown once, before you set foot in a place (manual: premise, the ten guardians, each mission)
+export const STORIES = {
+  fora: { title: 'Aetherion, o Carvalho Colossal', lines: [
+    'Há um mundo que é uma árvore. Doze mil anos de idade, doze quilômetros de altura: raízes, casca, câmaras de lava e gelo, lagos, selvas e uma copa que toca as nuvens. Chamam esse carvalho de Aetherion.',
+    'Para se proteger, a árvore criou dez guardiões, um para cada função vital: a água, a casca, a filtragem, o calor, o frio, a cadeia alimentar, a reciclagem, os sinais, as junções e o coração. Por milênios eles mantiveram o equilíbrio.',
+    'Agora algo deu errado. Os rios das raízes secam, o calor sobe pelas câmaras, sinais falsos ecoam nos cristais. Os guardiões não enlouqueceram: cada um levou sua função ao extremo. Alguém precisa subir andar por andar e entender o que quebrou.',
+    'Você chegou à clareira aos pés do carvalho. Ainda não é forte o bastante para entrar. Aprenda aqui fora.'] },
+  raizes: { title: 'Floresta das Raízes', lines: [
+    'Sob o tronco, raízes do tamanho de montanhas formam vales, cavernas e rios subterrâneos. É aqui que a água entra na árvore, e é aqui que ela está sumindo.',
+    'A Vila das Raízes vive da água das nascentes. Os rios baixaram, a água ficou turva e os Lobos de Raiz rondam as casas. Os coletores que desceram às galerias não voltaram.',
+    'A Anciã Maela desconfia de algo nas galerias profundas, onde a Rainha das Raízes guarda os canais. A Rainha nasceu para isolar contaminações. O que ela está isolando agora?'] },
+  deserto: { title: 'Deserto da Casca', lines: [
+    'Acima das raízes, a casca do carvalho se abre em fissuras e plataformas queimadas de sol. Um deserto de madeira, onde a água vale mais que ouro.',
+    'Os oásis secaram e a caravana de Tarek está presa entre eles. Coletores somem perto das fendas, e o Escorpião-Rei do Sol caça nas horas mais quentes.',
+    'O Colosso da Casca existe para selar fissuras e proteger a árvore de fungos. Mas, se ele selou tudo, quem decide quais canais devem respirar?'] },
+  oceano: { title: 'Oceano Interior', lines: [
+    'Dentro do tronco há um mar. Uma cavidade gigante, impermeável, cheia de água que a árvore filtra há milênios para alimentar os andares de cima.',
+    'Os peixes sobem à superfície procurando ar. A água escurece, os filtros vivos estão entupidos e os pescadores de Ilian não reconhecem mais o lago.',
+    'No fundo, o Leviatã do Lago Profundo ataca qualquer barco. Ele protegia os filtros. Agora parece ferido por dentro.'] },
+  fornalha: { title: 'Fornalha de Ignar', lines: [
+    'Câmaras minerais guardam o calor geotérmico que mantém a árvore viva no inverno. Barreiras de obsidiana separam a lava da madeira.',
+    'Três barreiras racharam. Mineiros ficaram presos, as chaminés perderam o controle e o calor já toca a madeira viva. Sem proteção, você não aguenta muito aqui dentro.',
+    'Ignar, o Coração Incandescente, regula esse calor. Preso num ciclo de compensação, ele aquece cada vez mais, e cada câmara paga o preço.'] },
+  niveria: { title: 'Nivéria, o Reino Congelado', lines: [
+    'Acima do calor, o frio. Nivéria conserva a água da árvore em forma de gelo, para os anos de seca.',
+    'Os canais congelaram, a expedição de Sora se espalhou e as torres de ar estão bloqueadas. A Matriarca Branca protege a nascente com toda a matilha.',
+    'O Rei do Inverno Eterno nunca deixou de cumprir seu papel: conservar água. Ele só esqueceu de deixá-la correr.'] },
+  selva: { title: 'Selva dos Gigantes', lines: [
+    'Uma selva inteira cresce nas cavidades do tronco: árvores dentro da árvore, manadas, predadores, um ciclo de vida completo.',
+    'Faz dias que a manada não passa. As panteras caçam perto das aldeias, e algo enraizado bloqueia a rota migratória.',
+    'O Rei das Feras Antigas regula herbívoros e clareiras. Defende as rotas com violência, e talvez esteja certo em defendê-las.'] },
+  pantano: { title: 'Pântano da Decomposição', lines: [
+    'Tudo o que morre na árvore desce até aqui. Fungos e decompositores devolvem os nutrientes à vida. Sem o pântano, a árvore morre de fome.',
+    'O ar pesa de esporos e a água não corre. A vila de Doran respira gás, e a matéria morta se acumula em vez de voltar ao ciclo.',
+    'A Mãe da Decomposição recicla os nutrientes de toda a árvore. Ela parou de distribuir, e ninguém sabe por quê.'] },
+  cristais: { title: 'Reino dos Cristais', lines: [
+    'Galerias de cristal conduzem a energia e os sinais de Aetherion: é por aqui que as regiões conversam entre si.',
+    'As comunidades recebem mensagens que se contradizem. Cristais falsos ecoam frequências erradas e reguladores param de responder.',
+    'O Arquiteto Prismático conduz os sinais mágicos. Saturado, ele emite frequências falsas, e a árvore inteira ouve.'] },
+  suspensa: { title: 'Floresta Suspensa', lines: [
+    'Nos galhos altos, plataformas e pontes de cipó sustentam aldeias inteiras sobre o vazio. O vento é rei aqui.',
+    'As plataformas racham e um galho inteiro pode cair com as famílias em cima. A Guardiã dos Ventos ataca quem se aproxima dos ninhos.',
+    'O Dragão dos Sete Galhos protege as junções estruturais. Está preso a uma conexão defeituosa, e cada movimento dele faz a floresta tremer.'] },
+  copa: { title: 'Jardim da Copa', lines: [
+    'No topo do mundo, a copa capta a luz que alimenta a árvore inteira. Flores do tamanho de casas, polinizadores, e no centro, o coração mágico.',
+    'Os polinizadores sumiram e as folhas perdem força. Toda Aetherion recebe menos energia a cada dia.',
+    'No coração, o Devorador de Seiva consome energia demais, acreditando que assim protege a árvore. Os fragmentos que você trouxe dos nove guardiões vão decidir como essa história termina.'] },
+};

@@ -198,7 +198,7 @@ export function createWalker({ walkables, rootMeshes, rootSegs, noGo = [] }) {
 
   // dodge (game-feel): 0.32 s burst of 15 m/s toward where you were moving (backward when still),
   // with invulnerability for its whole length; 0.7 s cooldown
-  function dodge() {
+  function dodge(cooldown = DODGE.cooldown) {
     if (state.flying || dodgeCd > 0) return false;
     const sy = Math.sin(state.yaw), cy = Math.cos(state.yaw);
     let f = lastF, r = lastR;
@@ -206,7 +206,7 @@ export function createWalker({ walkables, rootMeshes, rootSegs, noGo = [] }) {
     const m = Math.hypot(f, r) || 1;
     dashX = (-sy * f + cy * r) / m; dashZ = (-cy * f - sy * r) / m;
     state.dodgeT = DODGE.time;
-    dodgeCd = DODGE.cooldown;
+    dodgeCd = cooldown;
     return true;
   }
   return { state, update, teleport, dodge, look, zoom, setFlying, applyToCamera, floorAt };

@@ -167,7 +167,7 @@ walk.camera = cameraCheck;
 // ---- 4b. combat: the staff hits a creature in front; creatures notice, chase and bite ----
 const fight = await page.evaluate(async () => {
   const O = window.__oliveira, C = O.combat.debug, W = O.walker;
-  O.startJourney(false);
+  O.startJourney(0);
   const m = C.mobs.find((x) => x.biome === 'raizes' && !x.boss);
   // stand 1.5 m from it, facing it
   const dx = 1.5;
@@ -191,7 +191,7 @@ const fight = await page.evaluate(async () => {
 // ---- 5. the whole campaign, floor 1 to floor 10, every stage through its own action ----
 const act = await page.evaluate(() => {
   const O = window.__oliveira, G = O.game, D = G.debug, C = O.combat.debug;
-  O.startJourney(false);
+  O.startJourney(0);
   const log = [];
   const item = (id) => { const it = D.items.find((i) => i.id === id); if (!it) throw new Error('missing ' + id); return it; };
   const use = (id) => { const it = item(id); if (!it.enabled()) throw new Error('disabled ' + id + ' at ' + G.state.stage); it.use(); };
@@ -256,6 +256,12 @@ const act = await page.evaluate(() => {
       checks[`equip_${region}`] = `${G.state.equip.weapon}/${G.state.equip.outfit}`;
     } else {
       const need = st.need ?? {};
+      // levels, kills and collects of the clearing and of the level gates are earned in play:
+      // the test sets what the explorer would have reached, then the game's own rules advance
+      if (st.kind === 'level') { G.state.level = Math.max(G.state.level, need.nivel); }
+      if (st.kind === 'kill') { G.state.count[Object.keys(need)[0]] = need[Object.keys(need)[0]]; }
+      if (st.kind === 'collect') { const [k, n] = Object.entries(need)[0]; G.state.inv[k] = Math.max(G.state.inv[k] ?? 0, n); }
+      if (st.kind === 'level' || st.kind === 'kill' || st.kind === 'collect') { tick(); log.push(`${before} -> ${G.state.stage}`); if (G.state.stage === before) { log.push('STUCK at ' + before); break; } continue; }
       const bossKey = Object.keys(need).find((k) => k.startsWith('boss_'));
       const groups = Object.entries(need).filter(([k]) => !k.startsWith('boss_') && k !== st.group);
       for (const [g, n] of groups) {
@@ -287,8 +293,9 @@ const act = await page.evaluate(() => {
   checks.chests = { opened: chestsOpened, bonus: G.state.bonus, maxHealth: G.maxHealth() };
   checks.juice = { banner: !!document.getElementById('hudBanner'), progressBar: !!document.getElementById('hudQBar') };
   const allYielded = Object.values(bosses).every((b) => b.yielded) && Object.keys(bosses).length === 20;
+  checks.levelCapOk = G.state.level <= 100;
   const ok = G.state.stage === 'campanha_fim' && misplaced.length === 0 && allYielded && endTitle.includes('Final B') && D.intact() === 10
-    && checks.gateWeak < checks.gateStrong * 0.25 && checks.benchShown !== undefined && checks.wrongOrder?.reset && checks.wrongOrder?.hurt && chestsOpened === 30 && (G.state.bonus.hp + G.state.bonus.dmg * 100) >= 5 * 6;
+    && checks.gateWeak < checks.gateStrong * 0.25 && checks.benchShown !== undefined && checks.wrongOrder?.reset && checks.wrongOrder?.hurt && chestsOpened === 31 && (G.state.bonus.hp + G.state.bonus.dmg * 100) >= 5 * 6;
   return { log, checks, bosses, misplaced, endTitle, ending, intact: D.intact(), level: G.state.level, equip: G.state.equip, ok };
 });
 

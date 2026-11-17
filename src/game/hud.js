@@ -19,11 +19,13 @@ export function createHud(root) {
       <div class="qbar" id="hudQBar" hidden><i id="hudQFill"></i><span id="hudQText"></span></div>
       <div class="guide" id="hudGuide"><span class="arrow" id="hudArrow">▲</span><span id="hudDist"></span><em id="hudHint"></em></div>
     </div>
+    <div class="hud-marker" id="hudMarker" hidden><i id="hudMarkerArrow"></i><span id="hudMarkerText"></span></div>
     <div class="hud-prompt" id="hudPrompt" hidden><kbd>E</kbd><span></span></div>
     <div class="hud-actions">
       <button type="button" id="hudUse" hidden>Interagir</button>
       <button type="button" id="hudAttack">Atacar</button>
       <button type="button" id="hudDodge">Esquivar (C)</button>
+      <button type="button" id="hudAbility">Habilidade (R)</button>
       <button type="button" id="hudDrink">Beber (Q)</button>
       <button type="button" id="hudBag" aria-expanded="false">Mochila (I)</button>
     </div>
@@ -44,13 +46,14 @@ export function createHud(root) {
     <div class="hud-end" id="hudEnd" hidden><div><h2 id="hudEndTitle">Fim do Ato I</h2><p id="hudEndText"></p><div class="row"><button type="button" id="hudEndNext" hidden></button><button type="button" id="hudEndOk">Continuar explorando</button></div></div></div>
   `;
   const $ = (id) => root.querySelector(`#${id}`);
-  let handlers = { interact() {}, drink() {}, useItem() {}, attack() {}, dodge() {}, craft() {}, equip() {} };
+  let handlers = { interact() {}, drink() {}, useItem() {}, attack() {}, dodge() {}, ability() {}, craft() {}, equip() {} };
   let choices = [];
   let lastState = null;
 
   $('hudUse').onclick = () => handlers.interact();
   $('hudAttack').onclick = () => handlers.attack();
   $('hudDodge').onclick = () => handlers.dodge();
+  $('hudAbility').onclick = () => handlers.ability();
   $('hudDrink').onclick = () => handlers.drink();
   $('hudBag').onclick = () => toggleBag();
   $('hudEndOk').onclick = () => { $('hudEnd').hidden = true; };
@@ -117,15 +120,21 @@ export function createHud(root) {
     bind(h) { handlers = h; },
     objective(text, act = 1, floor = 1, place = '') {
       $('hudObjective').textContent = text;
-      $('hudAct').textContent = `Ato ${['I', 'II', 'III'][act - 1] ?? 'I'} · Andar ${floor} de 10${place ? ` · ${place[0].toUpperCase()}${place.slice(1)}` : ''}`;
+      $('hudAct').textContent = floor === 0 ? 'Prólogo · Fora da árvore · Níveis 1-5' : `Ato ${['I', 'II', 'III'][act - 1] ?? 'I'} · Andar ${floor} de 10 · Níveis ${(floor - 1) * 10 || 5}-${floor * 10}`;
     },
     workbench: renderBench,
     // quest progress under the objective (3/3 springs...)
-    progress(done, total) {
+    // the class ability button: its name and the seconds left on its cooldown
+    ability(name, cooldown) {
+      const b = $('hudAbility');
+      b.textContent = cooldown > 0 ? `${name} · ${Math.ceil(cooldown)} s` : `${name} (R)`;
+      b.disabled = cooldown > 0;
+    },
+    progress(done, total, label) {
       $('hudQBar').hidden = !total || total < 2;
       if (!total) return;
       $('hudQFill').style.width = `${Math.round((done / total) * 100)}%`;
-      $('hudQText').textContent = `${done}/${total}`;
+      $('hudQText').textContent = label ?? `${done}/${total}`;
     },
     // big centred title for moments: a new floor, a guardian waking, a level up. Queued.
     banner(kicker, title, sub = '', tone = '') {
@@ -174,6 +183,18 @@ export function createHud(root) {
       $('hudArrow').style.transform = `rotate(${(-bearing * 180) / Math.PI}deg)`;
       $('hudDist').textContent = dist < 1000 ? `${Math.round(dist)} m` : `${(dist / 1000).toFixed(1).replace('.', ',')} km`;
       $('hudHint').textContent = hint ?? '';
+    },
+    // a small ping on the ground that fades (a friend marked this spot)
+    ping(text) { hud.toast(text, 'xp'); },
+    // the objective's marker: over the target when it is on screen, else an arrow on the edge
+    marker(x, y, onScreen, angle, dist) {
+      const m = $('hudMarker');
+      m.hidden = x === null || x === undefined;
+      if (m.hidden) return;
+      m.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+      m.classList.toggle('edge', !onScreen);
+      $('hudMarkerArrow').style.transform = onScreen ? '' : `rotate(${angle}rad)`;
+      $('hudMarkerText').textContent = dist < 1000 ? `${Math.round(dist)} m` : `${(dist / 1000).toFixed(1).replace('.', ',')} km`;
     },
     toast(msg, kind = '') {
       const t = document.createElement('div');
@@ -235,7 +256,20 @@ export function createHud(root) {
       if (next) { b.textContent = next.label; b.onclick = () => { $('hudEnd').hidden = true; next.run(); }; }
       $('hudEnd').hidden = false;
     },
-    reset() { close(); $('hudEnd').hidden = true; $('hudBench').hidden = true; toggleBag(false); $('hudToasts').innerHTML = ''; $('hudReveal').hidden = true; $('hudCombo').hidden = true; bannerQ.length = 0; },
+    // a story card: the place's history, read once before stepping into it
+    story(kicker, title, lines, done) {
+      const at = (id) => document.getElementById(id);
+      at('storyKicker').textContent = kicker;
+      at('storyTitle').textContent = title;
+      const body = at('storyBody');
+      body.innerHTML = '';
+      for (const l of lines) { const p = document.createElement('p'); p.textContent = l; body.append(p); }
+      const b = at('storyGo');
+      b.onclick = () => { at('story').hidden = true; done?.(); };
+      at('story').hidden = false;
+      b.focus({ preventScroll: true });
+    },
+    reset() { $('hudMarker').hidden = true; close(); $('hudEnd').hidden = true; $('hudBench').hidden = true; toggleBag(false); $('hudToasts').innerHTML = ''; $('hudReveal').hidden = true; $('hudCombo').hidden = true; document.getElementById('story').hidden = true; bannerQ.length = 0; },
   };
   return hud;
 }

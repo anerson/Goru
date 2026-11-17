@@ -8,23 +8,26 @@
 // objective. Game state lives in one plain object (`state`); meshes only show it.
 import * as THREE from 'three';
 import { mulberry32 } from '../noise.js';
-import { BIOMES, DISK_R, ENTRANCES, junctionAngle } from '../tree/layout.js';
+import { BIOMES, DISK_R, ENTRANCES, junctionAngle, APPROACH, LOOP_R, rampAt, TRUNK } from '../tree/layout.js';
 import { createCharacter } from '../character.js';
 import {
   REGIONS_PLAN, ITEMS, RECIPES, RESOURCES, STAGES, stageIndex, DIALOGUES, dialogueFor, SPEAKERS, STRINGS, BOSSES,
   NEEDS, FLASK, HAZARD_NAMES, BASE_WEAPON, weaponStats, FRAGMENTS, ENDINGS, guardianName, REGION_NAMES,
+  FLOOR_IDS, levelCap, xpNeed, bandXp, XP_SHARE, CLASSES, STORIES, MAX_LEVEL,
 } from './campaign_data.js';
 import { makeNode, makeObject, makeWorkbench, makeChest } from './looks.js';
 import { sfx, setAmbience } from '../audio.js';
 
-const SAVE_KEY = 'aetherion-campanha-v2';
+const SAVE_PREFIX = 'aetherion-v3-vaga-';   // one save per character slot (4 slots)
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const PLAN = Object.fromEntries(REGIONS_PLAN.map((r) => [r.id, r]));
 const ORDER = REGIONS_PLAN.map((r) => r.id);
 const ROMAN = ['I', 'II', 'III', 'IV'];
 
-function freshState() {
+function freshState(profile = {}) {
   return {
+    name: profile.name ?? 'Explorador', cls: profile.cls ?? 'guerreiro',
+    seen: {},                // stories already shown
     stage: STAGES[0].id,
     inv: {},                 // item id -> count
     flask: FLASK.capacity,   // sips left
@@ -32,7 +35,7 @@ function freshState() {
     health: 100, thirst: 100, hunger: 100,
     count: {},               // quest counters per group
     equip: { weapon: null, outfit: null },
-    camp: 'raizes',          // where you wake after fainting
+    camp: 'fora',            // where you wake after fainting
     xp: 0, level: 1,
     bonus: { hp: 0, dmg: 0 }, // permanent upgrades from legendary chests
     chestsSinceEpic: 0,
@@ -42,14 +45,20 @@ function freshState() {
 
 export function createGame({ scene, biomes, walker, hud, fx }) {
   const rand = mulberry32(777);
-  const h = (id, x, z) => biomes.terrains[id](x, z);
+  const h = (id, x, z) => (id === 'fora' ? 0 : biomes.terrains[id](x, z));
   let state = freshState();
   let dialogue = null;
   let ended = false;
   const levelY = Object.fromEntries(BIOMES.map((b) => [b.id, b.level]));
+  levelY.fora = 0;
+  let slot = 0;
+  let sealsOn = false;
 
   // ---- placement: everything sits on or beside a trail, so it is reachable ----
-  const lines = biomes.paths;
+  // the clearing outside: the approach trail, the ring trail around the tree, the way in
+  const lines = { ...biomes.paths };
+  const ray = (a, r0, r1, n = 60) => Array.from({ length: n + 1 }, (_, k) => { const r = r0 + (r1 - r0) * (k / n); return { x: Math.cos(a) * r, z: Math.sin(a) * r }; });
+  lines.fora = [ray(APPROACH.angle, 1000, LOOP_R + 2), Array.from({ length: 241 }, (_, k) => ({ x: Math.cos((k / 240) * Math.PI * 2) * LOOP_R, z: Math.sin((k / 240) * Math.PI * 2) * LOOP_R })), ray(ENTRANCES[0], LOOP_R, 100, 50)];
   const loopOf = (id) => (id === 'raizes' ? 1 : 4);
   const plazaOf = (id) => (id === 'raizes' ? 2 : 5);
   function along(id, li, frac, side = 0) {
@@ -145,6 +154,17 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     mirror: 'Ativar o refletor', brace: 'Instalar a escora', sail: 'Armar a vela', flower: 'Restaurar as flores',
   };
 
+  // the clearing's camp: Thalor the guide, a fire, a water barrel
+  {
+    const L = 'fora', f = (1000 - 600) / (1000 - LOOP_R - 2);
+    camps.fora = spot(L, 0, f, 0);
+    tent(spot(L, 0, f - 0.01, 9), 0.6); tent(spot(L, 0, f + 0.012, -10), 2.1);
+    fire(spot(L, 0, f, 4));
+    villager('thalor', spot(L, 0, f + 0.004, -3.5), { shirt: '#5a4a2a', pants: '#3a3020', hat: '#7a5a2a', skin: '#a87a58' });
+    const barrel = spot(L, 0, f - 0.006, -5);
+    put(makeObject('barrel').root, barrel);
+    add({ id: 'agua_fora', kind: 'water', pos: barrel.clone().setY(barrel.y + 1), radius: 3, label: () => 'Beber e encher o cantil', use: () => water() });
+  }
   for (const [ri, r] of REGIONS_PLAN.entries()) {
     const L = r.id, lo = loopOf(L), pl = plazaOf(L);
     // the camp: tents, fire, the community's speaker, a water barrel and the workbench
@@ -209,6 +229,13 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   // reward: common (the floor's materials), rare (a potion and the creatures' material) or
   // legendary (a permanent upgrade). A legendary is guaranteed within every 6 chests.
   const chests = [];
+  {
+    const p = spot('fora', 1, 0.62, 14);
+    const c = makeChest();
+    put(c.root, p);
+    chests.push({ id: 'bau_fora_0', c });
+    add({ id: 'bau_fora_0', kind: 'chest', pos: p.clone().setY(p.y + 1), radius: 3, label: () => 'Abrir o baú', enabled: () => !state.flags.bau_fora_0, use: () => openChest('bau_fora_0', PLAN.raizes, -1, p) });
+  }
   for (const [ri, r] of REGIONS_PLAN.entries()) {
     [[0.49, 11], [0.69, -11], [0.97, 11]].forEach(([f, side], k) => {
       const p = spot(r.id, loopOf(r.id), f, side);
@@ -230,7 +257,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     chests.find((x) => x.id === id)?.c.open(true);
     const roll = rand();
     const epic = roll < 0.14 || (state.chestsSinceEpic ?? 0) >= 5;
-    gainXp(20 + ri * 10);
+    gainXp(xpFor('chest', ri < 0 ? 'fora' : r.id));
     sfx('chest');
     if (epic) {
       state.chestsSinceEpic = 0;
@@ -276,7 +303,16 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   const weaponDef = () => (state.equip.weapon && ITEMS[state.equip.weapon]?.weapon) || BASE_WEAPON;
   const outfitDef = () => (state.equip.outfit && ITEMS[state.equip.outfit]?.outfit) || null;
   let weaponCache = null;
-  const weapon = () => { const w = weaponDef(); if (weaponCache?.id !== w.id) weaponCache = { id: w.id, stats: weaponStats(w) }; return weaponCache.stats; };
+  // the weapon's stats shaped by the class: reach for Mago and Arqueiro, speed and crits for the
+  // Ladino, range for the Guerreiro
+  const weapon = () => {
+    const w = weaponDef(), c = cls(), k = `${w.id}/${state.cls}`;
+    if (weaponCache?.id !== k) {
+      const base = weaponStats(w);
+      weaponCache = { id: k, stats: { ...base, range: c.range + Math.min(1, w.tier * 0.1), reach: c.reach ?? 0, ranged: !!c.reach, cooldown: c.cooldown, crit: c.crit, color: c.reach ? c.color : base.color } };
+    }
+    return weaponCache.stats;
+  };
   const gearHooks = [];
   function equip(id) {
     const it = ITEMS[id];
@@ -289,12 +325,24 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   function applyGear() { gearHooks.forEach((f) => f(weaponDef(), outfitDef())); }
 
   // ---------- levels ----------
-  const xpNeed = (L) => Math.round(60 * L ** 1.35);
-  const maxHealth = () => 100 + 10 * (state.level - 1) + (state.bonus?.hp ?? 0);
-  const power = () => (1 + 0.05 * (state.level - 1)) * (1 + (state.bonus?.dmg ?? 0));
+  // levels 1-100: the current place's band caps them (outside 5, floor N 10 x N)
+  const cls = () => CLASSES[state.cls] ?? CLASSES.guerreiro;
+  const maxHealth = () => Math.round((100 + 2.5 * (state.level - 1)) * cls().hp + (state.bonus?.hp ?? 0));
+  const power = () => (1 + 0.012 * (state.level - 1)) * (1 + (state.bonus?.dmg ?? 0)) * cls().dmg;
+  const capNow = () => Math.min(MAX_LEVEL, levelCap(stage().region));
+  let partyNear = false, capToast = 0;
+  // an action's XP as a share of the floor's band, so every floor paces the same
+  const xpFor = (what, region = stage().region) => Math.max(1, Math.round(bandXp(region) * XP_SHARE[what]));
   function gainXp(n) {
+    if (partyNear) n *= 1 + XP_SHARE.party;
+    if (state.level >= capNow()) {
+      state.xp = Math.min(xpNeed(state.level), state.xp + Math.round(n));
+      if (performance.now() > capToast) { capToast = performance.now() + 20000; hud.toast(`Nível máximo deste lugar (${capNow()}). Derrote o guardião e suba para continuar evoluindo.`, 'xp'); }
+      return;
+    }
+    hud.toast(`+${Math.round(n)} XP${partyNear ? ' (bônus de grupo)' : ''}`, 'xp');
     state.xp += Math.round(n);
-    while (state.xp >= xpNeed(state.level)) {
+    while (state.xp >= xpNeed(state.level) && state.level < capNow()) {
       state.xp -= xpNeed(state.level);
       state.level++;
       state.health = maxHealth();
@@ -306,7 +354,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
 
   // =================== rules ===================
   const stage = () => STAGES[stageIndex(state.stage)];
-  const regionIndex = () => ORDER.indexOf(stage().region) + 1;
+  const regionIndex = () => ORDER.indexOf(stage().region) + 1;   // 0 = the clearing outside
   const showObjective = () => hud.objective(stage().text, stage().act, regionIndex(), REGION_NAMES[stage().region]);
   function advance() {
     const i = stageIndex(state.stage);
@@ -314,13 +362,15 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     const st = stage();
     if (st.region !== STAGES[i].region || st.kind === 'talk') state.camp = STAGES[i].region;
     showObjective();
-    sfx(st.region !== STAGES[i].region ? 'floor' : 'objective');
-    if (st.region !== STAGES[i].region && st.kind !== 'end') floorBanner();
-    hud.toast(st.region !== STAGES[i].region && st.kind !== 'end' ? `Andar ${regionIndex()} de 10: ${REGION_NAMES[st.region]}` : 'Novo objetivo');
+    const newPlace = st.region !== STAGES[i].region && st.kind !== 'end';
+    sfx(newPlace ? 'floor' : 'objective');
+    if (newPlace) tellStory(st.region, () => hud.banner('Selo aberto', `${REGION_NAMES[st.region].replace(/^(a|o) /, '')[0].toUpperCase()}${REGION_NAMES[st.region].replace(/^(a|o) /, '').slice(1)}`, 'Siga a trilha de luz até a entrada', 'level'));
+    else hud.toast('Novo objetivo');
     save();
     if (st.kind === 'end') finish();
   }
   function floorBanner() {
+    if (stage().region === 'fora') { hud.banner('Prólogo', 'Clareira de Aetherion', 'Chegue ao nível 5 para entrar na árvore'); return; }
     const r = PLAN[stage().region];
     const name = REGION_NAMES[r.id].replace(/^(a|o) /, '');
     hud.banner(`Andar ${regionIndex()} de 10`, name[0].toUpperCase() + name.slice(1), `Missão: ${r.mission}`);
@@ -336,6 +386,8 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   function stageProgress() {
     const st = stage();
     if (st.kind === 'craft') return [Object.keys(st.need).filter((k) => state.inv[k]).length, Object.keys(st.need).length];
+    if (st.kind === 'level') return [Math.round(state.xp / xpNeed(state.level) * 100), 100, `Nível ${state.level}/${st.need.nivel}`];
+    if (st.kind === 'kill' || st.kind === 'collect') { const [k, n] = Object.entries(st.need)[0]; return [Math.min(n, (ITEMS[k] ? state.inv[k] : state.count[k]) ?? 0), n]; }
     const g = st.kind === 'group' ? st.target : st.group;
     if (!g) return [0, 0];
     const n = st.need[g] ?? 3;
@@ -348,6 +400,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     if (!n) return false;
     return Object.entries(n).every(([k, v]) => {
       if (k.startsWith('boss_')) return !!state.flags[k];
+      if (k === 'nivel') return state.level >= v;
       if (ITEMS[k]) return (state.inv[k] ?? 0) >= v;
       return (state.count[k] ?? 0) >= v;
     });
@@ -415,7 +468,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     // a new weapon or outfit is put on at once when it is better than what is worn
     if (it.weapon && it.weapon.tier > weaponDef().tier) equip(rc.output);
     if (it.outfit && it.outfit.guard > (outfitDef()?.guard ?? 0)) equip(rc.output);
-    gainXp(10 + 6 * ORDER.indexOf(rc.region ?? 'raizes'));
+    gainXp(xpFor('craft'));
     if (benchOpen) openBench(benchOpen);
     return true;
   }
@@ -453,7 +506,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     objects.find((o) => o.flag === flag)?.done(true);
     const it = items.find((x) => x.id === flag);
     if (it) fx?.quest(it.pos.clone().setY(it.pos.y - 0.5));
-    gainXp(12 + ri * 4);
+    gainXp(xpFor('object'));
     sfx('quest');
     const line = def.done ? `${def.done} (${n + 1}/${def.count})` : `${def.label ?? LABELS[def.look]}: ${n + 1}/${def.count}`;
     if (def.look === 'station' || def.look === 'bones' || def.look === 'rescue') hud.message(line); else hud.toast(line);
@@ -491,8 +544,9 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   }
 
   // ---- guidance: the next place to walk toward, through the ramp if it is on another level ----
+  const FORA = { id: 'fora', level: 0, name: 'Clareira de Aetherion' };
   function levelOf(y, r) {
-    if (r > DISK_R + 25) return null;
+    if (r > DISK_R + 25) return y < 30 ? FORA : null;
     let best = null;
     for (const b of BIOMES) if (y > b.level - 1.5 && y < b.level + 26) best = b;
     return best;
@@ -519,6 +573,15 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
         if (node) return node.pos;
       }
     }
+    if (st.target.startsWith('node:')) {
+      const it = nearestOf((x) => x.kind === 'resource' && x.id.startsWith(`node_${st.region}_${st.target.slice(5)}_`));
+      if (it) return it.pos;
+    }
+    if (st.target.startsWith('mob:')) {
+      // the nearest living creature of this place (combat tells), else the camp
+      const m = mobFinder?.(st.target.slice(4));
+      return m ?? camps[st.region] ?? null;
+    }
     const group = st.kind === 'group' ? st.target : st.group;
     if (group) { const it = nearestOf((x) => x.group === group); if (it) return it.pos; }
     return items.find((i) => i.id === st.target)?.pos ?? null;
@@ -529,7 +592,12 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     if (!tp) return null;
     const me = walker.state, r = Math.hypot(me.x, me.z);
     const here = levelOf(me.feet, r), there = levelOf(tp.y - 1, Math.hypot(tp.x, tp.z));
-    if (!here) {
+    if (here?.id === 'fora' && there?.id === 'fora') return { pos: tp, hint: null };
+    if (here && here.id !== 'fora' && there?.id === 'fora') {
+      const a = ENTRANCES[0];
+      return { pos: way.set(Math.cos(a) * 110, 0, Math.sin(a) * 110), hint: 'Saia da árvore pela abertura entre as raízes' };
+    }
+    if (!here || here.id === 'fora') {
       let best = ENTRANCES[0], bd = Infinity;
       for (const a of ENTRANCES) { const d = Math.hypot(Math.cos(a) * 100 - me.x, Math.sin(a) * 100 - me.z); if (d < bd) { bd = d; best = a; } }
       return { pos: way.set(Math.cos(best) * 96, 0, Math.sin(best) * 96), hint: 'Entre no tronco por uma das aberturas entre as raízes' };
@@ -545,10 +613,39 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
 
   // =================== per-frame ===================
   let saveTimer = 0, hazardToast = 0;
+  // the light trail on the ground: glowing dots from the explorer toward the next objective,
+  // only where the floor is walkable (so it never shows through a wall or over water)
+  const TRAIL_N = 22;
+  const trailMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.2, 10, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffe9a0').multiplyScalar(2), transparent: true, opacity: 0.9, depthWrite: false }), TRAIL_N);
+  trailMesh.frustumCulled = false;
+  scene.add(trailMesh);
+  const tm4 = new THREE.Matrix4(), tq = new THREE.Quaternion(), tsc = new THREE.Vector3(), tpos = new THREE.Vector3();
+  let targetNow = null;
+  function updateTrail(me, goal, t) {
+    const hide = (k) => { tsc.setScalar(0.0001); tm4.compose(tpos.set(0, -999, 0), tq, tsc); trailMesh.setMatrixAt(k, tm4); };
+    if (!goal) { for (let k = 0; k < TRAIL_N; k++) hide(k); trailMesh.instanceMatrix.needsUpdate = true; return; }
+    const dx = goal.x - me.x, dz = goal.z - me.z, len = Math.hypot(dx, dz) || 1;
+    for (let k = 0; k < TRAIL_N; k++) {
+      const d = Math.min(len, 2.4 * (k + 1));
+      const x = me.x + (dx / len) * d, z = me.z + (dz / len) * d;
+      const fl = walker.floorAt(x, z, me.feet);
+      const ok = d < len && Math.abs(fl - me.feet) < 2.5 && !biomes.noGo.some((f) => f(x, z, fl)) && !blockedAt(x, z, fl);
+      if (!ok) { hide(k); continue; }
+      const pulse = 0.85 + 0.25 * Math.sin(t * 4 - k * 0.45);
+      tsc.setScalar(pulse * (0.7 + 0.3 * (1 - k / TRAIL_N)));
+      tm4.compose(tpos.set(x, fl + 0.12, z), tq, tsc);
+      trailMesh.setMatrixAt(k, tm4);
+    }
+    trailMesh.instanceMatrix.needsUpdate = true;
+  }
+  // the objective's world point for the screen marker (main.js projects it)
+  const targetPoint = () => targetNow;
+  let mobFinder = null;
   let current = null;
   function update(dt, t, { running, flying, camYaw }) {
     flames.forEach((f, i) => { f.scale.y = 1 + Math.sin(t * 9 + i) * 0.15; });
     for (const ch of chests) ch.c.pulse(t);
+    updateSeals(t);
     hud.progress(...stageProgress());
     for (const n of nodes) if (n.timer > 0) { n.timer -= dt; if (n.timer <= 0) n.mesh.visible = true; }
     const me = walker.state;
@@ -560,7 +657,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     const here = levelOf(me.feet, Math.hypot(me.x, me.z));
     setAmbience(here?.id ?? 'fora');
 
-    if (!dialogue) {
+    if (!dialogue && !storyOpen) {
       // needs drain on the game clock
       const k = flying ? NEEDS.flyFactor : running ? NEEDS.runFactor : 1;
       if (cheats.frozenNeeds) { state.thirst = 100; state.hunger = 100; }
@@ -569,7 +666,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
         state.hunger = Math.max(0, state.hunger - NEEDS.hungerPerSec * dt);
       }
       if (state.thirst <= 0 || state.hunger <= 0) state.health = Math.max(0, state.health - NEEDS.starvePerSec * dt * ((state.thirst <= 0) + (state.hunger <= 0)));
-      else if (state.thirst > 50 && state.hunger > 50) state.health = Math.min(maxHealth(), state.health + NEEDS.regenPerSec * dt);
+      else if (state.thirst > 50 && state.hunger > 50) state.health = Math.min(maxHealth(), state.health + NEEDS.regenPerSec * (cls().regen ?? 1) * dt);
       // heat, cold or spores: the region's outfit protects; the camp is always safe
       const hz = here && PLAN[here.id]?.hazard;
       hazardToast -= dt;
@@ -595,6 +692,8 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
 
     const wp = waypoint();
     const tp = targetPos();
+    targetNow = tp;
+    updateTrail(me, wp ? wp.pos : tp, t);
     beacon.visible = !!tp;
     if (tp) { beacon.position.set(tp.x, tp.y - 1.2, tp.z); ring.scale.setScalar(1 + Math.sin(t * 3) * 0.12); beam.material.opacity = 0.25 + Math.sin(t * 3) * 0.1; }
     if (wp) {
@@ -612,7 +711,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   const cheats = { invulnerable: false, frozenNeeds: false };
   function hurt(n) {
     if (cheats.invulnerable) return;
-    state.health = Math.max(0, state.health - n * (1 - (outfitDef()?.guard ?? 0)));
+    state.health = Math.max(0, state.health - n * (1 - Math.min(0.65, (outfitDef()?.guard ?? 0) + cls().guard)));
     hud.hurt();
     if (state.health <= 0) faint();
   }
@@ -632,12 +731,13 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     hud.reveal(how === 'destruir' ? 'Fragmento rachado' : 'Fragmento do Coração', ITEMS[fid].name, [ITEMS[fid].fragment, `Fragmentos: ${held()}/10 · intactos ${intact()}/10`], how === 'destruir' ? '#a8a8a8' : '#9dffcf');
   }
   // killed outright (no yield, e.g. by the GM's staff): counts as destroying it
-  function bossDefeated(id) {
+  function bossDefeated(id, remote = false) {
     if (state.flags[`boss_${id}`]) return;
     state.flags[`boss_${id}`] = true;
     state.flags[`escolha_${id}`] = state.flags[`escolha_${id}`] ?? 'destruir';
-    hud.message(`${bossName(id)} caiu.`);
+    hud.message(remote ? `Um amigo derrotou ${bossName(id)}.` : `${bossName(id)} caiu.`);
     fragmentOf(id, 'destruir');
+    if (!remote) bossEvents.forEach((f) => f(id, 'destruir'));
     save();
   }
   // the boss yields: the player decides its fate in a conversation
@@ -647,12 +747,15 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     goto(dialogue.graph.start);
   }
   const outcomeHooks = [];
-  const BOSS_XP = {};
-  function resolveBoss(id, how) {
+  const bossEvents = [];          // told to the party when this player decides a guardian's fate
+  function resolveBoss(id, how, remote = false) {
+    if (state.flags[`boss_${id}`]) return;
     state.flags[`boss_${id}`] = true;
     state.flags[`escolha_${id}`] = how;
     outcomeHooks.forEach((f) => f(id, how));
-    if (how !== 'destruir') gainXp(BOSS_XP[id] ?? 200);
+    if (remote) hud.toast(`Um amigo ${how === 'destruir' ? 'destruiu' : 'restaurou'} ${bossName(id)}.`, 'xp');
+    else bossEvents.forEach((f) => f(id, how));
+    if (how !== 'destruir') gainXp(xpFor(bossList.find((b) => b.id === id)?.kind === 'sub' ? 'sub' : 'boss'));
     fragmentOf(id, how);
     save();
   }
@@ -685,57 +788,157 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     spawnAtCamp();
   }
   function spawnAtCamp() {
-    const L = state.camp ?? 'raizes';
-    const p = spot(L, loopOf(L), 0.1, 6);
-    const m = npcs[PLAN[L].npc.id].pos;
+    const L = state.camp ?? 'fora';
+    const p = L === 'fora' ? camps.fora.clone().add(V(Math.cos(APPROACH.angle) * 7, 0, Math.sin(APPROACH.angle) * 7)) : spot(L, loopOf(L), 0.1, 6);
+    if (L === 'fora') p.y = walker.floorAt(p.x, p.z, 20);
+    const m = npcs[L === 'fora' ? 'thalor' : PLAN[L].npc.id].pos;
     walker.teleport({ x: p.x, z: p.z, feet: p.y, yaw: Math.atan2(-(m.x - p.x), -(m.z - p.z)), pitch: -0.15 });
   }
 
-  // ---- save / load (per-viewer convenience: wrapped in try/catch, game works without it) ----
+  // ---- four character slots, each with its own save (per-viewer convenience: wrapped in
+  // try/catch; the game works without storage, progress then lasts for this visit) ----
+  const key = (n) => `${SAVE_PREFIX}${n}`;
   function save() {
     try {
       const me = walker.state;
       state.pos = { x: me.x, z: me.z, feet: me.feet, yaw: me.yaw };
-      localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+      localStorage.setItem(key(slot), JSON.stringify(state));
     } catch { /* storage unavailable */ }
   }
-  function hasSave() { try { return !!localStorage.getItem(SAVE_KEY); } catch { return false; } }
-  function load() {
-    try {
-      const s = JSON.parse(localStorage.getItem(SAVE_KEY));
-      if (s && STAGES.some((x) => x.id === s.stage)) { state = { ...freshState(), ...s }; return true; }
-    } catch { /* new game */ }
-    return false;
+  function readSlot(n) {
+    try { const s = JSON.parse(localStorage.getItem(key(n))); return s && STAGES.some((x) => x.id === s.stage) ? s : null; } catch { return null; }
   }
-  function start(continueGame) {
+  // what the title screen shows for each slot
+  function profiles() {
+    return [0, 1, 2, 3].map((n) => {
+      const s = readSlot(n);
+      if (!s) return null;
+      const st = STAGES[stageIndex(s.stage)];
+      return { name: s.name, cls: s.cls, level: s.level, place: st.region === 'fora' ? 'Fora da árvore' : `Andar ${ORDER.indexOf(st.region) + 1}`, done: st.kind === 'end' };
+    });
+  }
+  function deleteSlot(n) { try { localStorage.removeItem(key(n)); } catch { /* ignore */ } }
+  // start the slot: a new character when `profile` is given, else continue its save
+  function start(n = 0, profile = null) {
+    slot = n;
     ended = false;
     dialogue = null;
     benchOpen = null;
     hud.workbench(null);
-    if (!(continueGame && load())) {
-      state = freshState();
-      try { localStorage.removeItem(SAVE_KEY); } catch { /* ignore */ }
-    }
+    const saved = profile ? null : readSlot(n);
+    state = saved ? { ...freshState(), ...saved } : freshState(profile ?? {});
+    if (!saved) { save(); }
     applyWorld();
     showObjective();
     hud.inventory(state);
     hud.closeDialogue();
-    if (continueGame && state.pos) walker.teleport({ x: state.pos.x, z: state.pos.z, feet: state.pos.feet, yaw: state.pos.yaw, pitch: -0.15 });
+    if (saved && state.pos) walker.teleport({ x: state.pos.x, z: state.pos.z, feet: state.pos.feet, yaw: state.pos.yaw, pitch: -0.15 });
     else spawnAtCamp();
     if (stage().kind === 'end') finish();
-    else floorBanner();
+    else tellStory(stage().region, floorBanner);
+  }
+
+  // ---- the story card before each place, shown once per character ----
+  let storyOpen = false;
+  function tellStory(region, then) {
+    const st = STORIES[region];
+    if (!st || state.seen?.[region]) { then?.(); return; }
+    state.seen = { ...(state.seen ?? {}), [region]: true };
+    storyOpen = true;
+    const kicker = region === 'fora' ? 'Prólogo' : `Andar ${ORDER.indexOf(region) + 1} de 10`;
+    hud.story(kicker, st.title, st.lines, () => { storyOpen = false; save(); then?.(); });
+  }
+
+  // ---- the seals: outside until level 5; floor N+1 needs level 10 x N and floor N's guardian ----
+  function openFloors() {
+    if (state.level < 5) return 0;
+    let n = 1;
+    for (let i = 0; i < REGIONS_PLAN.length - 1; i++) {
+      if (state.flags[`boss_${REGIONS_PLAN[i].boss.type}`] && state.level >= (i + 1) * 10) n++;
+      else break;
+    }
+    return n;
+  }
+  function sealReason(n) {   // why floor n (1-based) is still sealed
+    if (n === 1) return `Selo das raízes: alcance o nível 5 (você está no ${state.level})`;
+    const r = REGIONS_PLAN[n - 2];
+    const need = [];
+    if (state.level < (n - 1) * 10) need.push(`nível ${(n - 1) * 10} (você está no ${state.level})`);
+    if (!state.flags[`boss_${r.boss.type}`]) need.push(`vencer ${guardianName(r.boss.type)}`);
+    return `Selo de ${REGION_NAMES[REGIONS_PLAN[n - 1].id].replace(/^(a|o) /, '')}: falta ${need.join(' e ')}`;
+  }
+  // can the explorer step onto (x, z) at floor height fl? returns null or the reason
+  function blockedAt(x, z, fl) {
+    if (!sealsOn) return null;                 // free exploration (Explorar livremente) ignores them
+    const open = openFloors();
+    const r = Math.hypot(x, z);
+    if (open === 0 && r < 104) return sealReason(1);                       // the trunk's mouth
+    if (open < 10 && r > 58 && r < 84 && fl >= BIOMES[open].level - 1) return sealReason(open + 1);  // the ramp up to the locked floor
+    return null;
+  }
+  // seal visuals: a glowing rune wall across the ramp above each locked floor, and rings at the
+  // tree's entrances while the outside is not done
+  const sealMat = new THREE.MeshBasicMaterial({ color: '#ffb347', transparent: true, opacity: 0.35, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
+  const seals = [];
+  for (let n = 2; n <= 10; n++) {
+    const y = BIOMES[n - 2].level + 16, { a } = rampAt(y / 300);
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(9, 6), sealMat);
+    wall.position.set(Math.cos(a) * 70, y + 3, Math.sin(a) * 70);
+    wall.lookAt(wall.position.x - Math.sin(a), wall.position.y, wall.position.z + Math.cos(a));
+    scene.add(wall);
+    label(`Selo · nível ${(n - 1) * 10}`, wall.position.clone().setY(y + 7), '#ffcf8a');
+    seals.push({ n, wall });
+  }
+  for (const a of ENTRANCES) {
+    const ringM = new THREE.Mesh(new THREE.TorusGeometry(9, 0.25, 8, 48), sealMat);
+    ringM.position.set(Math.cos(a) * 102, 6, Math.sin(a) * 102);
+    ringM.rotation.y = -a;
+    scene.add(ringM);
+    seals.push({ n: 1, wall: ringM });
+  }
+  function updateSeals(t) {
+    const open = openFloors();
+    for (const s of seals) s.wall.visible = s.n > open;
+    sealMat.opacity = 0.25 + Math.sin(t * 2) * 0.1;
+  }
+
+  // every kill: XP as a share of the place's band, and kill counters for objectives
+  function onKill(biome, bossId) {
+    if (bossId) { gainXp(xpFor(bossList.find((b) => b.id === bossId)?.kind === 'sub' ? 'sub' : 'boss', biome)); return; }
+    state.count[`abate_${biome}`] = (state.count[`abate_${biome}`] ?? 0) + 1;
+    gainXp(xpFor('mob', biome));
   }
 
   applyWorld();
 
   return {
     get state() { return state; },
-    get busy() { return !!dialogue; },
+    get busy() { return !!dialogue || storyOpen; },
+    profiles, deleteSlot, openFloors, blockedAt, onKill, tellStory,
+    get cls() { return cls(); },
+    setMobFinder: (f) => { mobFinder = f; },
+    onBossEvent: (f) => bossEvents.push(f),
+    // a friend decided a guardian's fate: the same outcome here, without the conversation
+    remoteBoss(id, how) {
+      if (!bossList.some((b) => b.id === id) || state.flags[`boss_${id}`]) return;
+      if (how === 'destruir') bossDefeated(id, true); else resolveBoss(id, how, true);
+      save();
+    },
+    // what the party sees of this player (display data for the group)
+    partySnapshot() {
+      const r = stage().region;
+      return { name: state.name, cls: state.cls, level: state.level, place: r, hp: Math.round((state.health / maxHealth()) * 100) };
+    },
+    setPartyNear(n) { partyNear = n > 0; },
+    setSeals(on) { sealsOn = !!on; },
+    set partyNear(v) { partyNear = v; },
+    get partyNear() { return partyNear; },
+    healPct(p) { state.health = Math.min(maxHealth(), state.health + maxHealth() * p); },
+    get slot() { return slot; },
     interact() { if (!dialogue && current) current.use(); },
-    update, drink, useItem, equip, craft, start, hasSave, save, hurt, loot, bossDefeated, bossYield, cheats, gainXp, bossList,
+    update, drink, useItem, equip, craft, start, save, targetPoint, hurt, loot, bossDefeated, bossYield, cheats, gainXp, bossList,
     power, maxHealth, weapon, bossRules, lairs, camps, weaponDef, outfitDef,
     bossTier: (id) => ORDER.indexOf(bossList.find((b) => b.id === id)?.biome) + 1,
-    setBossXp: (id, xp) => { BOSS_XP[id] = xp; },
     onGear: (f) => { gearHooks.push(f); f(weaponDef(), outfitDef()); },
     onBossOutcome: (f) => outcomeHooks.push(f),
     bossChoice: (id) => state.flags[`escolha_${id}`] ?? null,
