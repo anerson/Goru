@@ -166,8 +166,9 @@ walk.camera = cameraCheck;
 
 // ---- 4b. combat: the staff hits a creature in front; creatures notice, chase and bite ----
 const fight = await page.evaluate(async () => {
+  const closeStory = () => { const e = document.getElementById('story'); if (e && !e.hidden) document.getElementById('storyGo').click(); };
   const O = window.__oliveira, C = O.combat.debug, W = O.walker;
-  O.startJourney(0);
+  O.startJourney(0); closeStory();
   const m = C.mobs.find((x) => x.biome === 'raizes' && !x.boss);
   // stand 1.5 m from it, facing it
   const dx = 1.5;
@@ -190,14 +191,15 @@ const fight = await page.evaluate(async () => {
 
 // ---- 5. the whole campaign, floor 1 to floor 10, every stage through its own action ----
 const act = await page.evaluate(() => {
+  const closeStory = () => { const e = document.getElementById('story'); if (e && !e.hidden) document.getElementById('storyGo').click(); };
   const O = window.__oliveira, G = O.game, D = G.debug, C = O.combat.debug;
-  O.startJourney(0);
+  O.startJourney(0); closeStory();
   const log = [];
   const item = (id) => { const it = D.items.find((i) => i.id === id); if (!it) throw new Error('missing ' + id); return it; };
   const use = (id) => { const it = item(id); if (!it.enabled()) throw new Error('disabled ' + id + ' at ' + G.state.stage); it.use(); };
   const useGroup = (g, n) => { const list = D.items.filter((i) => i.group === g && i.kind === 'quest' && i.enabled()).slice(0, n); if (list.length < n) throw new Error(`only ${list.length} of ${g}`); list.forEach((it) => it.use()); };
   const converse = (npc) => { use(npc); for (let k = 0; k < 20 && D.dialogue; k++) O.hud.pick(0); O.hud.closeDialogue(); };
-  const tick = () => G.update(0.05, 0, { running: false, flying: false, camYaw: 0 });
+  const tick = () => { closeStory(); G.update(0.05, 0, { running: false, flying: false, camYaw: 0 }); };
   // gather what a recipe needs from that floor's resource nodes (each node gives one, then regrows)
   const gather = (region, inputs) => {
     for (const [k, v] of Object.entries(inputs)) {
