@@ -185,9 +185,9 @@ const fight = await page.evaluate(async () => {
   O.combat.dodge();
   const invulnerable = W.dodgeT > 0;
   O.step(8);
+  const dodged = +Math.hypot(W.x - x0, W.z - z0).toFixed(2);
   // every class ability of the explorer's class runs without error (the four keys and R)
   const abilityRun = [0, 1, 2, 3, 4].map((i) => { O.combat.useAbility(i); return true; });
-  const dodged = +Math.hypot(W.x - x0, W.z - z0).toFixed(2);
   return { hit, state: m.state, playerHurt: O.game.state.health < health0, dodged, invulnerable, abilityRun: abilityRun.length, ok: hit && m.state !== 'idle' && dodged > 2.5 && invulnerable };
 });
 
