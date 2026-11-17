@@ -140,6 +140,12 @@ body:not(.journey) .journey-only { display: none !important; }
 .slot.empty button.primary { width: 100%; }
 .field { display: grid; gap: 4px; font: 600 13px/1 var(--mono); }
 .field input { padding: 10px; border-radius: 8px; border: 1px solid var(--line); background: rgba(0,0,0,0.25); color: var(--ink); font: 600 15px/1.2 var(--display); }
+.looks { display: grid; gap: 8px; }
+.looks .lrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font: 600 12px/1 var(--mono); }
+.looks .lrow > span { width: 60px; color: var(--ink-dim); }
+.looks .sw { width: 26px; height: 26px; border-radius: 50%; padding: 0; border: 2px solid rgba(0,0,0,0.4); }
+.looks .sw[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.cls .abil { margin: 0; padding-left: 14px; font: 500 11px/1.4 var(--mono); color: var(--ink); }
 .classes { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
 .cls { text-align: left; display: grid; gap: 4px; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0,0,0,0.18); }
 .cls[aria-pressed="true"] { border-color: var(--cls, var(--accent)); box-shadow: 0 0 0 1px var(--cls, var(--accent)) inset; background: rgba(217, 180, 92, 0.12); }
@@ -150,9 +156,13 @@ body:not(.journey) .journey-only { display: none !important; }
 .story small { font: 700 11px/1 var(--mono); letter-spacing: 0.25em; text-transform: uppercase; color: var(--accent); }
 .story-box p { margin: 0 0 10px; font-size: 15px; line-height: 1.6; color: var(--ink); }
 .story-box button { justify-self: end; }
-.hud-ability { }
-#hudAbility { border-color: #9a8aff; }
-#hudAbility:disabled { opacity: 0.5; cursor: default; }
+.hud-skills { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: calc(100vw - 32px); }
+.hud-skills[hidden] { display: none; }
+.hud-skills button { display: grid; gap: 2px; min-width: 96px; padding: 6px 8px; border-color: #9a8aff; text-align: left; }
+.hud-skills kbd { font: 700 11px/1 var(--mono); color: #9a8aff; }
+.hud-skills span { font: 600 11px/1.2 var(--mono); }
+.hud-skills button:disabled { opacity: 0.5; cursor: default; }
+@media (max-width: 700px) { .hud-skills button { min-width: 74px; } }
 #hudEndNext { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 800; }
 .hud-quest { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(62px + env(safe-area-inset-top, 0px)); width: min(320px, calc(100vw - 220px)); min-width: 180px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 4px; }
 .hud-quest small { font: 500 10px/1.2 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
@@ -369,6 +379,7 @@ body.walking .orbit-only { display: none !important; }
     <div id="classPick" hidden>
       <h3 id="pickTitle">Novo personagem</h3>
       <label class="field">Nome <input id="pName" maxlength="14" placeholder="Seu nome" autocomplete="off"></label>
+      <div class="looks" id="looks"></div>
       <div class="classes" id="classes"></div>
       <div class="row"><button id="pBack" type="button">Voltar</button><button id="pGo" class="primary" type="button" disabled>Entrar</button></div>
     </div>

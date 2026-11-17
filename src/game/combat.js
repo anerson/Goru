@@ -167,7 +167,8 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     }
   }
   function hurtPlayer(amount) {
-    if (bastiao > 0) amount *= 0.4;
+    if (shield.t > 0) amount *= 1 - shield.red;
+    if (invul > 0) { popNumber(V(walker.state.x, walker.state.feet + 2.2, walker.state.z), 'invulnerável', '#9dffcf'); return; }
     if (walker.state.dodgeT > 0) { fx?.dodge(V(walker.state.x, walker.state.feet + 1, walker.state.z)); popNumber(V(walker.state.x, walker.state.feet + 2.2, walker.state.z), 'esquivou', '#9dffcf'); return; }
     game.hurt(amount);
     sfx('hurt');
@@ -232,44 +233,100 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   // class effects: Ladino's crits, Sábio's bonus against guardians, Mago's and Arqueiro's
   // area burst (the ability is their ranged hit with a splash), the Ladino's sure crit after
   // Golpe Preciso and the Guerreiro's bastion (less damage taken, see hurtPlayer)
-  let preciso = 0, bastiao = 0;
   function strike(m, w, from) {
     const c = game.cls;
     combo = comboT > 0 ? combo + 1 : 1;
     comboT = 2.2;
     hud.combo(combo);
     const boss = !!(m.boss && m.boss !== 'gm');
-    const crit = preciso > 0 || rand() < (combo >= 10 ? 0.2 : 0.12) + (c.crit ?? 0);
-    if (preciso > 0) preciso = 0;
-    const bonus = boss && c.bossBonus ? 1 + c.bossBonus : 1;
+    // Arqueiro's steady aim: standing still before the shot is a sure-er crit
+    const steady = c.id === 'arqueiro' && !walker.state.moving ? 0.2 : 0;
+    const crit = readyCrit > 0 || rand() < (combo >= 10 ? 0.2 : 0.12) + (c.crit ?? 0) + steady;
+    if (readyCrit > 0) readyCrit = 0;
+    const bonus = (boss && c.bossBonus ? 1 + c.bossBonus : 1) * buff.dmg * (buff.plan ? 1.2 : 1);
     hurtMob(m, rollDamage(w) * game.power() * (1 + Math.min(combo - 1, 10) * 0.05) * (crit ? 1.8 : 1) * bonus, from, crit);
   }
-  // the class ability (R): a short window of change, with a cooldown shown in the HUD
-  let abilityCd = 0;
-  function ability() {
-    if (abilityCd > 0 || game.busy || walker.state.flying) return;
-    const a = game.cls.ability;
-    if (!a) return;
-    abilityCd = a.cd;
-    hud.ability(a.name, 0);
-    sfx('craft');
-    const me = walker.state, from = V(me.x, me.feet, me.z);
-    if (a.id === 'bastiao') bastiao = 6;
-    if (a.id === 'preciso') preciso = 1;
-    if (a.id === 'remedio') { game.healPct(0.4); fx?.pickup(V(me.x, me.feet + 1, me.z), '#7fe0b0'); }
-    if (a.id === 'projetil' || a.id === 'chuva') {
-      const splash = a.id === 'projetil' ? 6 : 8, mult = a.id === 'projetil' ? 4 : 2.5;
-      const target = findAim() ?? mobs.filter((x) => !['dead', 'dormant'].includes(x.state)).sort((p, q) => p.pos.distanceTo(from) - q.pos.distanceTo(from))[0];
-      const center = target ? target.pos : from;
-      fx?.ring(V(center.x, center.y + 0.2, center.z), a.id === 'projetil' ? '#9a8aff' : '#b0e07a', splash, 0.6);
-      for (const m of mobs) {
-        if (['dead', 'dormant', 'rise', 'gone', 'retreat'].includes(m.state) || m.ally) continue;
-        if (m.pos.distanceTo(center) > splash) continue;
-        hurtMob(m, rollDamage(cur()) * game.power() * mult, center);
+  // ---- class abilities: four active (keys 1-4) and the supreme one (R). Each is data (campaign_data
+  // CLASSES): effects the engine plays in order. Cooldowns run on the game clock.
+  const cds = [0, 0, 0, 0, 0];           // 0-3 active, 4 supreme
+  let shield = { t: 0, red: 0 }, buff = { t: 0, dmg: 1, plan: false }, invul = 0, readyCrit = 0;
+  let traps = [];
+  const aimPoint = (target) => {
+    if (target) return target.pos;
+    const me = walker.state, dx = -Math.sin(me.yaw) * 4, dz = -Math.cos(me.yaw) * 4;
+    return V(me.x + dx, me.feet, me.z + dz);
+  };
+  function runEffect(e, target) {
+    const me = walker.state, self = V(me.x, me.feet, me.z);
+    switch (e.v) {
+      case 'hit': {
+        const center = e.at === 'self' ? self : aimPoint(target);
+        if (!e.mult && !e.stun && !e.mark) break;
+        for (const m of mobs) {
+          if (['dead', 'dormant', 'rise', 'gone', 'retreat'].includes(m.state) || m.ally) continue;
+          if (m.pos.distanceTo(center) > (e.radius ?? 2)) continue;
+          if (e.execute && !(m.boss && m.boss !== 'gm') && m.hp / m.def.hp < e.execute) { m.hp = 0; die(m); continue; }
+          if (e.mult) hurtMob(m, rollDamage(cur()) * game.power() * e.mult * buff.dmg, center, true);
+          if (m.state !== 'dead') {
+            if (e.stun) { m.state = 'recover'; m.timer = e.stun; m.knock.set(0, 0, 0); }
+            if (e.mark) { m.markT = e.mark; m.markMore = e.markMore ?? 1.15; }
+            if (e.knock) { const d = m.pos.clone().sub(center).setY(0).normalize(); m.knock.copy(d).multiplyScalar(e.knock); }
+          }
+        }
+        fx?.ring(V(center.x, center.y + 0.2, center.z), '#ffe9a0', e.radius ?? 2, 0.5);
+        break;
+      }
+      case 'heal': game.healPct(e.pct); fx?.pickup(V(me.x, me.feet + 1, me.z), '#7fe0b0'); break;
+      case 'shield': shield = { t: e.time, red: e.reduce }; break;
+      case 'buff': buff = { t: e.time, dmg: e.dmg ?? 1, plan: !!e.plan }; break;
+      case 'calm': {
+        for (const m of mobs) if (!m.boss && m.pos.distanceTo(self) < e.radius) { m.calmUntil = now() + e.time; if (m.state === 'chase' || m.state === 'alert') m.state = 'return'; }
+        break;
+      }
+      case 'taunt': {
+        for (const m of mobs) if (!m.boss && !['dead', 'dormant', 'rise', 'gone'].includes(m.state) && m.pos.distanceTo(self) < e.radius) { m.calmUntil = 0; m.state = 'chase'; m.timer = 0; }
+        break;
+      }
+      case 'trap': traps.push({ pos: aimPoint(target).clone(), r: e.radius, t: e.time, dps: e.dps, slow: e.slow }); break;
+      case 'knock': {
+        for (const m of mobs) { if (['dead', 'dormant', 'gone'].includes(m.state) || m.ally) continue; if (m.pos.distanceTo(self) < e.radius) m.knock.copy(m.pos.clone().sub(self).setY(0).normalize()).multiplyScalar(e.dist); }
+        break;
+      }
+      case 'dash': {
+        // a step along the view (forward for a positive distance, back for a negative one), only
+        // onto solid floor at the same height; the walker is moved, the rest is the walker's own
+        const L = Math.abs(e.dist ?? 0), fwd = (e.dist ?? 0) >= 0 ? 1 : -1;
+        if (L) {
+          const nx = me.x - fwd * Math.sin(me.yaw) * L, nz = me.z - fwd * Math.cos(me.yaw) * L;
+          const fl = walker.floorAt(nx, nz, me.feet);
+          if (Math.abs(fl - me.feet) < 1.5 && !biomes.noGo.some((f) => f(nx, nz, fl))) walker.teleport({ x: nx, z: nz, feet: fl, yaw: me.yaw, pitch: -0.15 });
+        }
+        if (e.ready) readyCrit = 1;
+        if (e.dist < 0) invul = 0.5;
+        break;
+      }
+      case 'reveal': {
+        const t = target ?? aimed;
+        if (t) hud.toast(`${t.def.name}: ${Math.max(0, Math.round(t.hp))}/${t.def.hp} de vida${t.boss ? ' · guardião' : ''}`, 'xp');
+        else hud.toast('Nada na mira para analisar.', 'xp');
+        break;
       }
     }
-    hud.toast(`${a.name}!`, 'epic');
   }
+  function useAbility(slot) {
+    if (game.busy || walker.state.flying) return;
+    const cls = game.cls;
+    const a = slot === 4 ? cls.ultimate : cls.abilities[slot];
+    if (!a || cds[slot] > 0) return;
+    cds[slot] = a.cd * (cls.id === 'mago' ? 0.9 : 1);
+    const target = findAim();
+    for (const e of a.fx) runEffect(e, target);
+    sfx('craft');
+    hud.toast(`${a.name}!`, slot === 4 ? 'epic' : 'loot');
+    if (slot === 4) fx?.levelUp(V(walker.state.x, walker.state.feet + 0.2, walker.state.z));
+  }
+  const ability = () => useAbility(4);       // R: the supreme ability
+
   function dropCombo() { if (combo) { combo = 0; hud.combo(0); } }
   function attack() {
     if (attackCd > 0 || game.busy || walker.state.flying) return;
@@ -382,7 +439,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   function move(m, dx, dz, speed, dt) {
     const l = Math.hypot(dx, dz);
     if (l < 1e-4) return 0;
-    const step = Math.min(l, speed * dt);
+    const step = Math.min(l, speed * dt * (m.slowMul ?? 1));
     const nx = m.pos.x + (dx / l) * step, nz = m.pos.z + (dz / l) * step;
     const y = groundAt(m.biome, nx, nz);
     if (m.biome === 'fora' ? Math.hypot(nx, nz) < 150 || Math.abs(y) > 3 : Math.hypot(nx, nz) > DISK_R - 3 || y < m.level - 0.6) return 0;   // edge, water, lava, trunk
@@ -574,9 +631,15 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     const now = performance.now() / 1000;
     const sim = now < stopUntil ? dt * 0.05 : dt;           // hit-stop slows combat only
     attackCd -= dt;
-    abilityCd -= dt;
-    if (game.cls.ability) hud.ability(game.cls.ability.name, Math.max(0, abilityCd));
-    bastiao -= dt;
+    hud.skills(game.cls, cds);
+    shield.t -= dt; buff.t -= dt; if (buff.t <= 0) { buff.dmg = 1; buff.plan = false; } invul -= dt;
+    for (let i = 0; i < cds.length; i++) cds[i] = Math.max(0, cds[i] - dt);
+    traps = traps.filter((t) => (t.t -= dt) > 0);
+    for (const m of mobs) { m.slowMul = 1; if (m.markT > 0) m.markT -= dt; }
+    for (const tr of traps) for (const m of mobs) {
+      if (['dead', 'dormant', 'rise', 'gone', 'retreat'].includes(m.state) || m.ally) continue;
+      if (m.pos.distanceTo(tr.pos) < tr.r) { m.slowMul = 1 - tr.slow; if (!m.boss) hurtMob(m, tr.dps * dt, tr.pos); }
+    }
     comboT -= dt;
     if (comboT <= 0 && combo) dropCombo();
     const me = walker.state;
@@ -669,7 +732,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     sfx('dodge');
   }
   return {
-    dodge, ability,
+    dodge, ability, useAbility,
     update, attack, shake, resetBosses, gm, syncBossesWithStory,
     debug: {
       mobs, bosses, wake,

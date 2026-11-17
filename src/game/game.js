@@ -13,7 +13,7 @@ import { createCharacter } from '../character.js';
 import {
   REGIONS_PLAN, ITEMS, RECIPES, RESOURCES, STAGES, stageIndex, DIALOGUES, dialogueFor, SPEAKERS, STRINGS, BOSSES,
   NEEDS, FLASK, HAZARD_NAMES, BASE_WEAPON, weaponStats, FRAGMENTS, ENDINGS, guardianName, REGION_NAMES,
-  FLOOR_IDS, levelCap, xpNeed, bandXp, XP_SHARE, CLASSES, STORIES, MAX_LEVEL,
+  FLOOR_IDS, levelCap, xpNeed, bandXp, XP_SHARE, CLASSES, STORIES, MAX_LEVEL, DEFAULT_APPEARANCE,
 } from './campaign_data.js';
 import { makeNode, makeObject, makeWorkbench, makeChest } from './looks.js';
 import { sfx, setAmbience } from '../audio.js';
@@ -27,6 +27,7 @@ const ROMAN = ['I', 'II', 'III', 'IV'];
 function freshState(profile = {}) {
   return {
     name: profile.name ?? 'Explorador', cls: profile.cls ?? 'guerreiro',
+    appearance: { ...DEFAULT_APPEARANCE, ...(profile.appearance ?? {}) },
     seen: {},                // stories already shown
     stage: STAGES[0].id,
     inv: {},                 // item id -> count
@@ -747,6 +748,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     goto(dialogue.graph.start);
   }
   const outcomeHooks = [];
+  const identityHooks = [];       // told the character's class and look when a character starts
   const bossEvents = [];          // told to the party when this player decides a guardian's fate
   function resolveBoss(id, how, remote = false) {
     if (state.flags[`boss_${id}`]) return;
@@ -828,6 +830,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     const saved = profile ? null : readSlot(n);
     state = saved ? { ...freshState(), ...saved } : freshState(profile ?? {});
     if (!saved) { save(); }
+    identityHooks.forEach((f) => f(state));
     applyWorld();
     showObjective();
     hud.inventory(state);
@@ -918,6 +921,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     get cls() { return cls(); },
     setMobFinder: (f) => { mobFinder = f; },
     onBossEvent: (f) => bossEvents.push(f),
+    onIdentity: (f) => { identityHooks.push(f); f(state); },
     // a friend decided a guardian's fate: the same outcome here, without the conversation
     remoteBoss(id, how) {
       if (!bossList.some((b) => b.id === id) || state.flags[`boss_${id}`]) return;

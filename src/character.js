@@ -25,6 +25,7 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
   // torso: a rounded chest a little deeper at the top, a belt with a buckle, a scarf
   add(body, new THREE.CapsuleGeometry(0.2, 0.4, 8, 24), shirt, 0, 0.32, 0).scale.set(1.05, 1, 0.78);
   const dark = new THREE.MeshStandardMaterial({ color: '#2a2018', roughness: 0.6 });
+  const hairMat = dark;   // hair shares the dark material so it can be recoloured
   const metal = new THREE.MeshStandardMaterial({ color: '#c9a24a', metalness: 0.8, roughness: 0.35 });
   add(body, new THREE.TorusGeometry(0.205, 0.035, 8, 32), dark, 0, 0.06, 0).rotation.x = Math.PI / 2;
   add(body, new THREE.BoxGeometry(0.07, 0.06, 0.03), metal, 0, 0.06, -0.165);
@@ -209,5 +210,50 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
     if (L.cape) cape.material.color.set(L.cape);
   }
 
-  return { root, update, idle, setWeapon, setWeaponLook, setOutfit, roll: () => { rollT = 0.32; }, swing: () => { swingT = 0.3; if (sceptre?.visible) sceptre.userData.heart.rotation.y += 1; }, setHeading: (h) => { heading = h; root.rotation.y = h; } };
+  // ---- classes (the five of the manual) and the player's own look ----
+  // Each class holds its own weapon: the Guerreiro a sword and a round shield, the Mago a
+  // glowing staff, the Sábio a field book, the Ladino two daggers, the Arqueiro a bow and quiver.
+  const gearMat = (c, e) => new THREE.MeshStandardMaterial({ color: c, emissive: e ?? '#000000', emissiveIntensity: e ? 0.6 : 0, roughness: 0.5, metalness: 0.2 });
+  let gearParts = [];   // { parent, mesh } of the current class's gear, removed on a class change
+  let gearKind = null;
+  function buildGear(kind) {
+    for (const { parent, mesh } of gearParts) parent.remove(mesh);
+    gearParts = [];
+    const put = (parent, geo, m, x, y, z, rx = 0, ry = 0, rz = 0) => {
+      const o = new THREE.Mesh(geo, m);
+      o.position.set(x, y, z); o.rotation.set(rx, ry, rz); o.castShadow = true;
+      parent.add(o); gearParts.push({ parent, mesh: o });
+    };
+    if (kind === 'guerreiro') {
+      put(armR, new THREE.BoxGeometry(0.05, 0.75, 0.09), gearMat('#c9ced6', '#3a4a5a'), 0, -0.55, -0.12);
+      put(armR, new THREE.BoxGeometry(0.12, 0.12, 0.05), gearMat('#7a5a2a'), 0, -0.17, -0.12);
+      put(armL, new THREE.CylinderGeometry(0.27, 0.27, 0.05, 20), gearMat('#7a4a2a'), -0.05, -0.2, -0.1, Math.PI / 2, 0, 0);
+      put(armL, new THREE.TorusGeometry(0.22, 0.03, 6, 20), gearMat('#c9a24a', '#5a3a08'), -0.05, -0.2, -0.1, 0, Math.PI / 2, 0);
+    } else if (kind === 'sabio') {
+      put(armL, new THREE.BoxGeometry(0.22, 0.03, 0.3), gearMat('#7a4a2a'), 0.02, -0.42, -0.14);
+      put(armL, new THREE.BoxGeometry(0.2, 0.02, 0.27), gearMat('#f0e6c8'), 0.02, -0.44, -0.14);
+    } else if (kind === 'ladino') {
+      put(armR, new THREE.BoxGeometry(0.03, 0.03, 0.36), gearMat('#c0c4cc'), 0, -0.62, -0.08, Math.PI / 2);
+      put(armL, new THREE.BoxGeometry(0.03, 0.03, 0.36), gearMat('#c0c4cc'), 0, -0.62, -0.08, Math.PI / 2);
+    } else if (kind === 'arqueiro') {
+      put(armL, new THREE.TorusGeometry(0.45, 0.025, 6, 24, Math.PI), gearMat('#8a5a2a'), -0.05, -0.45, -0.05, 0, Math.PI / 2, Math.PI / 2);
+      put(body, new THREE.BoxGeometry(0.2, 0.5, 0.12), gearMat('#4a3018'), 0.05, 0.42, 0.25, 0.25);
+      for (let k = 0; k < 3; k++) put(body, new THREE.CylinderGeometry(0.01, 0.01, 0.5, 4), gearMat('#e8e2d0'), 0.05 + (k - 1) * 0.03, 0.54, 0.25, 0.25);
+    }
+    gearKind = kind;
+  }
+  function setClass(id) {
+    // the staff stays with the Mago (glowing) and the Sábio (carved), other classes hold their own
+    if (staffMesh) { staffMesh.visible = id === 'mago'; if (id === 'mago') { staffMat.color.set('#5a3a8a'); staffMesh.children[0].material.color.set(new THREE.Color('#c59bff').multiplyScalar(2)); } }
+    if (id !== gearKind) buildGear(id);
+  }
+  // the player's own look: skin, hair, shirt and trousers chosen at creation
+  function setAppearance(a = {}) {
+    if (a.skin) skin.color.set(a.skin);
+    if (a.hair) hairMat.color.set(a.hair);
+    if (a.shirt) { base.shirt = a.shirt; shirt.color.set(a.shirt); }
+    if (a.pants) { base.pants = a.pants; pants.color.set(a.pants); }
+    if (a.hat) { base.hat = a.hat; leather.color.set(a.hat); }
+  }
+  return { root, update, idle, setWeapon, setWeaponLook, setOutfit, setClass, setAppearance, roll: () => { rollT = 0.32; }, swing: () => { swingT = 0.3; if (sceptre?.visible) sceptre.userData.heart.rotation.y += 1; }, setHeading: (h) => { heading = h; root.rotation.y = h; } };
 }

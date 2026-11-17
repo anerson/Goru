@@ -25,7 +25,7 @@ export function createHud(root) {
       <button type="button" id="hudUse" hidden>Interagir</button>
       <button type="button" id="hudAttack">Atacar</button>
       <button type="button" id="hudDodge">Esquivar (C)</button>
-      <button type="button" id="hudAbility">Habilidade (R)</button>
+      <div class="hud-skills" id="hudSkills" hidden></div>
       <button type="button" id="hudDrink">Beber (Q)</button>
       <button type="button" id="hudBag" aria-expanded="false">Mochila (I)</button>
     </div>
@@ -46,14 +46,13 @@ export function createHud(root) {
     <div class="hud-end" id="hudEnd" hidden><div><h2 id="hudEndTitle">Fim do Ato I</h2><p id="hudEndText"></p><div class="row"><button type="button" id="hudEndNext" hidden></button><button type="button" id="hudEndOk">Continuar explorando</button></div></div></div>
   `;
   const $ = (id) => root.querySelector(`#${id}`);
-  let handlers = { interact() {}, drink() {}, useItem() {}, attack() {}, dodge() {}, ability() {}, craft() {}, equip() {} };
+  let handlers = { interact() {}, drink() {}, useItem() {}, attack() {}, dodge() {}, skill() {}, craft() {}, equip() {} };
   let choices = [];
   let lastState = null;
 
   $('hudUse').onclick = () => handlers.interact();
   $('hudAttack').onclick = () => handlers.attack();
   $('hudDodge').onclick = () => handlers.dodge();
-  $('hudAbility').onclick = () => handlers.ability();
   $('hudDrink').onclick = () => handlers.drink();
   $('hudBag').onclick = () => toggleBag();
   $('hudEndOk').onclick = () => { $('hudEnd').hidden = true; };
@@ -125,10 +124,23 @@ export function createHud(root) {
     workbench: renderBench,
     // quest progress under the objective (3/3 springs...)
     // the class ability button: its name and the seconds left on its cooldown
-    ability(name, cooldown) {
-      const b = $('hudAbility');
-      b.textContent = cooldown > 0 ? `${name} · ${Math.ceil(cooldown)} s` : `${name} (R)`;
-      b.disabled = cooldown > 0;
+    // the five skill buttons of the class (1-4 and R): name and seconds left on each cooldown
+    skills(cls, cds) {
+      const box = $('hudSkills');
+      if (!cls) { box.hidden = true; return; }
+      const list = [...cls.abilities.map((a, i) => [i, a]), [4, cls.ultimate]];
+      if (!box.dataset.cls || box.dataset.cls !== cls.name) {
+        box.dataset.cls = cls.name;
+        box.innerHTML = list.map(([i, a]) => `<button type="button" data-k="${i}" title="${a.text.replace(/"/g, '&quot;')}"><kbd>${i === 4 ? 'R' : i + 1}</kbd><span></span></button>`).join('');
+        box.querySelectorAll('button').forEach((b) => { b.onclick = () => handlers.skill(Number(b.dataset.k)); });
+      }
+      box.hidden = false;
+      box.querySelectorAll('button').forEach((b) => {
+        const i = Number(b.dataset.k), a = i === 4 ? cls.ultimate : cls.abilities[i];
+        const left = cds[i] ?? 0;
+        b.querySelector('span').textContent = left > 0 ? `${a.name} · ${Math.ceil(left)}s` : a.name;
+        b.disabled = left > 0;
+      });
     },
     progress(done, total, label) {
       $('hudQBar').hidden = !total || total < 2;

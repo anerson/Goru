@@ -18,7 +18,7 @@ import { createGame } from './game/game.js';
 import { createFx } from './fx.js';
 import { createParty } from './party.js';
 import { startAudio, toggleMute, isMuted, sfx } from './audio.js';
-import { CLASSES as CLASSES_PLAN } from './game/campaign_data.js';
+import { CLASSES as CLASSES_PLAN, APPEARANCE, DEFAULT_APPEARANCE } from './game/campaign_data.js';
 import { STAGES, RECIPES } from './game/campaign_data.js';
 import { createHud } from './game/hud.js';
 import { createCombat } from './game/combat.js';
@@ -105,6 +105,11 @@ function buildWorld() {
   game.onFaint(() => combat.resetBosses());
   // crafted gear shows on the explorer: the weapon recolours the staff, the outfit the clothes
   game.onGear((w, o) => { character.setWeaponLook(w.look, w.tier); character.setOutfit(o?.look ?? null); });
+  // the class's weapon in hand and the character's own look (chosen at creation)
+  game.onIdentity((s) => {
+    character.setAppearance({ ...s.appearance, hat: CLASSES_PLAN[s.cls]?.look.hat });
+    character.setClass(s.cls);
+  });
 
   $('sHeight').textContent = `${Math.round(canopy.maxY)} m`;
   $('sCrown').textContent = `${(canopy.crownR * 2 / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km`;
@@ -207,7 +212,8 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyE') g.interact();
   if (e.code === 'KeyJ' || (e.code === 'Space' && !world.walker.state.flying)) { world.combat.attack(); e.preventDefault(); }
   if ((e.code === 'KeyC' || e.code === 'ControlLeft') && !e.repeat) { world.combat.dodge(); e.preventDefault(); }
-  if (e.code === 'KeyR' && !e.repeat && journey) { world.combat.ability(); e.preventDefault(); }
+  if (e.code === 'KeyR' && !e.repeat && journey) { world.combat.useAbility(4); e.preventDefault(); }
+  if (/^Digit[1-4]$/.test(e.code) && !e.repeat && journey) { world.combat.useAbility(Number(e.code.slice(-1)) - 1); e.preventDefault(); }
   if (e.code === 'KeyM' && !e.repeat) setMute(toggleMute());
   if (e.code === 'KeyQ') g.drink();
   if (e.code === 'KeyI') h.toggleBag();
@@ -377,7 +383,9 @@ let newSlot = 0;
 function openNewCharacter(n) {
   newSlot = n;
   pickedClass = null;
+  pickedLook = { ...DEFAULT_APPEARANCE };
   $('pName').value = '';
+  renderLooks();
   $('pickTitle').textContent = `Novo personagem · vaga ${n + 1}`;
   $('classPick').hidden = false;
   $('slotGrid').hidden = true;
@@ -391,22 +399,45 @@ function openNewCharacter(n) {
     b.className = 'cls';
     b.setAttribute('aria-pressed', 'false');
     b.style.setProperty('--cls', CLASS_COLOR[k]);
-    b.innerHTML = `<b></b><small></small><em></em>`;
+    b.innerHTML = `<b></b><small></small><em></em><ul class="abil"></ul>`;
     b.querySelector('b').textContent = c.name;
     b.querySelector('small').textContent = `${c.title} · ${c.role}`;
-    b.querySelector('em').textContent = `Habilidade (R): ${c.ability.name}. ${c.ability.text}`;
+    b.querySelector('em').textContent = `Arma: ${WEAPON_NAME[c.weapon] ?? c.weapon}. ${c.passive}`;
+    const ul = b.querySelector('ul');
+    for (const a of [...c.abilities, c.ultimate]) { const li = document.createElement('li'); li.textContent = `${a.name}${a === c.ultimate ? ' (R)' : ''}: ${a.text}`; ul.append(li); }
     b.onclick = () => { pickedClass = k; box.querySelectorAll('.cls').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); checkGo(); };
     box.append(b);
   }
   checkGo();
   $('pName').focus();
 }
+let pickedLook = { ...DEFAULT_APPEARANCE };
+const WEAPON_NAME = { espada: 'espada e escudo', cajado: 'cajado de seiva', livro: 'livro de campo', adagas: 'duas adagas', arco: 'arco e aljava' };
+function renderLooks() {
+  const box = $('looks');
+  box.innerHTML = '';
+  const rows = [['skin', 'Pele'], ['hair', 'Cabelo'], ['shirt', 'Roupa'], ['pants', 'Calça']];
+  for (const [k, label] of rows) {
+    const row = document.createElement('div');
+    row.className = 'lrow';
+    row.innerHTML = `<span>${label}</span>`;
+    for (const col of APPEARANCE[k]) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'sw'; b.style.background = col;
+      b.setAttribute('aria-label', `${label} ${col}`);
+      b.setAttribute('aria-pressed', String(pickedLook[k] === col));
+      b.onclick = () => { pickedLook[k] = col; renderLooks(); };
+      row.append(b);
+    }
+    box.append(row);
+  }
+}
 function checkGo() { $('pGo').disabled = !(pickedClass && $('pName').value.trim().length >= 2); }
 $('pName').addEventListener('input', checkGo);
 $('pBack').onclick = () => { $('classPick').hidden = true; $('slotGrid').hidden = false; $('slotsFoot').hidden = false; };
 $('pGo').onclick = () => {
   if ($('pGo').disabled) return;
-  startJourney(newSlot, { name: $('pName').value.trim().slice(0, 14), cls: pickedClass });
+  startJourney(newSlot, { name: $('pName').value.trim().slice(0, 14), cls: pickedClass, appearance: pickedLook });
 };
 $('slotsBack').onclick = () => { $('slots').hidden = true; };
 function openSlots() {
@@ -494,7 +525,7 @@ requestAnimationFrame(() => setTimeout(() => {
     world = buildWorld();
     $('loading').hidden = true;
     connectParty();
-    world.hud.bind({ interact: () => world.game.interact(), drink: () => world.game.drink(), useItem: (id) => world.game.useItem(id), attack: () => world.combat.attack(), dodge: () => world.combat.dodge(), ability: () => world.combat.ability(), craft: (id) => world.game.craft(id), equip: (id) => world.game.equip(id) });
+    world.hud.bind({ interact: () => world.game.interact(), drink: () => world.game.drink(), useItem: (id) => world.game.useItem(id), attack: () => world.combat.attack(), dodge: () => world.combat.dodge(), skill: (i) => world.combat.useAbility(i), craft: (id) => world.game.craft(id), equip: (id) => world.game.equip(id) });
   } catch (err) {
     $('loading').textContent = 'Não foi possível montar a cena. Recarregue a página.';
     console.error(err);

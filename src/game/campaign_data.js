@@ -398,29 +398,85 @@ export function bandXp(region) {
 // 10% crafting and chests, the rest creatures, about 25-30 kills a floor)
 export const XP_SHARE = { object: 0.035, craft: 0.04, chest: 0.035, sub: 0.1, boss: 0.16, mob: 0.022, party: 0.25 };
 
+// the player's own look, chosen when the character is made (skin, hair, shirt, trousers)
+export const APPEARANCE = {
+  skin: ['#f0c8a0', '#c99674', '#a87a58', '#8a5a3a', '#5a3a28'],
+  hair: ['#2a2018', '#6a4a2a', '#c9a24a', '#d8d0c0', '#7a2a1a', '#3a5a8a'],
+  shirt: ['#2f7f86', '#7a3a2a', '#3a3a8a', '#2a6a5a', '#4a6a2a', '#8a5a9a', '#e8e0c8', '#2a2a2a'],
+  pants: ['#3a3226', '#2a2a3a', '#5a4a3a', '#2a3a2a', '#3a3a3a'],
+};
+export const DEFAULT_APPEARANCE = { skin: '#c99674', hair: '#2a2018', shirt: '#2f7f86', pants: '#3a3226' };
+
 // ---------------------------------------------------------------- the five classes (manual, ch. 3)
-// stats are multipliers on the base explorer; `ranged` classes attack what the crosshair aims at
+// Stats multiply the base explorer. Each class has its passives (always on) and its four active
+// abilities (keys 1-4) plus the supreme one (R, once per long rest in the manual, here a long
+// cooldown). Abilities are data: an `fx` list of effect verbs the combat engine plays:
+//   hit {mult, radius, at: 'aim'|'self', stun?, mark?, knock?}   damage to creatures in a radius
+//   heal {pct}                                                    recover a share of max health
+//   shield {time, reduce}                                         take less damage for a while
+//   buff {time, dmg?, crit?, plan?}                               stronger hits for a while
+//   calm {radius, time}                                           creatures there lose interest
+//   taunt {radius, time}                                          creatures there come to you
+//   trap {radius, time, dps, slow}                                a zone that hurts and slows
+//   knock {radius, dist}                                          push creatures away
+//   dash {dist, ready}                                            short dash; `ready` the next hit crits
+//   reveal {}                                                     show the aimed creature's health
 export const CLASSES = {
-  guerreiro: { name: 'Guerreiro', title: 'Vanguarda do Tronco', role: 'Tanque e dano corpo a corpo',
-    hp: 1.4, dmg: 1.0, guard: 0.15, range: 3, cooldown: 0.5, crit: 0, dodgeCd: 0.9,
-    ability: { id: 'bastiao', name: 'Bastião Vivo', cd: 20, text: 'Por 6 s recebe 60% menos dano e empurra criaturas próximas.' },
-    look: { shirt: '#7a3a2a', pants: '#3a3a3a', hat: '#8a8a8a', gear: 'shield' }, color: '#ff8a5a' },
-  mago: { name: 'Mago', title: 'Tecelão da Seiva Arcana', role: 'Dano mágico à distância e controle',
-    hp: 0.8, dmg: 1.0, guard: 0, range: 2.6, reach: 24, cooldown: 0.6, crit: 0.03, dodgeCd: 0.7,
-    ability: { id: 'projetil', name: 'Projétil Elemental', cd: 10, text: 'Explosão no alvo da mira: 4x dano em tudo a 6 m.' },
-    look: { shirt: '#3a3a8a', pants: '#2a2a4a', hat: '#5a3a9a', gear: 'orb' }, color: '#9a8aff' },
-  sabio: { name: 'Sábio', title: 'Cartógrafo dos Ciclos', role: 'Suporte, cura e estratégia',
-    hp: 1.0, dmg: 0.85, guard: 0.05, range: 2.8, cooldown: 0.5, crit: 0, dodgeCd: 0.7, bossBonus: 0.2, regen: 2,
-    ability: { id: 'remedio', name: 'Remédio de Campo', cd: 18, text: 'Cura 40% da vida sua e de amigos a 15 m. Passiva: chefes levam +20% de dano.' },
-    look: { shirt: '#2a6a5a', pants: '#3a3a2a', hat: '#c9b07a', gear: 'book' }, color: '#7fe0b0' },
-  ladino: { name: 'Ladino', title: 'Sombra das Fendas', role: 'Dano de precisão e mobilidade',
-    hp: 0.9, dmg: 0.9, guard: 0, range: 2.4, cooldown: 0.32, crit: 0.13, dodgeCd: 0.4,
-    ability: { id: 'preciso', name: 'Golpe Preciso', cd: 8, text: 'O próximo golpe é crítico e causa 3x dano.' },
-    look: { shirt: '#2a2a2a', pants: '#1a1a1a', hat: '#3a2a3a', gear: 'daggers' }, color: '#c0c0d0' },
-  arqueiro: { name: 'Arqueiro', title: 'Vigia dos Galhos', role: 'Dano à distância e reconhecimento',
-    hp: 0.9, dmg: 0.95, guard: 0, range: 2.6, reach: 28, cooldown: 0.5, crit: 0.06, dodgeCd: 0.6,
-    ability: { id: 'chuva', name: 'Chuva dos Galhos', cd: 14, text: 'Chuva de flechas no alvo da mira: 2,5x dano em tudo a 8 m.' },
-    look: { shirt: '#4a6a2a', pants: '#3a3020', hat: '#5a7a3a', gear: 'bow' }, color: '#b0e07a' },
+  guerreiro: { name: 'Guerreiro', title: 'Vanguarda do Tronco', role: 'Tanque e dano corpo a corpo', color: '#ff8a5a',
+    hp: 1.4, dmg: 1.0, guard: 0.15, range: 3.0, cooldown: 0.5, crit: 0, dodgeCd: 0.9, weapon: 'espada',
+    passive: 'Postura Firme: −15% de dano físico recebido. Treino de Armas: +1 em armas de lâmina.',
+    abilities: [
+      { id: 'escudo', name: 'Golpe de Escudo', cd: 6, text: 'Golpe que causa dano e interrompe conjurações.', fx: [{ v: 'hit', mult: 1.2, radius: 3, stun: 1 }] },
+      { id: 'provocar', name: 'Provocar', cd: 10, text: 'Criaturas próximas vêm até você por 6 s.', fx: [{ v: 'taunt', radius: 12, time: 6 }] },
+      { id: 'investida', name: 'Investida', cd: 9, text: 'Avança e atinge o que está à frente.', fx: [{ v: 'dash', dist: 6, ready: true }, { v: 'hit', mult: 1.6, radius: 3, knock: 4 }] },
+      { id: 'ultima_linha', name: 'Última Linha', cd: 18, text: 'Por 6 s você recebe 50% menos dano e empurra criaturas próximas.', fx: [{ v: 'shield', time: 6, reduce: 0.5 }, { v: 'knock', radius: 4, dist: 3 }] },
+    ],
+    ultimate: { id: 'bastiao', name: 'Bastião Vivo', cd: 90, text: 'Zona defensiva de 12 s: 60% menos dano para você e as criaturas próximas são empurradas.', fx: [{ v: 'shield', time: 12, reduce: 0.6 }, { v: 'knock', radius: 7, dist: 6 }] },
+    look: { shirt: '#7a3a2a', pants: '#3a3a3a', hat: '#8a8a8a' } },
+  mago: { name: 'Mago', title: 'Tecelão da Seiva Arcana', role: 'Dano mágico à distância e controle', color: '#9a8aff',
+    hp: 0.8, dmg: 1.0, guard: 0, range: 2.6, reach: 24, cooldown: 0.6, crit: 0.03, dodgeCd: 0.7, weapon: 'cajado',
+    passive: 'Conservação Arcana: as habilidades têm 10% menos recarga. Afinidade: dano mágico acerta crítico mais.',
+    abilities: [
+      { id: 'projetil', name: 'Projétil Elemental', cd: 8, text: 'Explosão no alvo da mira: 4× o dano a 6 m.', fx: [{ v: 'hit', mult: 4, radius: 6, at: 'aim' }] },
+      { id: 'barreira', name: 'Barreira de Seiva', cd: 12, text: 'Você recebe 40% menos dano por 6 s.', fx: [{ v: 'shield', time: 6, reduce: 0.4 }] },
+      { id: 'raiz', name: 'Raiz Aprisionadora', cd: 10, text: 'Raízes prendem as criaturas a 8 m por 4 s.', fx: [{ v: 'hit', mult: 0.6, radius: 8, at: 'aim', stun: 4 }] },
+      { id: 'dissipacao', name: 'Pulso de Dissipação', cd: 14, text: 'Pulso que enfraquece criaturas a 8 m: dano dobrado e recuo.', fx: [{ v: 'hit', mult: 2, radius: 8, mark: 6 }, { v: 'knock', radius: 8, dist: 4 }] },
+    ],
+    ultimate: { id: 'ressonancia', name: 'Ressonância do Carvalho', cd: 90, text: 'Por 8 s seus golpes causam 60% mais dano e todas as criaturas num raio de 14 m recebem um pulso.', fx: [{ v: 'buff', time: 8, dmg: 1.6 }, { v: 'hit', mult: 1.5, radius: 14, at: 'self' }] },
+    look: { shirt: '#3a3a8a', pants: '#2a2a4a', hat: '#5a3a9a' } },
+  sabio: { name: 'Sábio', title: 'Cartógrafo dos Ciclos', role: 'Suporte, cura e estratégia', color: '#7fe0b0',
+    hp: 1.0, dmg: 0.85, guard: 0.05, range: 2.8, cooldown: 0.5, crit: 0, dodgeCd: 0.7, bossBonus: 0.2, regen: 2, weapon: 'livro',
+    passive: 'Análise de Fraqueza: +20% de dano contra guardiões. Conhecimento Natural: sua vida regenera mais depressa.',
+    abilities: [
+      { id: 'diagnostico', name: 'Diagnóstico', cd: 6, text: 'Mostra a vida e a fraqueza da criatura da mira.', fx: [{ v: 'reveal' }] },
+      { id: 'plano', name: 'Plano Tático', cd: 14, text: 'Por 10 s seu grupo e você causam 20% mais dano.', fx: [{ v: 'buff', time: 10, dmg: 1.2, plan: true }] },
+      { id: 'remedio', name: 'Remédio de Campo', cd: 18, text: 'Cura 40% da sua vida e acalma as criaturas próximas.', fx: [{ v: 'heal', pct: 0.4 }, { v: 'calm', radius: 10, time: 5 }] },
+      { id: 'terreno', name: 'Leitura do Terreno', cd: 20, text: 'Armadilha no chão a 6 m por 8 s: dano e lentidão a quem entra.', fx: [{ v: 'trap', radius: 6, time: 8, dps: 14, slow: 0.4 }] },
+    ],
+    ultimate: { id: 'dez_ciclos', name: 'Teoria dos Dez Ciclos', cd: 90, text: 'Por 4 s todas as criaturas a 12 m ficam paralisadas e o chefe mostra a fraqueza.', fx: [{ v: 'hit', mult: 0, radius: 12, at: 'self', stun: 4 }, { v: 'reveal' }] },
+    look: { shirt: '#2a6a5a', pants: '#3a3a2a', hat: '#c9b07a' } },
+  ladino: { name: 'Ladino', title: 'Sombra das Fendas', role: 'Dano de precisão e mobilidade', color: '#c0c0d0',
+    hp: 0.9, dmg: 0.9, guard: 0, range: 2.4, cooldown: 0.32, crit: 0.13, dodgeCd: 0.4, weapon: 'adagas',
+    passive: 'Passo Silencioso: criaturas demoram a perceber você. Ataque Oportunista: +30% de crítico contra alvo marcado.',
+    abilities: [
+      { id: 'preciso', name: 'Golpe Preciso', cd: 8, text: 'O próximo golpe é crítico e causa 3× o dano.', fx: [{ v: 'dash', dist: 0, ready: true }] },
+      { id: 'desengajar', name: 'Desengajar', cd: 8, text: 'Recua 5 m e fica invulnerável por 0,5 s.', fx: [{ v: 'dash', dist: -5, ready: false }] },
+      { id: 'armadilha', name: 'Armadilha de Fio', cd: 14, text: 'Fio no chão a 6 m por 6 s: prende e fere quem passa.', fx: [{ v: 'trap', radius: 3, time: 6, dps: 10, slow: 0.9 }] },
+      { id: 'fumaca', name: 'Fumaça', cd: 16, text: 'Cortina de fumaça: criaturas perdem você por 6 s.', fx: [{ v: 'calm', radius: 8, time: 6 }] },
+    ],
+    ultimate: { id: 'execucao', name: 'Execução nas Sombras', cd: 90, text: 'Ataque que causa 5× o dano. Se a criatura tiver menos de 30% de vida, cai de uma vez (não vale contra guardiões).', fx: [{ v: 'hit', mult: 5, radius: 2.5, at: 'aim', execute: 0.3 }] },
+    look: { shirt: '#2a2a2a', pants: '#1a1a1a', hat: '#3a2a3a' } },
+  arqueiro: { name: 'Arqueiro', title: 'Vigia dos Galhos', role: 'Dano à distância e reconhecimento', color: '#b0e07a',
+    hp: 0.9, dmg: 0.95, guard: 0, range: 2.6, reach: 28, cooldown: 0.5, crit: 0.06, dodgeCd: 0.6, weapon: 'arco',
+    passive: 'Mira Estável: se você não se mexe antes do disparo, o golpe acerta crítico. Olho de Batedor: vê criaturas à distância.',
+    abilities: [
+      { id: 'disparo', name: 'Disparo Preciso', cd: 4, text: 'Flecha de dano confiável na mira.', fx: [{ v: 'hit', mult: 1.3, radius: 1, at: 'aim' }] },
+      { id: 'contencao', name: 'Flecha de Contenção', cd: 10, text: 'Prende a criatura da mira por 4 s.', fx: [{ v: 'hit', mult: 0.8, radius: 1, at: 'aim', stun: 4 }] },
+      { id: 'elemental', name: 'Flecha Elemental', cd: 9, text: 'Flecha de fogo e gelo: 2× dano e marca o alvo.', fx: [{ v: 'hit', mult: 2, radius: 1.5, at: 'aim', mark: 6 }] },
+      { id: 'marca', name: 'Marca do Caçador', cd: 12, text: 'Marca a criatura da mira: por 10 s ela recebe 30% mais dano de todos.', fx: [{ v: 'hit', mult: 0, radius: 1, at: 'aim', mark: 10, markMore: 1.3 }] },
+    ],
+    ultimate: { id: 'chuva', name: 'Chuva dos Galhos', cd: 90, text: 'Chuva de flechas em área de 8 m: 2,5× o dano dividido entre todos.', fx: [{ v: 'hit', mult: 2.5, radius: 8, at: 'aim' }] },
+    look: { shirt: '#4a6a2a', pants: '#3a3020', hat: '#5a7a3a' } },
 };
 
 // ---------------------------------------------------------------- stories before each place
