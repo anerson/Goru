@@ -38,29 +38,62 @@ function legPivot(parent, x, y, z, len, rad, m, splay = 0) {
   return p;
 }
 
-// four-legged animals: wolves, big cats
+// four-legged animals: wolves, big cats, boars, the beast king. A deep chest and slimmer hips,
+// a neck that lifts the head, a muzzle with a dark nose and a jaw, eyes with a bright iris,
+// two-part legs with paws, a ruff of fur at the neck and a tail made of shrinking segments.
 function quadruped({ color, belly, size = 1, snout = true, tail = true }) {
   const root = new THREE.Group();
   const fur = mat(color, { emissive: '#ffffff', emissiveIntensity: 0 });
   const light = mat(belly, { emissive: '#ffffff', emissiveIntensity: 0 });
+  const dark = mat('#1a1410', { roughness: 0.4 });
+  const add = (parent, geo, m, x, y, z, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0) => {
+    const o = new THREE.Mesh(geo, m);
+    o.position.set(x * size, y * size, z * size); o.scale.set(sx, sy, sz); o.rotation.set(rx, ry, rz);
+    o.castShadow = true; parent.add(o); return o;
+  };
+  const S = (r) => new THREE.SphereGeometry(r * size, 24, 18);
   const body = new THREE.Group();
-  body.position.y = 0.75 * size;
+  body.position.y = 0.78 * size;
   root.add(body);
-  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.28 * size, 0.8 * size, 8, 20), fur);
-  torso.rotation.x = Math.PI / 2;
-  torso.castShadow = true;
-  body.add(torso);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.24 * size, 28, 20), fur);
-  head.position.set(0, 0.18 * size, -0.62 * size);
-  head.castShadow = true;
-  body.add(head);
-  if (snout) { const s = new THREE.Mesh(new THREE.ConeGeometry(0.11 * size, 0.3 * size, 16), light); s.rotation.x = -Math.PI / 2; s.position.set(0, 0.12 * size, -0.86 * size); body.add(s); }
-  for (const x of [-0.13, 0.13]) { const ear = new THREE.Mesh(new THREE.ConeGeometry(0.06 * size, 0.16 * size, 10), fur); ear.position.set(x * size, 0.42 * size, -0.6 * size); body.add(ear); }
-  const eyes = new THREE.MeshBasicMaterial({ color: '#ffcf4a' });
-  for (const x of [-0.09, 0.09]) { const e = new THREE.Mesh(new THREE.SphereGeometry(0.03 * size, 14, 10), eyes); e.position.set(x * size, 0.24 * size, -0.82 * size); body.add(e); }
-  if (tail) { const t = new THREE.Mesh(new THREE.ConeGeometry(0.07 * size, 0.6 * size, 12), fur); t.rotation.x = Math.PI / 2 + 0.6; t.position.set(0, 0.15 * size, 0.6 * size); body.add(t); }
-  const legs = [[-0.16, -0.32], [0.16, -0.32], [-0.16, 0.32], [0.16, 0.32]].map(([x, z]) => legPivot(root, x * size, 0.7 * size, z * size, 0.7 * size, 0.07 * size, fur));
-  return rig(root, body, legs, [fur, light], { radius: 0.6 * size, height: 1.1 * size });
+  add(body, S(0.32), fur, 0, 0.04, -0.28, 1, 1.05, 1.15);                // chest
+  add(body, S(0.26), fur, 0, 0.0, 0.3, 1, 0.95, 1.2);                    // hips
+  add(body, new THREE.CapsuleGeometry(0.25 * size, 0.42 * size, 8, 20), fur, 0, 0.0, 0, 1, 1, 1, Math.PI / 2);
+  add(body, new THREE.CapsuleGeometry(0.2 * size, 0.5 * size, 8, 16), light, 0, -0.1, -0.05, 1, 0.8, 1, Math.PI / 2);   // belly
+  // a ruff of fur around the neck
+  for (let k = 0; k < 9; k++) { const a = (k / 9) * Math.PI * 2; add(body, new THREE.ConeGeometry(0.07 * size, 0.24 * size, 6), fur, Math.cos(a) * 0.24, 0.12 + Math.sin(a) * 0.2, -0.45, 1, 1, 1, Math.PI / 2 + 0.3, 0, a); }
+  const neck = new THREE.Group(); neck.position.set(0, 0.16 * size, -0.48 * size); neck.rotation.x = 0.55; body.add(neck);
+  add(neck, new THREE.CylinderGeometry(0.13 * size, 0.18 * size, 0.36 * size, 16), fur, 0, 0.12, 0);
+  const head = new THREE.Group(); head.position.set(0, 0.32 * size, -0.05 * size); head.rotation.x = -0.55; neck.add(head);
+  add(head, S(0.18), fur, 0, 0.02, 0, 1, 0.92, 1.05);                    // skull
+  if (snout) {
+    add(head, new THREE.CapsuleGeometry(0.09 * size, 0.16 * size, 6, 14), light, 0, -0.04, -0.2, 1, 0.85, 1, Math.PI / 2);
+    add(head, S(0.045), dark, 0, -0.01, -0.33);                         // nose
+    add(head, new THREE.CapsuleGeometry(0.06 * size, 0.12 * size, 6, 12), light, 0, -0.1, -0.17, 1, 0.6, 1, Math.PI / 2 - 0.15);   // jaw
+  }
+  for (const sx of [-1, 1]) {
+    add(head, new THREE.ConeGeometry(0.065 * size, 0.18 * size, 4), fur, sx * 0.1, 0.17, 0.03, 1, 1, 0.45, -0.15, 0, sx * -0.25);   // ears
+    add(head, S(0.038), mat('#f4efe6', { roughness: 0.3 }), sx * 0.085, 0.05, -0.13);                                              // eye
+    add(head, S(0.024), new THREE.MeshBasicMaterial({ color: '#ffcf4a' }), sx * 0.092, 0.055, -0.155);                             // iris
+  }
+  if (tail) {
+    const tl = new THREE.Group(); tl.position.set(0, 0.12 * size, 0.52 * size); tl.rotation.x = -0.9; body.add(tl);
+    for (let k = 0; k < 5; k++) add(tl, S(0.075 - k * 0.011), k === 4 ? light : fur, 0, 0.11 + k * 0.11, k * k * 0.008);
+  }
+  // legs: a thick upper part on the pivot, a slimmer lower part and a paw
+  const leg = (x, z, front) => {
+    const p = new THREE.Group();
+    p.position.set(x * size, 0.72 * size, z * size);
+    root.add(p);
+    add(p, new THREE.CapsuleGeometry(0.085 * size, 0.24 * size, 6, 12), fur, 0, -0.18, front ? 0 : 0.03);
+    add(p, new THREE.CapsuleGeometry(0.055 * size, 0.26 * size, 6, 12), fur, 0, -0.48, front ? -0.02 : 0.05);
+    add(p, S(0.07), dark, 0, -0.66, -0.04, 1, 0.55, 1.3);
+    return p;
+  };
+  const legs = [leg(-0.17, -0.34, true), leg(0.17, -0.34, true), leg(-0.16, 0.32, false), leg(0.16, 0.32, false)];
+  return rig(root, body, legs, [fur, light], {
+    radius: 0.6 * size, height: 1.15 * size,
+    extra: { onAnimate(phase, windup) { head.rotation.x = -0.55 - windup * 0.3; } },
+  });
 }
 
 // insects and arachnids: beetles, spiders, scorpions, the big grub
@@ -230,7 +263,7 @@ function decorate(model, { horns = null, wings = null, size = 1 }) {
   const body = model.root.children[0];
   if (horns) for (const s of [-1, 1]) {
     const h = new THREE.Mesh(new THREE.ConeGeometry(0.06 * size, 0.5 * size, 12), mat(horns));
-    h.position.set(s * 0.15 * size, 0.38 * size, -0.62 * size);
+    h.position.set(s * 0.13 * size, 0.6 * size, -0.62 * size);
     h.rotation.set(-0.6, 0, s * 0.5);
     body.add(h);
   }
