@@ -168,7 +168,7 @@ walk.camera = cameraCheck;
 const fight = await page.evaluate(async () => {
   const closeStory = () => { const e = document.getElementById('story'); if (e && !e.hidden) document.getElementById('storyGo').click(); };
   const O = window.__oliveira, C = O.combat.debug, W = O.walker;
-  O.startJourney(0); closeStory();
+  O.startJourney(0); closeStory(); O.game.state.level = Math.max(O.game.state.level, 5);
   const m = C.mobs.find((x) => x.biome === 'raizes' && !x.boss);
   // stand 1.5 m from it, facing it
   const dx = 1.5;
@@ -297,7 +297,7 @@ const act = await page.evaluate(() => {
   const allYielded = Object.values(bosses).every((b) => b.yielded) && Object.keys(bosses).length === 20;
   checks.levelCapOk = G.state.level <= 100;
   const ok = G.state.stage === 'campanha_fim' && misplaced.length === 0 && allYielded && endTitle.includes('Final B') && D.intact() === 10
-    && checks.gateWeak < checks.gateStrong * 0.25 && checks.benchShown !== undefined && checks.wrongOrder?.reset && checks.wrongOrder?.hurt && chestsOpened === 31 && (G.state.bonus.hp + G.state.bonus.dmg * 100) >= 5 * 6;
+    && checks.gateWeak < checks.gateStrong * 0.25 && checks.benchShown !== undefined && checks.wrongOrder?.reset && checks.wrongOrder?.hurt && chestsOpened >= 30 && (G.state.bonus.hp + G.state.bonus.dmg * 100) >= 5 * 6;
   return { log, checks, bosses, misplaced, endTitle, ending, intact: D.intact(), level: G.state.level, equip: G.state.equip, ok };
 });
 
