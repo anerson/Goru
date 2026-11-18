@@ -328,25 +328,73 @@ function mistTexture() {
   mistTex.wrapS = THREE.RepeatWrapping;
   return mistTex;
 }
+// a cloud puff for the mist: a soft lump, lighter on top and shaded underneath (baked into
+// vertex colours, so it reads as a volume without any lighting)
+let mistPuff = null;
+function mistPuffGeometry() {
+  if (mistPuff) return mistPuff;
+  const g = lumpy({ detail: 3, amp: 0.16, freq: 1.3, seed: 5 });
+  const n = g.attributes.normal, col = [];
+  for (let i = 0; i < n.count; i++) { const k = 0.66 + 0.38 * Math.pow(n.getY(i) * 0.5 + 0.5, 1.5) + 0.04 * n.getZ(i); col.push(k, k, k * 0.98); }
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  mistPuff = g;
+  return g;
+}
 export function makeMistWall({ radius = 103, angle = 0, halfWidth = 0.42, height = 36, y = 0 } = {}) {
   const tex = mistTexture().clone();
   tex.needsUpdate = true;
   tex.repeat.set(3, 1);
+  const root = new THREE.Group();
+  root.userData.noToon = true;
+  // the opaque core: a curved sheet across the whole opening (nothing of the inside shows)
   const m = new THREE.MeshBasicMaterial({ map: tex, color: '#b9ae98', side: THREE.DoubleSide, fog: false, transparent: false });
   const theta = Math.atan2(Math.cos(angle), Math.sin(angle));          // three's cylinder: x = r sin(t), z = r cos(t)
   const wall = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, 32, 1, true, theta - halfWidth, halfWidth * 2), m);
   wall.position.y = y + height / 2 - 1;
   wall.raycast = () => {};
   wall.userData.noToon = true;
+  root.add(wall);
+  // billowing banks of cloud on both faces, so the mist has depth and a soft, lumpy outline
+  const pm = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false });
+  const items = [];
+  const rnd = (k) => { const s = Math.sin(k * 127.1 + angle * 311.7) * 43758.5453; return s - Math.floor(s); };
+  const span = radius * halfWidth * 2;
+  const cols = Math.max(6, Math.round(span / 6.5)), rows = Math.max(3, Math.round(height / 7));
+  for (const side of [1, -1]) for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+    const k = items.length;
+    const u = (i + 0.5 + (rnd(k) - 0.5) * 0.6) / cols * 2 - 1;
+    const a = angle + u * halfWidth * 0.94;
+    const lift = j / (rows - 1);
+    const s = (6 + rnd(k + 0.5) * 3.5) * (1 - lift * 0.25) * (1 - Math.abs(u) * 0.25);
+    const r = radius + side * (0.8 + rnd(k + 0.7) * 1.0);
+    items.push({ base: new THREE.Vector3(Math.cos(a) * r, y + 2 + lift * (height - 7) + (rnd(k + 0.3) - 0.5) * 2, Math.sin(a) * r), s, phase: rnd(k + 0.9) * 6.28, tone: 0.86 + rnd(k + 0.2) * 0.18, yaw: Math.atan2(Math.cos(a), Math.sin(a)) });
+  }
+  const puffs = new THREE.InstancedMesh(mistPuffGeometry(), pm, items.length);
+  puffs.raycast = () => {};
+  puffs.userData.noToon = true;
+  puffs.frustumCulled = false;
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), p = new THREE.Vector3(), c = new THREE.Color();
+  const base = new THREE.Color('#ddd5c2');
+  items.forEach((it, i) => puffs.setColorAt(i, c.copy(base).multiplyScalar(it.tone)));
+  let shrink = 1;
+  const place = (t) => {
+    items.forEach((it, i) => {
+      p.set(it.base.x + Math.sin(t * 0.21 + it.phase) * 0.8, it.base.y + Math.sin(t * 0.17 + it.phase * 1.3) * 0.6 + (1 - shrink) * 6, it.base.z + Math.cos(t * 0.19 + it.phase) * 0.8);
+      const s = it.s * (1 + Math.sin(t * 0.3 + it.phase) * 0.05) * shrink;
+      puffs.setMatrixAt(i, m4.compose(p, q.setFromEuler(e.set(0, it.yaw, Math.sin(t * 0.05 + it.phase) * 0.3)), sc.set(s, s * 0.8, s * 0.38)));
+    });
+    puffs.instanceMatrix.needsUpdate = true;
+  };
+  place(0);
+  root.add(puffs);
   return {
-    root: wall,
-    drift(t) { tex.offset.x = t * 0.01; },
+    root,
+    drift(t) { tex.offset.x = t * 0.01; if (root.visible) place(t); },
     fade(k) {                                                // 0 = solid mist, 1 = gone
       const o = Math.max(0, 1 - k);
-      m.transparent = o < 1;
-      m.opacity = o;
-      m.depthWrite = o >= 1;
-      wall.visible = o > 0.01;
+      for (const mm of [m, pm]) { mm.transparent = o < 1; mm.opacity = o; mm.depthWrite = o >= 1; }
+      shrink = 0.6 + 0.4 * o;
+      root.visible = o > 0.01;
     },
   };
 }
