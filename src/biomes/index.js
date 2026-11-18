@@ -13,12 +13,14 @@
 // Each one is a terrain disk you can walk anywhere on, with marked trails from every entry
 // (ramp junction, level bridges, trunk entrances) to a landmark in the middle.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { lumpy, boulder } from '../organic.js';
 import { mulberry32 } from '../noise.js';
 import { SEED, BIOMES, ENTRANCES, DISK_R, SLAB, LEVEL_STEP, junctionAngle } from '../tree/layout.js';
 import { V, polar, instances, label } from '../geom.js';
-import { makeTerrain, makeTrails, scatter, ceiling, noise2, entryAngles, drift, fernGeometry, lerpColor, std } from './common.js';
+import { makeTerrain, makeTrails, scatter, ceiling, noise2, entryAngles, drift, fernGeometry, lerpColor, std, trunkGeometry, capGeometry, capSpotsGeometry, stemGeometry, cactusGeometry, mesaGeometry, menhirGeometry, obstacleList, facet } from './common.js';
 import { jungle, volcano } from './more.js';
+import { landscapeObstacles } from '../landscape.js';
 import { swamp, crystals, suspended, corals, giantFlowers } from './aetherion.js';
 
 
@@ -30,6 +32,7 @@ export function buildBiomes(scene, mats) {
   let trailLength = 0;
   const builders = { raizes: forest, deserto: canyon, oceano: ocean, fornalha: volcano, selva: jungle, pantano: swamp, cristais: crystals, niveria: ice, suspensa: suspended, copa: meadow };
   const terrains = {};
+  const obstacles = {};
   BIOMES.forEach((b, i) => {
     const rand = mulberry32(SEED + 100 + i);
     const out = builders[b.id]({ scene, mats, rand, b });
@@ -38,12 +41,14 @@ export function buildBiomes(scene, mats) {
     if (out.noGo) noGo.push(out.noGo);
     trailLength += out.trailLength;
     terrains[b.id] = out.h;
+    obstacles[b.id] = out.obstacles ?? [];
     paths[b.id] = out.trails.lines.map((l) => l.map((p) => ({ x: p.x, z: p.z })));
     out.trails.meshes.forEach((m) => scene.add(m));
     if (i < BIOMES.length - 1) ceiling(scene, { rand, top: BIOMES[i + 1].level, below: b, mats });
     scene.add(label(b.name, b.color, polar(DISK_R - 8, junctionAngle(b.level), b.level + 6), 22));
   });
-  return { walkables, trailLength, noGo, paths, terrains, update: (dt, t) => updates.forEach((u) => u(dt, t)) };
+  obstacles.fora = landscapeObstacles;
+  return { walkables, trailLength, noGo, paths, terrains, obstacles, update: (dt, t) => updates.forEach((u) => u(dt, t)) };
 }
 
 // ---------------------------------------------------------------------------
@@ -66,15 +71,19 @@ function forest({ scene, mats, rand, b }) {
     return r > 15 && !(r > 56 && r < 82) && !near(x, z, d);
   };
 
+  const obs = obstacleList(near);
   const trees = scatter(rand, 42, 15, 96, (x, z) => free(x, z, 6));
-  scene.add(instances(new THREE.CylinderGeometry(0.35, 0.6, 1, 8).translate(0, 0.5, 0), mats.barkStatic,
-    trees.map(([x, z]) => ({ p: V(x, terrain.h(x, z), z), s: V(1.2, 6 + rand() * 4, 1.2) }))));
-  const crowns = [];
+  scene.add(instances(trunkGeometry(1), mats.barkStatic,
+    trees.map(([x, z]) => { obs.add(x, z, 1.0); return { p: V(x, terrain.h(x, z) - 0.2, z), s: V(2.2, 7 + rand() * 4, 2.2), rot: [0, rand() * 6, 0] }; })));
+  // crowns: a big dark mass under lighter lumps on top, so each tree reads as layered foliage
+  const crowns = [], tops = [];
   trees.forEach(([x, z]) => {
-    const top = terrain.h(x, z) + 7;
-    for (let k = 0; k < 4; k++) crowns.push({ p: V(x + (rand() - 0.5) * 5, top + rand() * 4, z + (rand() - 0.5) * 5), s: 3 + rand() * 2.5, color: ['#3f6b2a', '#4f7d30', '#2f5a24'][k % 3] });
+    const top = terrain.h(x, z) + 7.5;
+    for (let k = 0; k < 4; k++) { const a = k * 1.7 + rand(); crowns.push({ p: V(x + Math.cos(a) * 2.2, top + rand() * 1.5, z + Math.sin(a) * 2.2), s: V(3 + rand() * 1.5, 2.4 + rand(), 3 + rand() * 1.5), rot: [0, rand() * 6, 0], color: ['#2f5a24', '#3a6a28', '#355f26'][k % 3] }); }
+    for (let k = 0; k < 3; k++) { const a = k * 2.1 + rand(); tops.push({ p: V(x + Math.cos(a) * 1.4, top + 2.4 + rand() * 1.2, z + Math.sin(a) * 1.4), s: 2 + rand() * 1.3, rot: [0, rand() * 6, 0], color: ['#5f8f34', '#6e9c3a', '#4f8030'][k % 3] }); }
   });
   scene.add(instances(lumpy({ detail: 2, amp: 0.25, seed: 1 }), std({ roughness: 0.85 }), crowns));
+  scene.add(instances(lumpy({ detail: 2, amp: 0.22, seed: 7 }), std({ roughness: 0.8 }), tops));
 
   const fern = fernGeometry();
   scene.add(instances(fern, std({ side: THREE.DoubleSide, roughness: 0.7 }),
@@ -83,26 +92,40 @@ function forest({ scene, mats, rand, b }) {
   // glowing mushrooms: pale stems, caps that light up
   const shrooms = scatter(rand, 90, 14, 96, (x, z) => free(x, z, 2.5));
   const capColors = ['#4ff0ff', '#ffb347', '#ff6ad5', '#9dff6a'];
-  const stems = [], caps = [];
+  const stems = [], caps = [], spots = [];
+  const tilt = () => [(rand() - 0.5) * 0.25, rand() * 6, (rand() - 0.5) * 0.25];
   shrooms.forEach(([x, z]) => {
-    const h = 0.8 + Math.pow(rand(), 2) * 4, cap = 0.6 + h * 0.6, y = terrain.h(x, z);
+    const h = 0.8 + Math.pow(rand(), 2) * 4, cap = 0.6 + h * 0.6, y = terrain.h(x, z), rot = tilt();
     stems.push({ p: V(x, y, z), s: V(0.15 + h * 0.06, h, 0.15 + h * 0.06), color: '#e9e2cf' });
-    caps.push({ p: V(x, y + h, z), s: V(cap, cap * 0.55, cap), color: new THREE.Color(capColors[(rand() * 4) | 0]).multiplyScalar(1.6) });
+    const top = V(0, h * 0.97, 0).applyEuler(new THREE.Euler(rot[0], 0, rot[2])).add(V(x, y, z));
+    caps.push({ p: top, s: V(cap, cap * 0.6, cap), rot, color: new THREE.Color(capColors[(rand() * 4) | 0]).multiplyScalar(1.6) });
+    spots.push({ p: top, s: V(cap, cap * 0.6, cap), rot, color: '#fff8e6' });
+    if (h > 3) obs.add(x, z, 0.15 + h * 0.06 + 0.2);
   });
   // the landmark: one giant mushroom in the middle
   stems.push({ p: V(0, terrain.h(0, 0), 0), s: V(1.6, 13, 1.6), color: '#efe6d0' });
-  caps.push({ p: V(0, terrain.h(0, 0) + 13, 0), s: V(11, 5, 11), color: new THREE.Color('#4ff0ff').multiplyScalar(1.3) });
-  scene.add(instances(new THREE.CylinderGeometry(1, 1.2, 1, 10).translate(0, 0.5, 0), std({ roughness: 0.6 }), stems));
-  scene.add(instances(new THREE.SphereGeometry(1, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffffff' }), caps));
+  caps.push({ p: V(0, terrain.h(0, 0) + 12.6, 0), s: V(11, 5.5, 11), color: new THREE.Color('#4ff0ff').multiplyScalar(1.3) });
+  spots.push({ p: V(0, terrain.h(0, 0) + 12.6, 0), s: V(11, 5.5, 11), color: '#fff8e6' });
+  obs.add(0, 0, 1.9);
+  scene.add(instances(stemGeometry(), std({ roughness: 0.6 }), stems));
+  scene.add(instances(capGeometry(), new THREE.MeshBasicMaterial({ color: '#ffffff' }), caps));
+  scene.add(instances(capSpotsGeometry(), std({ roughness: 0.5 }), spots, { shadow: false }));
   const glow = new THREE.PointLight('#7ff6ff', 1800, 0, 2);
   glow.position.set(0, 13, 0);
   scene.add(glow);
 
-  scene.add(instances(boulder(4), std({ color: '#6c7660', roughness: 0.9 }),
-    scatter(rand, 45, 12, 98, (x, z) => free(x, z, 3)).map(([x, z]) => ({ p: V(x, terrain.h(x, z), z), s: V(1 + rand() * 2.5, 0.6 + rand() * 1.4, 1 + rand() * 2.5), rot: [rand(), rand() * 6, rand()] }))));
+  // mossy boulders: grey stone with a green cap of moss on top
+  const rocks = scatter(rand, 45, 12, 98, (x, z) => free(x, z, 3)).map(([x, z]) => {
+    const sx = 1 + rand() * 2.5, sz = 1 + rand() * 2.5, sy = 0.6 + rand() * 1.4;
+    if (sy > 1.1) obs.add(x, z, Math.min(sx, sz) * 0.85);
+    return { p: V(x, terrain.h(x, z), z), s: V(sx, sy, sz), rot: [(rand() - 0.5) * 0.3, rand() * 6, (rand() - 0.5) * 0.3], color: ['#6c7660', '#7a8070', '#636a58'][(rand() * 3) | 0] };
+  });
+  scene.add(instances(boulder(4), std({ roughness: 0.9 }), rocks));
+  scene.add(instances(lumpy({ detail: 2, amp: 0.2, seed: 12, flatten: 0.35 }), std({ roughness: 1 }),
+    rocks.map((r) => ({ p: r.p.clone().setY(r.p.y + r.s.y * 0.6), s: V(r.s.x * 0.66, r.s.y * 0.55, r.s.z * 0.66), rot: r.rot, color: '#5a8a35' })), { shadow: false }));
 
   const flies = drift(scene, rand, { count: 500, rMax: 90, y0: L + 0.5, y1: L + 14, color: '#d8ff7a', size: 0.25, speed: 0.6 });
-  return { h: terrain.h, walkables: [terrain.mesh], trails, trailLength: trails.length + more.length, update: (dt, t) => flies(dt, t, 0.5 + 0.5 * Math.sin(t * 2.3)) };
+  return { h: terrain.h, walkables: [terrain.mesh], trails, trailLength: trails.length + more.length, obstacles: obs.list, update: (dt, t) => flies(dt, t, 0.5 + 0.5 * Math.sin(t * 2.3)) };
 }
 
 // ---------------------------------------------------------------------------
@@ -152,9 +175,10 @@ function ocean({ scene, mats, rand, b }) {
   scene.add(instances(new THREE.SphereGeometry(0.3, 10, 8), new THREE.MeshBasicMaterial({ color: '#ffffff' }),
     pads.filter(() => rand() < 0.35).map(([x, z]) => ({ p: V(x, L + W + 0.2, z), s: 1, color: new THREE.Color(rand() < 0.5 ? '#ffb3d9' : '#fff2c4').multiplyScalar(1.3) })), { shadow: false }));
 
+  const obs = obstacleList(trails.near);
   const willows = scatter(rand, 20, 18, 60, (x, z) => !inWater(x, z) && terrain.h(x, z) > L + W + 0.5 && free(x, z, 6));
-  scene.add(instances(new THREE.CylinderGeometry(0.4, 0.7, 1, 8).translate(0, 0.5, 0), mats.barkStatic,
-    willows.map(([x, z]) => ({ p: V(x, terrain.h(x, z), z), s: V(1, 7, 1) }))));
+  scene.add(instances(trunkGeometry(4), mats.barkStatic,
+    willows.map(([x, z]) => { obs.add(x, z, 0.9); return { p: V(x, terrain.h(x, z) - 0.2, z), s: V(1.9, 7.2, 1.9), rot: [0, rand() * 6, 0] }; })));
   const drapes = [];
   willows.forEach(([x, z]) => {
     const y = terrain.h(x, z) + 6.5;
@@ -166,8 +190,10 @@ function ocean({ scene, mats, rand, b }) {
   // landmark: a pavilion in the dry middle
   const y0 = terrain.h(0, 0);
   const posts = Array.from({ length: 8 }, (_, k) => ({ p: polar(7, (k / 8) * Math.PI * 2, y0), s: V(0.35, 6, 0.35) }));
-  scene.add(instances(new THREE.CylinderGeometry(1, 1, 1, 8).translate(0, 0.5, 0), mats.wood, posts));
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(9.5, 4, 8), mats.wood);
+  scene.add(instances(new THREE.CylinderGeometry(1, 1, 1, 12).translate(0, 0.5, 0), mats.wood, posts));
+  posts.forEach(({ p }) => obs.add(p.x, p.z, 0.5));
+  // a curved pagoda roof with a turned-up rim
+  const roof = new THREE.Mesh(new THREE.LatheGeometry([[0, 2.4], [1.2, 2.1], [4, 0.9], [8, -0.1], [9.8, -0.35], [10.2, 0.1], [9.6, -0.6], [0, -0.6]].map(([r, y]) => new THREE.Vector2(r, y)), 16), std({ color: '#3f7a6a', roughness: 0.7 }));
   roof.position.set(0, y0 + 8, 0);
   roof.castShadow = true;
   scene.add(roof);
@@ -179,6 +205,7 @@ function ocean({ scene, mats, rand, b }) {
   return {
     h: terrain.h, walkables: [terrain.mesh, ...trails.meshes], trails, trailLength: trails.length,
     // the water is not walkable: stay on the shore or the boardwalks
+    obstacles: obs.list,
     noGo: (x, z, floor) => Math.abs(floor - L) < 12 && floor < L + W - 0.05 && Math.hypot(x, z) < DISK_R,
     update: (dt, t) => { mist(dt, t, 1); water.material.emissiveIntensity = 0.55 + Math.sin(t * 0.8) * 0.08; },
   };
@@ -199,27 +226,34 @@ function canyon({ scene, mats, rand, b }) {
   const free = (x, z, d) => Math.hypot(x, z) > 15 && !trails.near(x, z, d);
 
   const rock = std({ roughness: 0.95 });
+  const obs = obstacleList(trails.near);
   const mesas = [];
   scatter(rand, 26, 18, 60, (x, z) => free(x, z, 9)).forEach(([x, z]) => {
     const r = 3 + rand() * 6, h = 5 + Math.pow(rand(), 1.5) * 12, y = terrain.h(x, z) - 0.5;
     const tone = ['#9e4a2a', '#b85a32', '#c97a45'][(rand() * 3) | 0];
     mesas.push({ p: V(x, y, z), s: V(r, h, r), rot: [0, rand() * 6, 0], color: tone });
-    if (rand() < 0.6) mesas.push({ p: V(x, y + h, z), s: V(r * 0.7, h * 0.35, r * 0.7), rot: [0, rand() * 6, 0], color: '#d08a50' });
+    if (rand() < 0.6) mesas.push({ p: V(x, y + h - 0.2, z), s: V(r * 0.62, h * 0.35, r * 0.62), rot: [0, rand() * 6, 0], color: '#d89a5c' });
+    obs.add(x, z, r * 1.05);
   });
-  scene.add(instances(new THREE.CylinderGeometry(1, 1.15, 1, 9).translate(0, 0.5, 0), rock, mesas));
+  scene.add(instances(mesaGeometry(3), std({ roughness: 0.95, vertexColors: true }), mesas));
   scene.add(instances(boulder(5), rock,
-    scatter(rand, 70, 15, 62, (x, z) => free(x, z, 3)).map(([x, z]) => ({ p: V(x, terrain.h(x, z), z), s: V(0.8 + rand() * 2, 0.6 + rand() * 1.6, 0.8 + rand() * 2), rot: [rand(), rand() * 6, rand()], color: '#a85a35' }))));
+    scatter(rand, 70, 15, 62, (x, z) => free(x, z, 3)).map(([x, z]) => {
+      const sx = 0.8 + rand() * 2, sy = 0.6 + rand() * 1.6, sz = 0.8 + rand() * 2;
+      if (sy > 1.2) obs.add(x, z, Math.min(sx, sz) * 0.85);
+      return { p: V(x, terrain.h(x, z), z), s: V(sx, sy, sz), rot: [(rand() - 0.5) * 0.4, rand() * 6, (rand() - 0.5) * 0.4], color: ['#a85a35', '#b86a40', '#94502e'][(rand() * 3) | 0] };
+    })));
 
   // saguaro-style cacti: a trunk and two arms
-  const cactusMat = std({ color: '#5d7d3a', roughness: 0.7 });
-  const trunks = [], arms = [];
+  const cactusMat = std({ roughness: 0.7 });
+  const cacti = [], blooms = [];
   scatter(rand, 50, 15, 62, (x, z) => free(x, z, 3)).forEach(([x, z]) => {
-    const h = 3 + rand() * 4, y = terrain.h(x, z), a = rand() * 6;
-    trunks.push({ p: V(x, y, z), s: V(0.45, h, 0.45) });
-    for (const s of [-1, 1]) if (rand() < 0.8) arms.push({ p: V(x + Math.cos(a) * s * 0.85, y + h * (0.35 + rand() * 0.2), z + Math.sin(a) * s * 0.85), s: V(0.3, h * 0.45, 0.3) });
+    const h = 3 + rand() * 4, y = terrain.h(x, z), w = h * (0.9 + rand() * 0.3);
+    cacti.push({ p: V(x, y - 0.1, z), s: V(w, h, w), rot: [0, rand() * 6, 0], color: ['#5d7d3a', '#6a8a40', '#4f7034'][(rand() * 3) | 0] });
+    blooms.push({ p: V(x, y + h * 0.99, z), s: 0.18 + rand() * 0.1, color: new THREE.Color(['#ff6fa8', '#ffd23f', '#ff8a3a'][(rand() * 3) | 0]).multiplyScalar(1.2) });
+    obs.add(x, z, h * 0.13);
   });
-  const cyl = new THREE.CylinderGeometry(1, 1, 1, 10).translate(0, 0.5, 0);
-  scene.add(instances(cyl, cactusMat, trunks), instances(cyl, cactusMat, arms));
+  scene.add(instances(cactusGeometry(), cactusMat, cacti));
+  scene.add(instances(new THREE.IcosahedronGeometry(1, 1), new THREE.MeshBasicMaterial({ color: '#ffffff' }), blooms, { shadow: false }));
 
   // cairns marking the trails
   const cairns = [];
@@ -235,9 +269,10 @@ function canyon({ scene, mats, rand, b }) {
   arch.rotation.y = junctionAngle(L);
   arch.castShadow = arch.receiveShadow = true;
   scene.add(arch);
+  for (const s of [-1, 1]) obs.add(Math.cos(junctionAngle(L)) * 11 * s, -Math.sin(junctionAngle(L)) * 11 * s, 2.2);
 
   const dust = drift(scene, rand, { count: 500, rMax: 62, y0: L, y1: L + 20, color: '#ffc89a', size: 0.18, speed: 2.5, opacity: 0.5 });
-  return { h: terrain.h, walkables: [terrain.mesh], trails, trailLength: trails.length, update: (dt, t) => dust(dt, t, 1) };
+  return { h: terrain.h, walkables: [terrain.mesh], trails, trailLength: trails.length, obstacles: obs.list, update: (dt, t) => dust(dt, t, 1) };
 }
 
 // ---------------------------------------------------------------------------
@@ -263,29 +298,54 @@ function ice({ scene, mats, rand, b }) {
   const free = (x, z, d) => Math.hypot(x, z) > 15 && !trails.near(x, z, d);
 
   // frosted pines: three stacked cones, each with a snow cap
+  const obs = obstacleList(trails.near);
   const pines = scatter(rand, 55, 16, 62, (x, z) => free(x, z, 4));
-  const greens = [], snow = [];
+  const greens = [], snow = [], pineTrunks = [];
+  // a pine tier: a cone with a scalloped, drooping skirt; snow sits on its upper half
+  const tier = (() => {
+    const g = new THREE.ConeGeometry(1, 1, 16, 3).translate(0, 0.5, 0);
+    const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i), a = Math.atan2(z, x);
+      const droop = y < 0.05 ? -0.08 * (1 + Math.cos(a * 8)) : 0;
+      const k = 1 + (y < 0.05 ? Math.cos(a * 8) * 0.06 : 0);
+      p.setXYZ(i, x * k, y + droop, z * k);
+    }
+    g.computeVertexNormals();
+    return g;
+  })();
   pines.forEach(([x, z]) => {
-    const h = 6 + rand() * 8, y = terrain.h(x, z);
+    const h = 6 + rand() * 8, y = terrain.h(x, z), dark = rand() < 0.5 ? '#2c4a36' : '#2f5540';
+    pineTrunks.push({ p: V(x, y - 0.1, z), s: V(0.9, h * 0.35, 0.9), rot: [0, rand() * 6, 0] });
     for (let k = 0; k < 3; k++) {
       const w = (1 - k * 0.28) * h * 0.32, base = y + h * (0.15 + k * 0.25);
-      greens.push({ p: V(x, base, z), s: V(w, h * 0.45, w), color: '#2c4a36' });
-      snow.push({ p: V(x, base + h * 0.12, z), s: V(w * 0.85, h * 0.36, w * 0.85), color: '#f2f7ff' });
+      greens.push({ p: V(x, base, z), s: V(w, h * 0.45, w), color: dark });
+      snow.push({ p: V(x, base + h * 0.2, z), s: V(w * 0.66, h * 0.3, w * 0.66), color: '#f2f7ff' });
     }
+    obs.add(x, z, 0.7);
   });
-  const cone = new THREE.ConeGeometry(1, 1, 9).translate(0, 0.5, 0);
-  scene.add(instances(cone, std({ roughness: 0.85 }), greens), instances(cone, std({ roughness: 0.6 }), snow));
+  scene.add(instances(trunkGeometry(2, 4), mats.barkStatic, pineTrunks));
+  scene.add(instances(tier, std({ roughness: 0.85 }), greens), instances(tier, std({ roughness: 0.6 }), snow));
 
   const crystalMat = new THREE.MeshStandardMaterial({ color: '#b9e3ff', roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.8, emissive: '#3a90ff', emissiveIntensity: 0.6 });
-  const crystals = scatter(rand, 70, 15, 62, (x, z) => free(x, z, 3)).map(([x, z]) => ({
-    p: V(x, terrain.h(x, z), z), s: V(0.6 + rand(), 2 + rand() * 6, 0.6 + rand()), rot: [(rand() - 0.5) * 0.7, rand() * 6, (rand() - 0.5) * 0.7],
-  }));
+  // ice crystals grow in clusters: a tall one with smaller ones leaning out around it
+  const crystals = [];
+  scatter(rand, 26, 15, 62, (x, z) => free(x, z, 3.5)).forEach(([x, z]) => {
+    const y = terrain.h(x, z), H = 2.5 + rand() * 5;
+    crystals.push({ p: V(x, y, z), s: V(0.6 + rand() * 0.4, H, 0.6 + rand() * 0.4), rot: [(rand() - 0.5) * 0.2, rand() * 6, (rand() - 0.5) * 0.2] });
+    for (let k = 0; k < 3; k++) { const a = rand() * 6; crystals.push({ p: V(x + Math.cos(a) * 0.7, y, z + Math.sin(a) * 0.7), s: V(0.35 + rand() * 0.3, H * (0.3 + rand() * 0.3), 0.35 + rand() * 0.3), rot: [Math.sin(a) * 0.6, rand() * 6, -Math.cos(a) * 0.6] }); }
+    if (H > 4) obs.add(x, z, 1.0);
+  });
   // landmark: a cluster of huge crystals at the edge of the pond
-  for (let k = 0; k < 9; k++) crystals.push({ p: polar(14 + rand() * 2, (k / 9) * Math.PI * 2, L), s: V(2 + rand() * 1.5, 7 + rand() * 7, 2 + rand() * 1.5), rot: [(rand() - 0.5) * 0.5, rand() * 6, (rand() - 0.5) * 0.5] });
-  scene.add(instances(new THREE.OctahedronGeometry(1, 0), crystalMat, crystals));
+  for (let k = 0; k < 9; k++) { const c = { p: polar(14 + rand() * 2, (k / 9) * Math.PI * 2, L), s: V(2 + rand() * 1.5, 7 + rand() * 7, 2 + rand() * 1.5), rot: [(rand() - 0.5) * 0.5, rand() * 6, (rand() - 0.5) * 0.5] }; crystals.push(c); obs.add(c.p.x, c.p.z, c.s.x * 0.75); }
+  // a hexagonal prism with a pointed tip (faceted normals, like cut ice)
+  const prism = facet(new THREE.CylinderGeometry(0.55, 0.7, 0.75, 6).translate(0, 0.375, 0)).clone();
+  const tip = facet(new THREE.ConeGeometry(0.55, 0.3, 6).translate(0, 0.9, 0));
+  const shard = mergeGeometries([prism, tip].map((g) => { g.deleteAttribute('uv'); return g; }));
+  scene.add(instances(shard, crystalMat, crystals));
 
   const snowfall = drift(scene, rand, { count: 1600, rMax: 64, y0: L, y1: L + LEVEL_STEP - SLAB, color: '#ffffff', size: 0.16, speed: 0, fall: 2.2, opacity: 0.9 });
-  return { h: terrain.h, walkables: [terrain.mesh], trails, trailLength: trails.length, update: (dt, t) => snowfall(dt, t, 1) };
+  return { h: terrain.h, walkables: [terrain.mesh], trails, trailLength: trails.length, obstacles: obs.list, update: (dt, t) => snowfall(dt, t, 1) };
 }
 
 // ---------------------------------------------------------------------------
@@ -308,17 +368,22 @@ function meadow({ scene, mats, rand, b }) {
     scatter(rand, 5000, 8, 64, (x, z) => free(x, z, 1.6)).map(([x, z]) => ({ p: V(x, terrain.h(x, z), z), s: V(1, 0.4 + rand() * 0.6, 1), rot: [(rand() - 0.5) * 0.4, rand() * 6, 0], color: rand() < 0.5 ? '#7d9a3e' : '#a3b555' })), { shadow: false }));
 
   // young olive trees
+  const obs = obstacleList(trails.near);
   const saplings = scatter(rand, 14, 18, 58, (x, z) => free(x, z, 6));
-  scene.add(instances(new THREE.CylinderGeometry(0.3, 0.5, 1, 8).translate(0, 0.5, 0), mats.barkStatic, saplings.map(([x, z]) => ({ p: V(x, terrain.h(x, z), z), s: V(1, 4, 1) }))));
+  scene.add(instances(trunkGeometry(3), mats.barkStatic, saplings.map(([x, z]) => { obs.add(x, z, 0.7); return { p: V(x, terrain.h(x, z) - 0.15, z), s: V(1.5, 5, 1.5), rot: [0, rand() * 6, 0] }; })));
   const blobs = [];
-  saplings.forEach(([x, z]) => { for (let k = 0; k < 5; k++) blobs.push({ p: V(x + (rand() - 0.5) * 4, terrain.h(x, z) + 5 + rand() * 2, z + (rand() - 0.5) * 4), s: V(2.4, 1.6, 2.4), color: '#68724c' }); });
+  saplings.forEach(([x, z]) => {
+    for (let k = 0; k < 5; k++) { const a = k * 1.3 + rand(); blobs.push({ p: V(x + Math.cos(a) * 1.8, terrain.h(x, z) + 5 + rand() * 1.5, z + Math.sin(a) * 1.8), s: V(2.4, 1.6, 2.4), rot: [0, rand() * 6, 0], color: ['#68724c', '#7a8456', '#5d6844'][k % 3] }); }
+    blobs.push({ p: V(x, terrain.h(x, z) + 7, z), s: V(2, 1.5, 2), color: '#8a9460' });
+  });
   scene.add(instances(lumpy({ detail: 2, amp: 0.2, seed: 3 }), std({ roughness: 0.8 }), blobs));
 
-  giantFlowers(scene, rand, terrain.h, free);
+  giantFlowers(scene, rand, terrain.h, free, 18, obs);
 
-  // landmark: a ring of standing stones
-  const stones = Array.from({ length: 11 }, (_, k) => ({ p: polar(9, (k / 11) * Math.PI * 2, terrain.h(0, 0) - 0.3), s: V(1.3, 5 + rand() * 3, 0.8), rot: [0, (k / 11) * Math.PI * 2, (rand() - 0.5) * 0.1], color: '#9a958a' }));
-  scene.add(instances(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0), std({ flatShading: true }), stones));
+  // landmark: a ring of weathered standing stones
+  const stones = Array.from({ length: 11 }, (_, k) => ({ p: polar(9, (k / 11) * Math.PI * 2, terrain.h(0, 0) - 0.3), s: V(1.5, 5 + rand() * 3, 1.5), rot: [0, -(k / 11) * Math.PI * 2 + Math.PI / 2, (rand() - 0.5) * 0.12], color: ['#9a958a', '#a8a294', '#8d897e'][k % 3] }));
+  scene.add(instances(menhirGeometry(2), std({ roughness: 0.95 }), stones));
+  stones.forEach(({ p }) => obs.add(p.x, p.z, 0.8));
 
-  return { h: terrain.h, walkables: [terrain.mesh], trails, trailLength: trails.length };
+  return { h: terrain.h, walkables: [terrain.mesh], trails, trailLength: trails.length, obstacles: obs.list };
 }
