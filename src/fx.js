@@ -52,6 +52,8 @@ export function createFx(scene, reduceMotion = false) {
     dodge: (pos) => emit(pos, { n: 10, color: '#9dffcf', speed: 2, up: 0.5, life: 0.4, gravity: 0 }),
     yield: (pos) => { ring(pos, '#9dffcf', 8, 1.4); emit(pos, { n: 50, color: '#9dffcf', speed: 2, up: 2, rise: 3, gravity: -1, life: 2 }); },
     ring,
+    // free-form bursts for ability effects
+    burst: (pos, o) => emit(pos, o),
     update(dt) {
       let k = 0;
       for (let i = parts.length - 1; i >= 0; i--) {

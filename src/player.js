@@ -44,7 +44,28 @@ export function createWalker({ walkables, rootMeshes, rootSegs, noGo = [] }) {
     if (d < r && d > 1e-4) { state.x = cx + (dx / d) * r; state.z = cz + (dz / d) * r; }
   }
 
+  // solid props (tents, huts, barrels, NPCs, trees...): circles on the ground between two heights,
+  // kept in an 8 m grid so only the nearby ones are checked
+  const CELL = 8, grid = new Map();
+  const cellKey = (i, j) => `${i},${j}`;
+  function addObstacle(x, z, r, y0 = -2, y1 = 40) {
+    const o = { x, z, r, y0, y1 };
+    const m = r + 1;   // the body radius reaches into neighbouring cells
+    const i0 = Math.floor((x - m) / CELL), i1 = Math.floor((x + m) / CELL), j0 = Math.floor((z - m) / CELL), j1 = Math.floor((z + m) / CELL);
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) {
+      const k = cellKey(i, j);
+      if (!grid.has(k)) grid.set(k, []);
+      grid.get(k).push(o);
+    }
+    return o;
+  }
+  function collideProps() {
+    const list = grid.get(cellKey(Math.floor(state.x / CELL), Math.floor(state.z / CELL)));
+    if (!list) return;
+    for (const o of list) if (!o.off && state.feet > o.y0 - 0.5 && state.feet < o.y1) pushOut(o.x, o.z, o.r + METRICS.body);
+  }
   function collide() {
+    collideProps();
     const y = Math.max(state.feet + 0.9, 0);
     if (y < TRUNK.top + 5) {
       for (let i = 0; i < TRUNK.strands; i++) {
@@ -209,5 +230,5 @@ export function createWalker({ walkables, rootMeshes, rootSegs, noGo = [] }) {
     dodgeCd = cooldown;
     return true;
   }
-  return { state, update, teleport, dodge, look, zoom, setFlying, applyToCamera, floorAt };
+  return { state, update, teleport, dodge, addObstacle, look, zoom, setFlying, applyToCamera, floorAt };
 }

@@ -116,10 +116,13 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   }
 
   // ---------- damage ----------
-  function hurtMob(m, amount, from, crit = false) {
+  // opts.quiet: a damage-over-time tick (no push, no shake, no sound); opts.skill: an ability hit
+  function hurtMob(m, amount, from, crit = false, opts = {}) {
     if (m.state === 'dead' || m.state === 'dormant' || !(amount > 0)) return;
     // armour from the bestiary's Defesa (and a boss's own mechanics); the GM's staff ignores it
     if (amount < 1e6) amount *= (m.def.armor ?? 1) * (rulesOf(m).armorMul ?? 1);
+    // a marked creature takes more from everyone (Marca do Caçador, Flecha Elemental, Pulso)
+    if (amount < 1e6 && m.markT > 0) amount *= m.markMore ?? 1.15;
     let weakHit = false;
     // a guardian barely feels a weapon below its floor's tier: craft that floor's weapon first
     if (amount < 1e6 && m.boss && m.boss !== 'gm' && !gmOn) {
@@ -132,16 +135,19 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
       }
     }
     m.hp -= amount;
-    if (!weakHit) sfx(m.boss || amount >= 1e6 ? 'bigHit' : 'hit');
     m.flash = 0.12;
-    const away = m.pos.clone().sub(from).setY(0).normalize();
-    m.knock.copy(away).multiplyScalar(m.boss ? 2 : 7);
     const huge = amount >= 1e6;
     const top = m.pos.clone().setY(m.pos.y + m.model.height + 0.6);
-    popNumber(top, `${crit ? 'CRÍTICO ' : ''}${Math.max(1, Math.round(amount)).toLocaleString('pt-BR')}`, huge || crit ? '#ffd76a' : weakHit ? '#9a9a9a' : '#ffe9a8', crit ? 'crit' : '');
-    const mid = m.pos.clone().setY(m.pos.y + m.model.height * 0.6);
-    if (crit) { fx?.crit(mid); sfx('crit'); } else if (!weakHit) fx?.hit(mid, !!m.boss);
-    feedback(m.boss ? 'large' : 'medium');
+    if (!opts.quiet) {
+      if (!weakHit) sfx(m.boss || amount >= 1e6 ? 'bigHit' : 'hit');
+      const away = m.pos.clone().sub(from).setY(0).normalize();
+      m.knock.copy(away).multiplyScalar(m.boss ? 2 : 7);
+      const mid = m.pos.clone().setY(m.pos.y + m.model.height * 0.6);
+      if (crit) { fx?.crit(mid); sfx('crit'); } else if (!weakHit) fx?.hit(mid, !!m.boss);
+      feedback(m.boss ? 'large' : 'medium');
+    }
+    const colour = huge || crit ? '#ffd76a' : weakHit ? '#9a9a9a' : opts.skill ? opts.skill : opts.quiet ? '#b0e0ff' : '#ffe9a8';
+    popNumber(top, `${crit ? 'CRÍTICO ' : ''}${Math.max(1, Math.round(amount)).toLocaleString('pt-BR')}`, colour, crit ? 'crit' : '');
     if (m.state === 'idle' || m.state === 'alert' || m.state === 'return') { m.state = 'chase'; m.timer = 0; }
     if (m.hp <= 0) { die(m); return; }
     // a story boss at a quarter of its health yields instead of fighting on: the player chooses
@@ -176,6 +182,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     if (walker.state.dodgeT > 0) { fx?.dodge(V(walker.state.x, walker.state.feet + 1, walker.state.z)); popNumber(V(walker.state.x, walker.state.feet + 2.2, walker.state.z), 'esquivou', '#9dffcf'); return; }
     game.hurt(amount);
     sfx('hurt');
+    popNumber(V(walker.state.x, walker.state.feet + 2.3, walker.state.z), `-${Math.round(amount)}`, '#ff6a5a');
     dropCombo();
     feedback(amount >= 20 ? 'large' : 'medium');
   }
@@ -245,21 +252,44 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     const boss = !!(m.boss && m.boss !== 'gm');
     // Arqueiro's steady aim: standing still before the shot is a sure-er crit
     const steady = c.id === 'arqueiro' && !walker.state.moving ? 0.2 : 0;
-    const crit = readyCrit > 0 || rand() < (combo >= 10 ? 0.2 : 0.12) + (c.crit ?? 0) + steady;
-    if (readyCrit > 0) readyCrit = 0;
-    const bonus = (boss && c.bossBonus ? 1 + c.bossBonus : 1) * buff.dmg * (buff.plan ? 1.2 : 1);
+    const opportunist = c.id === 'ladino' && m.markT > 0 ? 0.3 : 0;   // Ataque Oportunista
+    const crit = readyCrit > 0 || rand() < (combo >= 10 ? 0.2 : 0.12) + (c.crit ?? 0) + steady + opportunist;
+    const ready = readyCrit > 0 ? readyMult : 1;
+    if (readyCrit > 0) { readyCrit = 0; readyMult = 1; }
+    const bonus = (boss && c.bossBonus ? 1 + c.bossBonus : 1) * buff.dmg * ready;
     hurtMob(m, rollDamage(w) * game.power() * (1 + Math.min(combo - 1, 10) * 0.05) * (crit ? 1.8 : 1) * bonus, from, crit);
   }
   // ---- class abilities: four active (keys 1-4) and the supreme one (R). Each is data (campaign_data
   // CLASSES): effects the engine plays in order. Cooldowns run on the game clock.
   const cds = [0, 0, 0, 0, 0];           // 0-3 active, 4 supreme
-  let shield = { t: 0, red: 0 }, buff = { t: 0, dmg: 1, plan: false }, invul = 0, readyCrit = 0;
+  let shield = { t: 0, red: 0 }, buff = { t: 0, dmg: 1, plan: false }, invul = 0, readyCrit = 0, readyMult = 1;
   let traps = [];
   const aimPoint = (target) => {
     if (target) return target.pos;
     const me = walker.state, dx = -Math.sin(me.yaw) * 4, dz = -Math.cos(me.yaw) * 4;
     return V(me.x + dx, me.feet, me.z + dz);
   };
+  // ---- what each ability looks like ----
+  const shots = [];                       // projectiles in flight: { mesh, from, to, t, dur, color, splash }
+  const shotGeo = { orb: new THREE.SphereGeometry(0.35, 16, 12), arrow: new THREE.CylinderGeometry(0.04, 0.04, 1.4, 6).rotateX(Math.PI / 2) };
+  function launch(kind, from, to, color, splash) {
+    const mesh = new THREE.Mesh(shotGeo[kind], new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(2) }));
+    mesh.position.copy(from);
+    mesh.lookAt(to);
+    scene.add(mesh);
+    shots.push({ mesh, from: from.clone(), to: to.clone(), t: 0, dur: Math.max(0.12, from.distanceTo(to) / 45), color, splash, kind });
+  }
+  const bubble = new THREE.Mesh(new THREE.SphereGeometry(1.25, 28, 20), new THREE.MeshBasicMaterial({ color: '#9ad0ff', transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+  const aura = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.06, 6, 40).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffd76a', transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending }));
+  bubble.visible = aura.visible = false;
+  scene.add(bubble, aura);
+  const trapMeshes = [];
+  function trapDisc(pos, r, color) {
+    const m = new THREE.Mesh(new THREE.RingGeometry(r * 0.15, r, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.35, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
+    m.position.copy(pos).setY(pos.y + 0.08);
+    scene.add(m);
+    return m;
+  }
   function runEffect(e, target) {
     const me = walker.state, self = V(me.x, me.feet, me.z);
     switch (e.v) {
@@ -267,33 +297,44 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
         const center = e.at === 'self' ? self : aimPoint(target);
         if (!e.mult && !e.stun && !e.mark) break;
         for (const m of mobs) {
-          if (['dead', 'dormant', 'rise', 'gone', 'retreat'].includes(m.state) || m.ally) continue;
+          if (['dead', 'dormant', 'rise', 'gone', 'retreat', 'yield'].includes(m.state) || m.ally) continue;
           if (m.pos.distanceTo(center) > (e.radius ?? 2)) continue;
           if (e.execute && !(m.boss && m.boss !== 'gm') && m.hp / m.def.hp < e.execute) { m.hp = 0; die(m); continue; }
-          if (e.mult) hurtMob(m, rollDamage(cur()) * game.power() * e.mult * buff.dmg, center, true);
+          if (e.mult) hurtMob(m, rollDamage(cur()) * game.power() * e.mult * buff.dmg, center, false, { skill: game.cls.color });
           if (m.state !== 'dead') {
-            if (e.stun) { m.state = 'recover'; m.timer = e.stun; m.knock.set(0, 0, 0); }
+            if (e.stun && m.state !== 'yield') { if (m.boss) lane.visible = ring.visible = false; m.state = 'recover'; m.timer = e.stun; m.knock.set(0, 0, 0); }
             if (e.mark) { m.markT = e.mark; m.markMore = e.markMore ?? 1.15; }
             if (e.knock) { const d = m.pos.clone().sub(center).setY(0).normalize(); m.knock.copy(d).multiplyScalar(e.knock); }
           }
         }
-        fx?.ring(V(center.x, center.y + 0.2, center.z), '#ffe9a0', e.radius ?? 2, 0.5);
+        const col = game.cls.color ?? '#ffe9a0';
+        if (e.at === 'aim' && game.cls.reach) launch(game.cls.id === 'arqueiro' ? 'arrow' : 'orb', V(me.x, me.feet + 1.5, me.z), V(center.x, center.y + 1, center.z), col, e.radius ?? 2);
+        else {
+          fx?.ring(V(center.x, center.y + 0.2, center.z), col, e.radius ?? 2, 0.45);
+          fx?.burst(V(center.x, center.y + 0.6, center.z), { n: 26, color: col, speed: 6, up: 2, life: 0.5 });
+        }
+        if (e.stun) fx?.burst(V(center.x, center.y + 1.8, center.z), { n: 16, color: '#fff2a0', speed: 1.5, up: 0.5, gravity: 0, life: 0.9 });
+        if (e.mark) fx?.ring(V(center.x, center.y + 2.2, center.z), '#ff6a5a', 1, 0.8);
         break;
       }
-      case 'heal': game.healPct(e.pct); fx?.pickup(V(me.x, me.feet + 1, me.z), '#7fe0b0'); break;
-      case 'shield': shield = { t: e.time, red: e.reduce }; break;
-      case 'buff': buff = { t: e.time, dmg: e.dmg ?? 1, plan: !!e.plan }; break;
+      case 'heal': game.healPct(e.pct); fx?.burst(V(me.x, me.feet + 0.3, me.z), { n: 40, color: '#7fe0b0', speed: 1.4, up: 1, rise: 4, gravity: -1, life: 1.3, size: 1.2 }); fx?.ring(V(me.x, me.feet + 0.1, me.z), '#7fe0b0', 3, 0.8); break;
+      case 'shield': shield = { t: e.time, red: e.reduce }; bubble.material.color.set(game.cls.color ?? '#9ad0ff'); break;
+      case 'buff': buff = { t: e.time, dmg: e.dmg ?? 1, plan: !!e.plan }; aura.material.color.set(game.cls.color ?? '#ffd76a'); break;
       case 'calm': {
         for (const m of mobs) if (!m.boss && m.pos.distanceTo(self) < e.radius) { m.calmUntil = now() + e.time; if (m.state === 'chase' || m.state === 'alert') m.state = 'return'; }
+        fx?.burst(V(me.x, me.feet + 0.6, me.z), { n: 60, color: '#c8d0dc', speed: 4, up: 0.6, gravity: -0.4, life: 2, size: 2.2 });
         break;
       }
       case 'taunt': {
         for (const m of mobs) if (!m.boss && !['dead', 'dormant', 'rise', 'gone'].includes(m.state) && m.pos.distanceTo(self) < e.radius) { m.calmUntil = 0; m.state = 'chase'; m.timer = 0; }
+        for (let k = 0; k < 3; k++) fx?.ring(V(me.x, me.feet + 0.2 + k * 0.4, me.z), '#ff5a3a', 4 + k * 3, 0.5 + k * 0.2);
         break;
       }
-      case 'trap': traps.push({ pos: aimPoint(target).clone(), r: e.radius, t: e.time, dps: e.dps, slow: e.slow }); break;
+      case 'trap': { const tp = aimPoint(target).clone(); traps.push({ pos: tp, r: e.radius, t: e.time, dps: e.dps, slow: e.slow, mesh: trapDisc(tp, e.radius, game.cls.color ?? '#b0e07a') }); break; }
       case 'knock': {
         for (const m of mobs) { if (['dead', 'dormant', 'gone'].includes(m.state) || m.ally) continue; if (m.pos.distanceTo(self) < e.radius) m.knock.copy(m.pos.clone().sub(self).setY(0).normalize()).multiplyScalar(e.dist); }
+        fx?.ring(V(me.x, me.feet + 0.3, me.z), '#ffffff', e.radius, 0.35);
+        fx?.burst(V(me.x, me.feet + 0.3, me.z), { n: 30, color: '#e8e0c8', speed: 9, up: 0.4, gravity: 2, life: 0.4 });
         break;
       }
       case 'dash': {
@@ -303,15 +344,18 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
         if (L) {
           const nx = me.x - fwd * Math.sin(me.yaw) * L, nz = me.z - fwd * Math.cos(me.yaw) * L;
           const fl = walker.floorAt(nx, nz, me.feet);
-          if (Math.abs(fl - me.feet) < 1.5 && !biomes.noGo.some((f) => f(nx, nz, fl))) walker.teleport({ x: nx, z: nz, feet: fl, yaw: me.yaw, pitch: -0.15 });
+          if (Math.abs(fl - me.feet) < 1.5 && !biomes.noGo.some((f) => f(nx, nz, fl))) {
+            for (let k = 0; k <= 6; k++) fx?.burst(V(me.x + (nx - me.x) * k / 6, me.feet + 0.8, me.z + (nz - me.z) * k / 6), { n: 4, color: game.cls.color ?? '#ffffff', speed: 0.6, up: 0.3, gravity: 0, life: 0.5 });
+            walker.teleport({ x: nx, z: nz, feet: fl, yaw: me.yaw, pitch: -0.15 });
+          }
         }
-        if (e.ready) readyCrit = 1;
+        if (e.ready) { readyCrit = 1; readyMult = e.mult ?? 1; fx?.burst(V(me.x, me.feet + 1.4, me.z), { n: 18, color: '#ffd76a', speed: 1, up: 0.5, gravity: 0, life: 0.8 }); }
         if (e.dist < 0) invul = 0.5;
         break;
       }
       case 'reveal': {
         const t = target ?? aimed;
-        if (t) hud.toast(`${t.def.name}: ${Math.max(0, Math.round(t.hp))}/${t.def.hp} de vida${t.boss ? ' · guardião' : ''}`, 'xp');
+        if (t) { hud.toast(`${t.def.name}: ${Math.max(0, Math.round(t.hp))}/${t.def.hp} de vida${t.boss ? ' · guardião' : ''}`, 'xp'); fx?.ring(V(t.pos.x, t.pos.y + 0.1, t.pos.z), '#7fe0b0', 2.5, 1); fx?.burst(V(t.pos.x, t.pos.y + 3, t.pos.z), { n: 20, color: '#7fe0b0', speed: 0.5, up: -1, gravity: 3, life: 1 }); }
         else hud.toast('Nada na mira para analisar.', 'xp');
         break;
       }
@@ -330,6 +374,13 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     if (slot === 4) fx?.levelUp(V(walker.state.x, walker.state.feet + 0.2, walker.state.z));
   }
   const ability = () => useAbility(4);       // R: the supreme ability
+  // a different character (or a new one) starts without the last one's cooldowns and effects
+  function resetCharacter() {
+    cds.fill(0); shield = { t: 0, red: 0 }; buff = { t: 0, dmg: 1, plan: false }; invul = 0; readyCrit = 0; readyMult = 1;
+    for (const t of traps) scene.remove(t.mesh);
+    traps = [];
+    dropCombo();
+  }
 
   function dropCombo() { if (combo) { combo = 0; hud.combo(0); } }
   function attack() {
@@ -525,7 +576,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
       }
       case 'charge':
         speed = move(m, m.lock.x, m.lock.z, 16, dt);
-        if (!m.hitDone && sameLevel && dist < m.model.radius + 1) { m.hitDone = true; hurtPlayer(22); }
+        if (!m.hitDone && sameLevel && dist < m.model.radius + 1) { m.hitDone = true; hurtPlayer(Math.round(def.damage * 1.5)); }
         if (m.timer <= 0 || speed === 0) { m.state = 'recover'; m.timer = 1.2; }
         break;
       case 'slamWind': {
@@ -535,7 +586,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
         windup = k;
         if (m.timer <= 0) {
           ring.visible = false;
-          if (sameLevel && dist < 7 + 0.4) hurtPlayer(25);
+          if (sameLevel && dist < 7 + 0.4) hurtPlayer(Math.round(def.damage * 1.8));
           feedback('large');
           m.state = 'recover'; m.timer = 1.4;
         }
@@ -548,7 +599,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
         m.hp = Math.min(def.hp, m.hp + def.hp * 0.1 * dt);
         if (m.boss) hud.boss(null);
         if (homeD < 2) { m.state = m.boss ? 'lurk' : 'idle'; m.timer = 1; }
-        if (sameLevel && dist < CHASE_IN * 0.7 && homeD < (m.boss ? BOSS_LEASH : LEASH) * 0.6) m.state = 'chase';
+        if (sameLevel && dist < CHASE_IN * 0.7 && homeD < (m.boss ? BOSS_LEASH : LEASH) * 0.6 && !(m.calmUntil > now())) m.state = 'chase';
         break;
       case 'yield':                                          // kneeling, waiting for the choice
         windup = 1;
@@ -602,6 +653,17 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     b.model.root.visible = true;
   }
   game.onBossOutcome(applyOutcome);
+  // hunting objectives point at the nearest living creature of that place (never the camp)
+  game.setMobFinder((biome) => {
+    const me = walker.state;
+    let best = null, bd = Infinity;
+    for (const m of mobs) {
+      if (m.boss || m.temp || m.biome !== biome || ['dead', 'dormant'].includes(m.state)) continue;
+      const d = Math.hypot(m.pos.x - me.x, m.pos.z - me.z);
+      if (d < bd) { bd = d; best = m; }
+    }
+    return best ? best.pos.clone().setY(best.pos.y + 1) : null;
+  });
   // a saved game: put each resolved boss where the player's choice left it
   function syncBossesWithStory() {
     for (const [id, b] of Object.entries(bosses)) {
@@ -638,11 +700,33 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     hud.skills(game.cls, cds);
     shield.t -= dt; buff.t -= dt; if (buff.t <= 0) { buff.dmg = 1; buff.plan = false; } invul -= dt;
     for (let i = 0; i < cds.length; i++) cds[i] = Math.max(0, cds[i] - dt);
-    traps = traps.filter((t) => (t.t -= dt) > 0);
+    traps = traps.filter((t) => { t.t -= dt; if (t.t > 0) { t.mesh.material.opacity = 0.25 + Math.sin(performance.now() / 150) * 0.1; return true; } scene.remove(t.mesh); t.mesh.geometry.dispose(); return false; });
+    for (let i = shots.length - 1; i >= 0; i--) {
+      const sh = shots[i];
+      sh.t += dt;
+      const k = Math.min(1, sh.t / sh.dur);
+      sh.mesh.position.lerpVectors(sh.from, sh.to, k);
+      if (sh.kind === 'orb') fx?.burst(sh.mesh.position, { n: 2, color: sh.color, speed: 0.4, up: 0.2, gravity: 0, life: 0.35 });
+      if (k >= 1) {
+        fx?.ring(V(sh.to.x, sh.to.y - 0.8, sh.to.z), sh.color, sh.splash, 0.45);
+        fx?.burst(sh.to, { n: 34, color: sh.color, speed: 7, up: 2, life: 0.55, size: 1.3 });
+        scene.remove(sh.mesh); sh.mesh.material.dispose();
+        shots.splice(i, 1);
+      }
+    }
+    const mp = walker.state;
+    bubble.visible = shield.t > 0;
+    if (bubble.visible) { bubble.position.set(mp.x, mp.feet + 1, mp.z); bubble.material.opacity = 0.16 + Math.sin(performance.now() / 120) * 0.05; }
+    aura.visible = buff.t > 0;
+    if (aura.visible) { aura.position.set(mp.x, mp.feet + 0.12, mp.z); aura.rotation.y += dt * 3; aura.scale.setScalar(1 + Math.sin(performance.now() / 200) * 0.1); }
     for (const m of mobs) { m.slowMul = 1; if (m.markT > 0) m.markT -= dt; }
     for (const tr of traps) for (const m of mobs) {
       if (['dead', 'dormant', 'rise', 'gone', 'retreat'].includes(m.state) || m.ally) continue;
-      if (m.pos.distanceTo(tr.pos) < tr.r) { m.slowMul = 1 - tr.slow; if (!m.boss) hurtMob(m, tr.dps * dt, tr.pos); }
+      if (m.pos.distanceTo(tr.pos) < tr.r) {
+        m.slowMul = 1 - tr.slow;
+        m.trapAcc = (m.trapAcc ?? 0) + dt;
+        if (m.trapAcc >= 0.5 && !m.boss) { m.trapAcc = 0; hurtMob(m, tr.dps * 0.5 * game.power() * (1 + 0.28 * cur().tier), tr.pos, false, { quiet: true }); }
+      }
     }
     comboT -= dt;
     if (comboT <= 0 && combo) dropCombo();
@@ -666,7 +750,8 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
         const k = Math.max(0, 1 - m.timer / 1.2);
         m.model.root.scale.setScalar(Math.max(k, 0.001));
         if (k === 0) m.model.root.visible = false;
-        if (!m.boss && !m.temp && m.timer > 90 && !active) { m.hp = m.def.hp; m.pos.copy(m.home); m.state = 'idle'; m.model.root.visible = true; m.model.root.scale.setScalar(1); }
+        // creatures come back after 30 s at their home, unless the explorer is standing right there
+        if (!m.boss && !m.temp && m.timer > 30 && Math.hypot(m.home.x - me.x, m.home.z - me.z) > 25) { m.hp = m.def.hp; m.pos.copy(m.home); m.state = 'idle'; m.model.root.visible = true; m.model.root.scale.setScalar(1); }
         continue;
       }
       if (m.state === 'dormant') continue;
@@ -736,7 +821,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     sfx('dodge');
   }
   return {
-    dodge, ability, useAbility,
+    dodge, ability, useAbility, resetCharacter,
     update, attack, shake, resetBosses, gm, syncBossesWithStory,
     debug: {
       mobs, bosses, wake,

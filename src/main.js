@@ -19,7 +19,7 @@ import { createFx } from './fx.js';
 import { createParty } from './party.js';
 import { toonify } from './toon.js';
 import { startAudio, toggleMute, isMuted, sfx } from './audio.js';
-import { CLASSES as CLASSES_PLAN, APPEARANCE, DEFAULT_APPEARANCE } from './game/campaign_data.js';
+import { CLASSES as CLASSES_PLAN, APPEARANCE, DEFAULT_APPEARANCE, STYLES } from './game/campaign_data.js';
 import { STAGES, RECIPES } from './game/campaign_data.js';
 import { createHud } from './game/hud.js';
 import { createCombat } from './game/combat.js';
@@ -110,6 +110,8 @@ function buildWorld() {
   game.onIdentity((s) => {
     character.setAppearance({ ...s.appearance, hat: CLASSES_PLAN[s.cls]?.look.hat });
     character.setClass(s.cls);
+    character.setStyle({ top: s.appearance.top, head: s.appearance.head, hair: s.appearance.hairStyle });
+    toonify(character.root, { outline: true });      // new parts (class gear, clothes) join the cartoon look
   });
 
   $('sHeight').textContent = `${Math.round(canopy.maxY)} m`;
@@ -156,13 +158,15 @@ const PLACES = {
   },
   mirante() {
     const a = TOP_BRIDGES[0], p = at(LOOKOUT.centre + 4, a);
-    return { ...p, feet: GALLERY.levels[3], yaw: yawToward(Math.cos(a), Math.sin(a)), pitch: 0.05, label: 'Mirante · 300 m' };
+    return { ...p, feet: RAMP.top, yaw: yawToward(Math.cos(a), Math.sin(a)), pitch: 0.05, label: 'Mirante · 300 m' };
   },
 };
 
 function goTo(name) {
   // in the journey, the seals decide: you can only jump to floors you have unlocked
   const floorIdx = BIOMES.findIndex((b) => b.id === name);
+  // the ramp and the lookout sit above every seal: only in free exploration (or for the GM)
+  if (journey && (name === 'rampa' || name === 'mirante') && !world.gm?.on) { world.hud.toast('Durante a jornada, a rampa e o mirante só se alcançam a pé.', 'xp'); return; }
   if (journey && floorIdx >= 0 && world && floorIdx >= world.game.openFloors()) {
     world.hud.toast('Este andar está selado. Suba de nível e vença o guardião do andar anterior.', 'xp');
     return;
@@ -194,6 +198,7 @@ function exitWalk() {
 }
 function setFly(on) {
   if (!world) return;
+  if (on && journey && !world.gm?.on) { world.hud.toast('Na jornada não se voa: suba pelas rampas e abra os selos.', 'xp'); return; }
   world.walker.setFlying(on);
   $('bFly').setAttribute('aria-pressed', String(on));
   document.body.classList.toggle('flying', on);
@@ -269,8 +274,10 @@ function renderParty(members, code) {
       const go = document.createElement('button');
       go.type = 'button'; go.textContent = 'Ir até';
       go.onclick = () => {
-        const f = m.x !== undefined ? m : null;
-        if (f) world.walker.teleport({ x: f.x + 2, z: f.z + 2, feet: f.feet ?? 0, yaw: 0, pitch: -0.15 });
+        const f = [m.x, m.z, m.feet].every((v) => Number.isFinite(v) && Math.abs(v) < 2000) ? m : null;
+        if (!f) return;
+        if (world.game.blockedAt(f.x, f.z, f.feet)) { world.hud.toast('Seu amigo está além de um selo que você ainda não abriu.', 'xp'); return; }
+        world.walker.teleport({ x: f.x + 2, z: f.z + 2, feet: f.feet, yaw: 0, pitch: -0.15 });
         $('party').hidden = true;
       };
       li.append(go);
@@ -351,6 +358,8 @@ function startJourney(slot, profile = null) {
   enterWalk('fora');
   world.hud.reset();
   world.game.start(slot, profile);
+  world.combat.resetCharacter?.();
+  setFly(false);
   world.game.setSeals(true);
   // a new character brings every boss back; a continued one puts them where its choices left them
   if (profile) world.combat.gm.reviveBosses(); else world.combat.resetBosses();
@@ -411,10 +420,11 @@ function openNewCharacter(n) {
     b.querySelector('em').textContent = `Arma: ${WEAPON_NAME[c.weapon] ?? c.weapon}. ${c.passive}`;
     const ul = b.querySelector('ul');
     for (const a of [...c.abilities, c.ultimate]) { const li = document.createElement('li'); li.textContent = `${a.name}${a === c.ultimate ? ' (R)' : ''}: ${a.text}`; ul.append(li); }
-    b.onclick = () => { pickedClass = k; box.querySelectorAll('.cls').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); checkGo(); };
+    b.onclick = () => { pickedClass = k; box.querySelectorAll('.cls').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); checkGo(); updatePreview(); };
     box.append(b);
   }
   checkGo();
+  updatePreview();
   $('pName').focus();
 }
 let pickedLook = { ...DEFAULT_APPEARANCE };
@@ -422,7 +432,21 @@ const WEAPON_NAME = { espada: 'espada e escudo', cajado: 'cajado de seiva', livr
 function renderLooks() {
   const box = $('looks');
   box.innerHTML = '';
-  const rows = [['skin', 'Pele'], ['hair', 'Cabelo'], ['shirt', 'Roupa'], ['pants', 'Calça']];
+  const styleRows = [['top', 'Roupa'], ['head', 'Cabeça'], ['hairStyle', 'Penteado']];
+  for (const [k, label] of styleRows) {
+    const row = document.createElement('div');
+    row.className = 'lrow';
+    row.innerHTML = `<span>${label}</span>`;
+    for (const [id, name] of STYLES[k]) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'chip'; b.textContent = name;
+      b.setAttribute('aria-pressed', String(pickedLook[k] === id));
+      b.onclick = () => { pickedLook[k] = id; renderLooks(); updatePreview(); };
+      row.append(b);
+    }
+    box.append(row);
+  }
+  const rows = [['skin', 'Pele'], ['hair', 'Cor do cabelo'], ['shirt', 'Cor da roupa'], ['pants', 'Calça']];
   for (const [k, label] of rows) {
     const row = document.createElement('div');
     row.className = 'lrow';
@@ -432,10 +456,51 @@ function renderLooks() {
       b.type = 'button'; b.className = 'sw'; b.style.background = col;
       b.setAttribute('aria-label', `${label} ${col}`);
       b.setAttribute('aria-pressed', String(pickedLook[k] === col));
-      b.onclick = () => { pickedLook[k] = col; renderLooks(); };
+      b.onclick = () => { pickedLook[k] = col; renderLooks(); updatePreview(); };
       row.append(b);
     }
     box.append(row);
+  }
+}
+// ---------- the live preview of the character being made: a small renderer of its own ----------
+let preview = null;
+function updatePreview() {
+  if (!preview) {
+    const canvas = $('pPreview');
+    const r = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    r.setPixelRatio(Math.min(2, devicePixelRatio));
+    r.toneMapping = THREE.ACESFilmicToneMapping;
+    r.outputColorSpace = THREE.SRGBColorSpace;
+    const sc = new THREE.Scene();
+    sc.add(new THREE.HemisphereLight('#fff4e0', '#3a3020', 2.2));
+    const sun = new THREE.DirectionalLight('#ffffff', 2.4); sun.position.set(2, 4, 3); sc.add(sun);
+    const cam = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
+    cam.position.set(0, 1.25, 4.4); cam.lookAt(0, 0.95, 0);
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(0.9, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#3a3424', transparent: true, opacity: 0.6 }));
+    sc.add(disc);
+    preview = { r, sc, cam, ch: null, raf: 0 };
+  }
+  const p = preview;
+  if (p.ch) p.sc.remove(p.ch.root);
+  p.ch = createCharacter({ name: 'preview', light: false });
+  p.ch.setAppearance({ ...pickedLook, hat: CLASSES_PLAN[pickedClass ?? 'guerreiro']?.look.hat });
+  p.ch.setClass(pickedClass ?? 'guerreiro');
+  p.ch.setStyle({ top: pickedLook.top, head: pickedLook.head, hair: pickedLook.hairStyle });
+  toonify(p.ch.root, { outline: true });
+  p.sc.add(p.ch.root);
+  const w = $('pPreview').clientWidth || 200, h = $('pPreview').clientHeight || 260;
+  p.r.setSize(w, h, false); p.cam.aspect = w / h; p.cam.updateProjectionMatrix();
+  if (!p.raf) {
+    let t0 = performance.now();
+    const loop = (t) => {
+      if ($('classPick').hidden || $('slots').hidden) { p.raf = 0; return; }
+      const dt = Math.min(0.05, (t - t0) / 1000); t0 = t;
+      p.ch.root.rotation.y += dt * 0.6;
+      p.ch.idle(dt, t / 1000, null);
+      p.r.render(p.sc, p.cam);
+      p.raf = requestAnimationFrame(loop);
+    };
+    p.raf = requestAnimationFrame(loop);
   }
 }
 function checkGo() { $('pGo').disabled = !(pickedClass && $('pName').value.trim().length >= 2); }
@@ -443,7 +508,7 @@ $('pName').addEventListener('input', checkGo);
 $('pBack').onclick = () => { $('classPick').hidden = true; $('slotGrid').hidden = false; $('slotsFoot').hidden = false; };
 $('pGo').onclick = () => {
   if ($('pGo').disabled) return;
-  startJourney(newSlot, { name: $('pName').value.trim().slice(0, 14), cls: pickedClass, appearance: pickedLook });
+  startJourney(newSlot, { name: $('pName').value.trim().slice(0, 14), cls: pickedClass, appearance: { ...pickedLook } });
 };
 $('slotsBack').onclick = () => { $('slots').hidden = true; };
 function openSlots() {

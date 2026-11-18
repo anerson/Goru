@@ -26,7 +26,7 @@ function toToon(m) {
   if (m.onBeforeCompile !== baseOnBeforeCompile) return m;      // custom shader (wind): keep
   const t = new THREE.MeshToonMaterial({
     map: m.map, normalMap: m.normalMap, alphaMap: m.alphaMap, transparent: m.transparent, side: m.side,
-    vertexColors: m.vertexColors, flatShading: m.flatShading, depthWrite: m.depthWrite,
+    vertexColors: m.vertexColors, depthWrite: m.depthWrite,
     polygonOffset: m.polygonOffset, polygonOffsetFactor: m.polygonOffsetFactor, polygonOffsetUnits: m.polygonOffsetUnits,
     gradientMap: gradientMap(), name: m.name,
   });

@@ -7,8 +7,8 @@
 
 export const GAME_SCALE = {
   mobHp: 0.9,        // creature health = Vida x 0.9 (2-3 hits with the floor's weapon)
-  subBossHp: 2 / 3,  // sub-boss health = Vida x 2/3 (about 15 hits)
-  bossHp: 0.35,      // boss health = Vida x 0.35 (about 30 hits)
+  subBossHp: 1.0,    // sub-boss health = Vida x 1 (about 15 hits, a 10 s fight)
+  bossHp: 0.6,       // boss health = Vida x 0.6 (about 25-30 hits, a 12-15 s fight)
   damage: 0.6,       // damage per hit = Ataque x 0.6
   speed: (v) => 2 + v * 0.45,           // m/s from Velocidade 1..10
   armor: (d) => 20 / (20 + d * 0.5),    // damage taken multiplier from Defesa

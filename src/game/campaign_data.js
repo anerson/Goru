@@ -462,7 +462,13 @@ export const APPEARANCE = {
   shirt: ['#2f7f86', '#7a3a2a', '#3a3a8a', '#2a6a5a', '#4a6a2a', '#8a5a9a', '#e8e0c8', '#2a2a2a'],
   pants: ['#3a3226', '#2a2a3a', '#5a4a3a', '#2a3a2a', '#3a3a3a'],
 };
-export const DEFAULT_APPEARANCE = { skin: '#c99674', hair: '#2a2018', shirt: '#2f7f86', pants: '#3a3226' };
+export const DEFAULT_APPEARANCE = { skin: '#c99674', hair: '#2a2018', shirt: '#2f7f86', pants: '#3a3226', top: 'tunica', head: 'chapeu', hairStyle: 'curto' };
+// clothing styles (the shape; the colours come from the choices above)
+export const STYLES = {
+  top: [['tunica', 'Túnica'], ['colete', 'Colete'], ['manto', 'Manto'], ['armadura', 'Armadura leve']],
+  head: [['chapeu', 'Chapéu'], ['capuz', 'Capuz'], ['bandana', 'Bandana'], ['nada', 'Sem nada']],
+  hairStyle: [['curto', 'Curto'], ['longo', 'Longo'], ['rabo', 'Rabo de cavalo']],
+};
 
 // ---------------------------------------------------------------- the five classes (manual, ch. 3)
 // Stats multiply the base explorer. Each class has its passives (always on) and its four active
@@ -494,10 +500,10 @@ export const CLASSES = {
     hp: 0.8, dmg: 1.0, guard: 0, range: 2.6, reach: 24, cooldown: 0.6, crit: 0.03, dodgeCd: 0.7, weapon: 'cajado',
     passive: 'Conservação Arcana: as habilidades têm 10% menos recarga. Afinidade: dano mágico acerta crítico mais.',
     abilities: [
-      { id: 'projetil', name: 'Projétil Elemental', cd: 8, text: 'Explosão no alvo da mira: 4× o dano a 6 m.', fx: [{ v: 'hit', mult: 4, radius: 6, at: 'aim' }] },
+      { id: 'projetil', name: 'Projétil Elemental', cd: 8, text: 'Explosão no alvo da mira: 2,5× o dano a 4 m.', fx: [{ v: 'hit', mult: 2.5, radius: 4, at: 'aim' }] },
       { id: 'barreira', name: 'Barreira de Seiva', cd: 12, text: 'Você recebe 40% menos dano por 6 s.', fx: [{ v: 'shield', time: 6, reduce: 0.4 }] },
       { id: 'raiz', name: 'Raiz Aprisionadora', cd: 10, text: 'Raízes prendem as criaturas a 8 m por 4 s.', fx: [{ v: 'hit', mult: 0.6, radius: 8, at: 'aim', stun: 4 }] },
-      { id: 'dissipacao', name: 'Pulso de Dissipação', cd: 14, text: 'Pulso que enfraquece criaturas a 8 m: dano dobrado e recuo.', fx: [{ v: 'hit', mult: 2, radius: 8, mark: 6 }, { v: 'knock', radius: 8, dist: 4 }] },
+      { id: 'dissipacao', name: 'Pulso de Dissipação', cd: 14, text: 'Pulso de 2× o dano a 8 m: empurra e deixa as criaturas recebendo 50% mais dano por 6 s.', fx: [{ v: 'hit', mult: 2, radius: 8, mark: 6, markMore: 1.5 }, { v: 'knock', radius: 8, dist: 4 }] },
     ],
     ultimate: { id: 'ressonancia', name: 'Ressonância do Carvalho', cd: 90, text: 'Por 8 s seus golpes causam 60% mais dano e todas as criaturas num raio de 14 m recebem um pulso.', fx: [{ v: 'buff', time: 8, dmg: 1.6 }, { v: 'hit', mult: 1.5, radius: 14, at: 'self' }] },
     look: { shirt: '#3a3a8a', pants: '#2a2a4a', hat: '#5a3a9a' } },
@@ -505,7 +511,7 @@ export const CLASSES = {
     hp: 1.0, dmg: 0.85, guard: 0.05, range: 2.8, cooldown: 0.5, crit: 0, dodgeCd: 0.7, bossBonus: 0.2, regen: 2, weapon: 'livro',
     passive: 'Análise de Fraqueza: +20% de dano contra guardiões. Conhecimento Natural: sua vida regenera mais depressa.',
     abilities: [
-      { id: 'diagnostico', name: 'Diagnóstico', cd: 6, text: 'Mostra a vida e a fraqueza da criatura da mira.', fx: [{ v: 'reveal' }] },
+      { id: 'diagnostico', name: 'Diagnóstico', cd: 6, text: 'Mostra a vida exata da criatura da mira e a marca: ela recebe 15% mais dano por 8 s.', fx: [{ v: 'reveal' }, { v: 'hit', mult: 0, radius: 1.5, at: 'aim', mark: 8 }] },
       { id: 'plano', name: 'Plano Tático', cd: 14, text: 'Por 10 s seu grupo e você causam 20% mais dano.', fx: [{ v: 'buff', time: 10, dmg: 1.2, plan: true }] },
       { id: 'remedio', name: 'Remédio de Campo', cd: 18, text: 'Cura 40% da sua vida e acalma as criaturas próximas.', fx: [{ v: 'heal', pct: 0.4 }, { v: 'calm', radius: 10, time: 5 }] },
       { id: 'terreno', name: 'Leitura do Terreno', cd: 20, text: 'Armadilha no chão a 6 m por 8 s: dano e lentidão a quem entra.', fx: [{ v: 'trap', radius: 6, time: 8, dps: 14, slow: 0.4 }] },
@@ -513,10 +519,10 @@ export const CLASSES = {
     ultimate: { id: 'dez_ciclos', name: 'Teoria dos Dez Ciclos', cd: 90, text: 'Por 4 s todas as criaturas a 12 m ficam paralisadas e o chefe mostra a fraqueza.', fx: [{ v: 'hit', mult: 0, radius: 12, at: 'self', stun: 4 }, { v: 'reveal' }] },
     look: { shirt: '#2a6a5a', pants: '#3a3a2a', hat: '#c9b07a' } },
   ladino: { name: 'Ladino', title: 'Sombra das Fendas', role: 'Dano de precisão e mobilidade', color: '#c0c0d0',
-    hp: 0.9, dmg: 0.9, guard: 0, range: 2.4, cooldown: 0.32, crit: 0.13, dodgeCd: 0.4, weapon: 'adagas',
+    hp: 0.9, dmg: 0.9, guard: 0, range: 2.4, cooldown: 0.38, crit: 0.13, dodgeCd: 0.9, weapon: 'adagas',
     passive: 'Passo Silencioso: criaturas demoram a perceber você. Ataque Oportunista: +30% de crítico contra alvo marcado.',
     abilities: [
-      { id: 'preciso', name: 'Golpe Preciso', cd: 8, text: 'O próximo golpe é crítico e causa 3× o dano.', fx: [{ v: 'dash', dist: 0, ready: true }] },
+      { id: 'preciso', name: 'Golpe Preciso', cd: 8, text: 'O próximo golpe é crítico e causa 3× o dano.', fx: [{ v: 'dash', dist: 0, ready: true, mult: 3 / 1.8 }] },
       { id: 'desengajar', name: 'Desengajar', cd: 8, text: 'Recua 5 m e fica invulnerável por 0,5 s.', fx: [{ v: 'dash', dist: -5, ready: false }] },
       { id: 'armadilha', name: 'Armadilha de Fio', cd: 14, text: 'Fio no chão a 6 m por 6 s: prende e fere quem passa.', fx: [{ v: 'trap', radius: 3, time: 6, dps: 10, slow: 0.9 }] },
       { id: 'fumaca', name: 'Fumaça', cd: 16, text: 'Cortina de fumaça: criaturas perdem você por 6 s.', fx: [{ v: 'calm', radius: 8, time: 6 }] },
@@ -532,9 +538,11 @@ export const CLASSES = {
       { id: 'elemental', name: 'Flecha Elemental', cd: 9, text: 'Flecha de fogo e gelo: 2× dano e marca o alvo.', fx: [{ v: 'hit', mult: 2, radius: 1.5, at: 'aim', mark: 6 }] },
       { id: 'marca', name: 'Marca do Caçador', cd: 12, text: 'Marca a criatura da mira: por 10 s ela recebe 30% mais dano de todos.', fx: [{ v: 'hit', mult: 0, radius: 1, at: 'aim', mark: 10, markMore: 1.3 }] },
     ],
-    ultimate: { id: 'chuva', name: 'Chuva dos Galhos', cd: 90, text: 'Chuva de flechas em área de 8 m: 2,5× o dano dividido entre todos.', fx: [{ v: 'hit', mult: 2.5, radius: 8, at: 'aim' }] },
+    ultimate: { id: 'chuva', name: 'Chuva dos Galhos', cd: 90, text: 'Chuva de flechas em área de 8 m: 2,5× o dano em cada criatura.', fx: [{ v: 'hit', mult: 2.5, radius: 8, at: 'aim' }] },
     look: { shirt: '#4a6a2a', pants: '#3a3020', hat: '#5a7a3a' } },
 };
+
+for (const [k, c] of Object.entries(CLASSES)) c.id = k;   // each class knows its own key (passives check it)
 
 // ---------------------------------------------------------------- stories before each place
 // Shown once, before you set foot in a place (manual: premise, the ten guardians, each mission)

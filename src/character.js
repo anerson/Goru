@@ -48,10 +48,12 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
   add(head, new THREE.SphereGeometry(0.022, 12, 10), skin, 0, -0.02, -0.14).scale.set(0.9, 1.2, 1);       // nose
   add(head, new THREE.BoxGeometry(0.05, 0.008, 0.01), new THREE.MeshStandardMaterial({ color: '#8a4a3a' }), 0, -0.065, -0.128); // mouth
   add(head, new THREE.SphereGeometry(0.145, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.5), dark, 0, 0.02, 0.012).scale.set(0.96, 0.9, 1.02); // hair
-  // a wide-brimmed explorer's hat with a band
-  add(head, new THREE.CylinderGeometry(0.2, 0.21, 0.018, 40), leather, 0, 0.075, 0);
-  add(head, new THREE.CylinderGeometry(0.105, 0.13, 0.13, 32), leather, 0, 0.14, 0);
-  add(head, new THREE.CylinderGeometry(0.132, 0.132, 0.03, 32), dark, 0, 0.1, 0);
+  // a wide-brimmed explorer's hat with a band (one of the head styles)
+  const hatParts = [
+    add(head, new THREE.CylinderGeometry(0.2, 0.21, 0.018, 40), leather, 0, 0.075, 0),
+    add(head, new THREE.CylinderGeometry(0.105, 0.13, 0.13, 32), leather, 0, 0.14, 0),
+    add(head, new THREE.CylinderGeometry(0.132, 0.132, 0.03, 32), dark, 0, 0.1, 0),
+  ];
   if (pack) {   // backpack (behind: +z): a rounded pack, a rolled blanket on top, two straps
     add(body, new THREE.CapsuleGeometry(0.13, 0.16, 8, 16), leather, 0, 0.36, 0.22).scale.set(1.25, 1, 0.7);
     add(body, new THREE.CylinderGeometry(0.06, 0.06, 0.34, 16), new THREE.MeshStandardMaterial({ color: '#7a3a2a', roughness: 0.9 }), 0, 0.58, 0.22).rotation.z = Math.PI / 2;
@@ -256,5 +258,36 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
     if (a.pants) { base.pants = a.pants; pants.color.set(a.pants); }
     if (a.hat) { base.hat = a.hat; leather.color.set(a.hat); }
   }
-  return { root, update, idle, setWeapon, setWeaponLook, setOutfit, setClass, setAppearance, roll: () => { rollT = 0.32; }, swing: () => { swingT = 0.3; if (sceptre?.visible) sceptre.userData.heart.rotation.y += 1; }, setHeading: (h) => { heading = h; root.rotation.y = h; } };
+  // ---- clothing styles chosen at creation: top (túnica, colete, manto, armadura), head (chapéu,
+  // capuz, bandana, nada) and hair (curto, longo, rabo). Built from the same coloured materials, so
+  // outfits and colours still apply.
+  let styleParts = [];
+  function setStyle(st = {}) {
+    for (const { parent, mesh } of styleParts) parent.remove(mesh);
+    styleParts = [];
+    const put = (parent, geo, m, x, y, z, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) => {
+      const o = new THREE.Mesh(geo, m);
+      o.position.set(x, y, z); o.rotation.set(rx, ry, rz); o.scale.set(sx, sy, sz); o.castShadow = true;
+      parent.add(o); styleParts.push({ parent, mesh: o });
+      return o;
+    };
+    const top = st.top ?? 'tunica', hd = st.head ?? 'chapeu', hair = st.hair ?? 'curto';
+    if (top === 'colete') {
+      put(body, new THREE.CapsuleGeometry(0.215, 0.3, 6, 20, 1), leather, 0, 0.38, 0, 0, 0, 0, 1.08, 1, 0.82);
+      put(body, new THREE.BoxGeometry(0.06, 0.42, 0.04), shirt, 0, 0.38, -0.19);          // the open front shows the shirt
+    } else if (top === 'manto') {
+      put(body, new THREE.ConeGeometry(0.34, 0.95, 24, 1, true), shirt, 0, -0.32, 0, 0, 0, 0, 1, 1, 0.85);   // robe skirt to the knees
+      put(body, new THREE.TorusGeometry(0.2, 0.04, 6, 24), leather, 0, 0.16, 0, Math.PI / 2);                // sash
+    } else if (top === 'armadura') {
+      const plate = new THREE.MeshStandardMaterial({ color: '#9aa2ac', metalness: 0.7, roughness: 0.35 });
+      put(body, new THREE.CapsuleGeometry(0.215, 0.26, 6, 20), plate, 0, 0.4, 0, 0, 0, 0, 1.1, 1, 0.84);
+      for (const sx of [-1, 1]) put(body, new THREE.SphereGeometry(0.11, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), plate, sx * 0.27, 0.6, 0, 0, 0, sx * -0.4);
+    }
+    for (const p of hatParts) p.visible = hd === 'chapeu';
+    if (hd === 'capuz') put(head, new THREE.SphereGeometry(0.17, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.62), shirt, 0, 0.0, 0.03, -0.35, 0, 0, 1, 1.1, 1.05);
+    if (hd === 'bandana') { put(head, new THREE.TorusGeometry(0.14, 0.025, 6, 28), leather, 0, 0.06, 0, Math.PI / 2 - 0.15); put(head, new THREE.ConeGeometry(0.035, 0.14, 6), leather, 0, 0.04, 0.16, 1.3); }
+    if (hair === 'longo') put(head, new THREE.CapsuleGeometry(0.11, 0.18, 6, 16), hairMat, 0, -0.1, 0.07, 0.15, 0, 0, 1.25, 1, 0.6);
+    if (hair === 'rabo') put(head, new THREE.CapsuleGeometry(0.04, 0.2, 6, 12), hairMat, 0, -0.06, 0.17, 0.5);
+  }
+  return { root, update, idle, setWeapon, setWeaponLook, setOutfit, setClass, setAppearance, setStyle, roll: () => { rollT = 0.32; }, swing: () => { swingT = 0.3; if (sceptre?.visible) sceptre.userData.heart.rotation.y += 1; }, setHeading: (h) => { heading = h; root.rotation.y = h; } };
 }
