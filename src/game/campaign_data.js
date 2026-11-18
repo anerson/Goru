@@ -314,9 +314,9 @@ STAGES.push(
   { id: 'fora_chegada', act: 0, region: 'fora', text: 'Fale com Thalor, o guia, no acampamento (siga a trilha de luz)', target: 'thalor', kind: 'talk' },
   { id: 'fora_ervas', act: 0, region: 'fora', text: 'Siga a trilha rumo à árvore e colete 3 ervas medicinais pelo caminho', target: 'node:erva', kind: 'collect', need: { erva: 3 } },
   { id: 'fora_caravana', act: 0, region: 'fora', text: 'Uma caravana tombou mais adiante na trilha: recupere 3 caixotes de mantimentos', target: 'caixote', kind: 'group', need: { caixote: 3 } },
-  { id: 'fora_caca', act: 0, region: 'fora', text: 'Lobos rondam a caravana: derrote 5 criaturas perto da trilha (clique ou Espaço)', target: 'mob:fora', kind: 'kill', need: { abate_fora: 5 } },
+  { id: 'fora_caca', act: 0, region: 'fora', text: 'Criaturas rondam a caravana: derrote 5 delas perto da trilha (clique ou Espaço)', target: 'mob:fora', kind: 'kill', need: { abate_fora: 5 } },
   { id: 'fora_lanternas', act: 0, region: 'fora', text: 'Acenda as 3 lanternas do último trecho, até o anel da árvore', target: 'lanterna', kind: 'group', need: { lanterna: 3 } },
-  { id: 'fora_portal', act: 0, region: 'fora', text: 'Chegue ao nível 5 e atravesse o Portal das Raízes (cace criaturas e abra o baú)', target: 'portal', kind: 'level', need: { nivel: 5 } },
+  { id: 'fora_portal', act: 0, region: 'fora', text: 'Chegue ao nível 5 (cace criaturas e abra o baú da trilha) e atravesse o Portal das Raízes', target: 'portal', kind: 'level', need: { nivel: 5 } },
 );
 
 for (const [ri, r] of REGIONS_PLAN.entries()) {

@@ -277,7 +277,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   // legendary (a permanent upgrade). A legendary is guaranteed within every 6 chests.
   const chests = [];
   {
-    const p = spot('fora', 1, 0.62, 14);
+    const p = spot('fora', 0, along0(560), 13);    // on the trail, between the caravan and the lanterns
     const c = makeChest();
     put(c.root, p);
     solid(p, 0.75);
@@ -395,6 +395,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
       state.xp -= xpNeed(state.level);
       state.level++;
       state.health = maxHealth();
+      if (!dialogue) hud.closeDialogue();
       hud.banner('Subiu de nível', `Nível ${state.level}`, `Vida máxima ${maxHealth()} · dano +${Math.round((power() - 1) * 100)}%`, 'level');
       fx?.levelUp(V(walker.state.x, walker.state.feet + 0.2, walker.state.z));
       sfx('level');
@@ -417,7 +418,8 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     showObjective();
     const newPlace = st.region !== STAGES[i].region && st.kind !== 'end';
     sfx(newPlace ? 'floor' : 'objective');
-    if (newPlace) tellStory(st.region, () => hud.banner('Selo aberto', `${REGION_NAMES[st.region].replace(/^(a|o) /, '')[0].toUpperCase()}${REGION_NAMES[st.region].replace(/^(a|o) /, '').slice(1)}`, 'Siga a trilha de luz até a entrada', 'level'));
+    if (newPlace && STAGES[i].region === 'fora') { storyPending = st.region; hud.closeDialogue(); }
+    else if (newPlace) tellStory(st.region, () => hud.banner('Selo aberto', `${REGION_NAMES[st.region].replace(/^(a|o) /, '')[0].toUpperCase()}${REGION_NAMES[st.region].replace(/^(a|o) /, '').slice(1)}`, 'Siga a trilha de luz até a entrada', 'level'));
     else hud.toast('Novo objetivo');
     save();
     if (st.kind === 'end') finish();
@@ -653,12 +655,18 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
       const it = nearestOf((x) => x.kind === 'resource' && x.id.startsWith(`node_${st.region}_${st.target.slice(5)}_`));
       if (it) return it.pos;
     }
+    if (st.id === 'fora_portal' && state.level < 5) {
+      const chest = items.find((i) => i.id === 'bau_fora_0');
+      if (chest?.enabled()) return chest.pos;
+      return mobFinder?.('fora') ?? chest?.pos ?? null;
+    }
     if (st.target.startsWith('mob:')) {
       // the nearest living creature of this place (combat tells), else the camp
       const m = mobFinder?.(st.target.slice(4));
       return m ?? camps[st.region] ?? null;
     }
     const group = st.kind === 'group' ? st.target : st.group;
+    if (group && st.region === 'fora') { const it = items.find((x) => x.group === group && x.enabled()); if (it) return it.pos; }
     if (group) { const it = nearestOf((x) => x.group === group); if (it) return it.pos; }
     return items.find((i) => i.id === st.target)?.pos ?? null;
   }
@@ -722,6 +730,10 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     flames.forEach((f, i) => { f.scale.y = 1 + Math.sin(t * 9 + i) * 0.15; });
     for (const ch of chests) ch.c.pulse(t);
     updateSeals(t, dt);
+    if (storyPending && Math.hypot(walker.state.x, walker.state.z) < 98 && !dialogue) {
+      const r = storyPending; storyPending = null;
+      tellStory(r, () => hud.banner('Andar 1 de 10', 'Floresta das Raízes', `Missão: ${PLAN.raizes.mission}`));
+    }
     hud.progress(...stageProgress());
     for (const n of nodes) if (n.timer > 0) { n.timer -= dt; if (n.timer <= 0) n.mesh.visible = true; }
     const me = walker.state;
@@ -908,7 +920,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     hud.workbench(null);
     const saved = profile ? null : readSlot(n);
     state = saved ? { ...freshState(), ...saved } : freshState(profile ?? {});
-    if (!saved) { save(); }
+    if (!saved) { state.health = maxHealth(); save(); }
     identityHooks.forEach((f) => f(state));
     applyWorld();
     showObjective();
@@ -922,6 +934,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
 
   // ---- the story card before each place, shown once per character ----
   let storyOpen = false;
+  let storyPending = null;          // the Raízes story, told when the explorer walks through the portal
   function tellStory(region, then) {
     const st = STORIES[region];
     if (!st || state.seen?.[region]) { then?.(); return; }

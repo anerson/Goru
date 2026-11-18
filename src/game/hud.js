@@ -178,7 +178,7 @@ export function createHud(root) {
         el.querySelector('b').style.width = `${v}%`;
         el.classList.toggle('low', v <= NEEDS.warnAt);
       }
-      $('hudLevel').textContent = `Nível ${state.level ?? 1} · ${Math.round(state.health)}/${maxHealth}`;
+      $('hudLevel').textContent = `Nível ${state.level ?? 1} · vida ${Math.round(state.health)}/${maxHealth}`;
       $('hudXp').style.width = `${Math.round(Math.min(1, xpFrac) * 100)}%`;
       $('hudFlask').textContent = `Cantil ${state.flask}/${FLASK.capacity}`;
     },

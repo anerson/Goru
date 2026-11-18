@@ -503,7 +503,11 @@ function updatePreview() {
     p.raf = requestAnimationFrame(loop);
   }
 }
-function checkGo() { $('pGo').disabled = !(pickedClass && $('pName').value.trim().length >= 2); }
+function checkGo() {
+  const nameOk = $('pName').value.trim().length >= 2;
+  $('pGo').disabled = !(pickedClass && nameOk);
+  $('pHint').textContent = !nameOk ? 'Escreva um nome (2 letras ou mais)' : !pickedClass ? 'Escolha uma classe abaixo' : 'Pronto!';
+}
 $('pName').addEventListener('input', checkGo);
 $('pBack').onclick = () => { $('classPick').hidden = true; $('slotGrid').hidden = false; $('slotsFoot').hidden = false; };
 $('pGo').onclick = () => {
