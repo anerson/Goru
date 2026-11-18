@@ -173,6 +173,8 @@ export function createWalker({ walkables, rootMeshes, rootSegs, noGo = [] }) {
   // Is this camera point inside something solid?
   function blocked(p, pivotY) {
     const r = Math.hypot(p.x, p.z);
+    const near = grid.get(cellKey(Math.floor(p.x / CELL), Math.floor(p.z / CELL)));
+    if (near) for (const o of near) if (!o.off && p.y > o.y0 && p.y < o.y1 && Math.hypot(p.x - o.x, p.z - o.z) < o.r + 0.35) return true;
     if (p.y < TRUNK.top + 5) {
       for (let i = 0; i < TRUNK.strands; i++) {
         const th = strandTheta(i, p.y), R = ringR(p.y);

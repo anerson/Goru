@@ -488,13 +488,13 @@ function updatePreview() {
     sc.add(new THREE.HemisphereLight('#fff4e0', '#3a3020', 2.2));
     const sun = new THREE.DirectionalLight('#ffffff', 2.4); sun.position.set(2, 4, 3); sc.add(sun);
     const cam = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
-    cam.position.set(0, 1.25, 4.4); cam.lookAt(0, 0.95, 0);
+    cam.position.set(0, 1.35, 3.6); cam.lookAt(0, 1.05, 0);
     const disc = new THREE.Mesh(new THREE.CircleGeometry(0.9, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#3a3424', transparent: true, opacity: 0.6 }));
     sc.add(disc);
     preview = { r, sc, cam, ch: null, raf: 0 };
   }
   const p = preview;
-  if (p.ch) p.sc.remove(p.ch.root);
+  if (p.ch) { p.sc.remove(p.ch.root); p.ch.root.traverse((o) => { if (o.isMesh && !o.userData.outline) o.geometry.dispose(); }); }
   p.ch = createCharacter({ name: 'preview', light: false });
   p.ch.setAppearance({ ...pickedLook, hat: CLASSES_PLAN[pickedClass ?? 'guerreiro']?.look.hat });
   p.ch.setClass(pickedClass ?? 'guerreiro');
@@ -508,7 +508,8 @@ function updatePreview() {
     const loop = (t) => {
       if ($('classPick').hidden || $('slots').hidden) { p.raf = 0; return; }
       const dt = Math.min(0.05, (t - t0) / 1000); t0 = t;
-      p.ch.root.rotation.y += dt * 0.6;
+      p.swayT = (p.swayT ?? 0) + dt;
+      p.ch.root.rotation.y = Math.PI + Math.sin(p.swayT * 0.7) * 0.6;   // faces you, turning a little each way
       p.ch.idle(dt, t / 1000, null);
       p.r.render(p.sc, p.cam);
       p.raf = requestAnimationFrame(loop);

@@ -40,8 +40,8 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
   const eye = new THREE.MeshStandardMaterial({ color: '#1a120c', roughness: 0.2 });
   const white = new THREE.MeshStandardMaterial({ color: '#f4efe6', roughness: 0.4 });
   for (const sx of [-1, 1]) {
-    add(head, new THREE.SphereGeometry(0.026, 16, 12), white, sx * 0.05, 0.02, -0.118).scale.set(1, 0.8, 0.5);
-    add(head, new THREE.SphereGeometry(0.014, 12, 10), eye, sx * 0.05, 0.02, -0.13);
+    add(head, new THREE.SphereGeometry(0.042, 16, 12), white, sx * 0.052, 0.02, -0.112).scale.set(1, 1.1, 0.55);   // big cartoon eyes
+    add(head, new THREE.SphereGeometry(0.024, 12, 10), eye, sx * 0.052, 0.015, -0.13);
     add(head, new THREE.SphereGeometry(0.035, 12, 10), skin, sx * 0.132, 0.0, 0).scale.set(0.5, 1, 0.8); // ears
     add(head, new THREE.BoxGeometry(0.045, 0.01, 0.01), dark, sx * 0.05, 0.058, -0.125).rotation.z = sx * -0.15; // brows
   }

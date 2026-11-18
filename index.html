@@ -172,6 +172,19 @@ body:not(.journey) .journey-only { display: none !important; }
 .hud-skills span { font: 600 11px/1.2 var(--mono); }
 .hud-skills button:disabled { opacity: 0.5; cursor: default; }
 @media (max-width: 700px) { .hud-skills button { max-width: 19vw; } .hud-skills span { font-size: 10px; } }
+/* phones: skills become a column of round keys on the right, above a big round Atacar */
+@media (max-width: 560px), (pointer: coarse) and (max-width: 900px) {
+  .hud-skills { left: auto; right: max(10px, env(safe-area-inset-right, 0px)); transform: none; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); flex-direction: column; gap: 6px; }
+  .hud-skills button { width: 46px; height: 46px; min-width: 0; padding: 0; border-radius: 50%; display: grid; place-items: center; }
+  .hud-skills span { display: none; }
+  .hud-skills kbd { font-size: 15px; }
+  #hudAttack { width: 72px; height: 72px; border-radius: 50%; font-size: 13px; }
+  .hud-quest { top: calc(172px + env(safe-area-inset-top, 0px)); width: calc(100vw - 32px); right: 16px; }
+  .hud-needs { width: 172px; }
+  .hud-reveal { top: 46%; }
+}
+body.bag-open .hud-skills { display: none; }
+.slots-box:has(#classPick:not([hidden])) > h2, .slots-box:has(#classPick:not([hidden])) > .note { display: none; }
 #hudEndNext { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 800; }
 .hud-quest { position: fixed; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(62px + env(safe-area-inset-top, 0px)); width: min(320px, calc(100vw - 220px)); min-width: 180px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; display: grid; gap: 4px; }
 .hud-quest small { font: 500 10px/1.2 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
@@ -254,7 +267,7 @@ body.flying .hud-actions { bottom: calc(190px + env(safe-area-inset-bottom, 0px)
 .hud-banner.boss b { color: #ffd0c8; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.8), 0 0 34px rgba(255, 80, 60, 0.6); }
 .hud-banner.level b { color: #fff2a8; }
 @keyframes bannerIn { from { transform: scale(1.25); letter-spacing: 0.08em; } }
-.hud-reveal { position: fixed; left: 50%; top: 22%; transform: translateX(-50%); min-width: 260px; max-width: calc(100vw - 32px); box-sizing: border-box; padding: 14px 20px; display: grid; gap: 4px; text-align: center; background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--glow) 35%, transparent), var(--panel) 70%); border: 1px solid var(--glow); border-radius: 12px; box-shadow: 0 0 30px color-mix(in srgb, var(--glow) 45%, transparent); pointer-events: none; }
+.hud-reveal { position: fixed; left: 50%; top: 34%; transform: translateX(-50%); min-width: 260px; max-width: calc(100vw - 32px); box-sizing: border-box; padding: 14px 20px; display: grid; gap: 4px; text-align: center; background: radial-gradient(circle at 50% 0%, color-mix(in srgb, var(--glow) 35%, transparent), var(--panel) 70%); border: 1px solid var(--glow); border-radius: 12px; box-shadow: 0 0 30px color-mix(in srgb, var(--glow) 45%, transparent); pointer-events: none; }
 .hud-reveal.on { animation: revealIn 0.5s cubic-bezier(.2,1.6,.4,1); }
 .hud-reveal small { font: 700 11px/1 var(--mono); letter-spacing: 0.25em; text-transform: uppercase; color: var(--glow); }
 .hud-reveal b { font: 800 22px/1.15 var(--display); color: #fff6dc; }
@@ -388,6 +401,7 @@ body.walking .orbit-only { display: none !important; }
     <div class="slot-grid" id="slotGrid"></div>
     <div id="classPick" hidden>
       <h3 id="pickTitle">Novo personagem</h3>
+      <div class="classes" id="classes"></div>
       <div class="maker">
         <canvas id="pPreview" aria-label="Prévia do personagem"></canvas>
         <div class="maker-side">
@@ -395,7 +409,6 @@ body.walking .orbit-only { display: none !important; }
           <div class="looks" id="looks"></div>
         </div>
       </div>
-      <div class="classes" id="classes"></div>
       <div class="row pick-foot"><span id="pHint" class="hint-go"></span><button id="pBack" type="button">Voltar</button><button id="pGo" class="primary" type="button" disabled>Entrar</button></div>
     </div>
     <div class="row" id="slotsFoot"><button id="slotsBack" type="button">Voltar</button></div>

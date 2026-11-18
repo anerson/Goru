@@ -700,7 +700,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   // the light trail on the ground: glowing dots from the explorer toward the next objective,
   // only where the floor is walkable (so it never shows through a wall or over water)
   const TRAIL_N = 22;
-  const trailMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(0.2, 10, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffe9a0').multiplyScalar(2), transparent: true, opacity: 0.9, depthWrite: false }), TRAIL_N);
+  const trailMesh = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.16, 0.2, 0.05, 14), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffd98a').multiplyScalar(1.6), transparent: true, opacity: 0.85, depthWrite: false }), TRAIL_N);
   trailMesh.frustumCulled = false;
   scene.add(trailMesh);
   const tm4 = new THREE.Matrix4(), tq = new THREE.Quaternion(), tsc = new THREE.Vector3(), tpos = new THREE.Vector3();
@@ -782,7 +782,8 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     const tp = targetPos();
     targetNow = tp;
     updateTrail(me, wp ? wp.pos : tp, t);
-    beacon.visible = !!tp;
+    const tpDist = tp ? Math.hypot(tp.x - me.x, tp.z - me.z) : 0;
+    beacon.visible = !!tp && tpDist > 6;               // close by, the beam would hide what you came for
     if (tp) { beacon.position.set(tp.x, tp.y - 1.2, tp.z); ring.scale.setScalar(1 + Math.sin(t * 3) * 0.12); beam.material.opacity = 0.25 + Math.sin(t * 3) * 0.1; }
     if (wp) {
       const dx = wp.pos.x - me.x, dz = wp.pos.z - me.z;

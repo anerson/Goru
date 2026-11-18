@@ -108,9 +108,11 @@ export function makeCampfire() {
   part(g, new THREE.CircleGeometry(0.75, 20), mat('#2a1a10'), 0, 0.02, 0, -Math.PI / 2);
   const flame = new THREE.Group();
   flame.position.y = 0.3;
-  part(flame, new THREE.ConeGeometry(0.42, 1.2, 12), glow('#ff8a2a', 1.6), 0, 0.6, 0).castShadow = false;
-  part(flame, new THREE.ConeGeometry(0.3, 0.95, 12), glow('#ffcf4a', 2), 0.08, 0.5, 0.05).castShadow = false;
-  part(flame, new THREE.ConeGeometry(0.16, 0.6, 10), glow('#fff2b0', 2.4), -0.05, 0.35, -0.04).castShadow = false;
+  // three teardrop flames, a hot core inside, and a few embers
+  part(flame, new THREE.LatheGeometry(Array.from({ length: 12 }, (_, k) => { const t = k / 11; return new THREE.Vector2(Math.sin(Math.PI * Math.pow(t, 0.7)) * 0.42 * (1 - t * 0.6), t * 1.3); }), 14), glow('#ff7a1a', 1.5), 0, 0, 0).castShadow = false;
+  part(flame, new THREE.LatheGeometry(Array.from({ length: 12 }, (_, k) => { const t = k / 11; return new THREE.Vector2(Math.sin(Math.PI * Math.pow(t, 0.7)) * 0.3 * (1 - t * 0.6), t * 1.0); }), 14), glow('#ffc23a', 1.9), 0.1, 0, 0.06).castShadow = false;
+  part(flame, new THREE.LatheGeometry(Array.from({ length: 12 }, (_, k) => { const t = k / 11; return new THREE.Vector2(Math.sin(Math.PI * Math.pow(t, 0.7)) * 0.17 * (1 - t * 0.6), t * 0.7); }), 14), glow('#fff2b0', 2.4), -0.06, 0, -0.04).castShadow = false;
+  for (let k = 0; k < 5; k++) part(flame, new THREE.SphereGeometry(0.035, 6, 4), glow('#ffb347', 2.2), Math.cos(k * 2.3) * 0.35, 0.9 + (k % 3) * 0.35, Math.sin(k * 2.3) * 0.35).castShadow = false;
   g.add(flame);
   return { root: g, flame };
 }
@@ -347,7 +349,7 @@ export function makeMistWall({ radius = 103, angle = 0, halfWidth = 0.42, height
   const root = new THREE.Group();
   root.userData.noToon = true;
   // the opaque core: a curved sheet across the whole opening (nothing of the inside shows)
-  const m = new THREE.MeshBasicMaterial({ map: tex, color: '#b9ae98', side: THREE.DoubleSide, fog: false, transparent: false });
+  const m = new THREE.MeshBasicMaterial({ map: tex, color: '#d9bf86', side: THREE.DoubleSide, fog: false, transparent: false });
   const theta = Math.atan2(Math.cos(angle), Math.sin(angle));          // three's cylinder: x = r sin(t), z = r cos(t)
   const wall = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, 32, 1, true, theta - halfWidth, halfWidth * 2), m);
   wall.position.y = y + height / 2 - 1;
@@ -374,7 +376,7 @@ export function makeMistWall({ radius = 103, angle = 0, halfWidth = 0.42, height
   puffs.userData.noToon = true;
   puffs.frustumCulled = false;
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), sc = new THREE.Vector3(), p = new THREE.Vector3(), c = new THREE.Color();
-  const base = new THREE.Color('#ddd5c2');
+  const base = new THREE.Color('#f2dcaa');
   items.forEach((it, i) => puffs.setColorAt(i, c.copy(base).multiplyScalar(it.tone)));
   let shrink = 1;
   const place = (t) => {

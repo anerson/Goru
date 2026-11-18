@@ -60,6 +60,7 @@ export function createHud(root) {
     const open = force ?? $('hudBagPanel').hidden;
     $('hudBagPanel').hidden = !open;
     $('hudBag').setAttribute('aria-expanded', String(open));
+    document.body.classList.toggle('bag-open', open);
     if (open && lastState) renderBag(lastState);
   }
 

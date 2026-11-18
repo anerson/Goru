@@ -41,7 +41,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   function spawn(type, biome, x, z, opts = {}) {
     const def = CREATURES[type];
     const model = def.build();
-    toonify(model.root, { outline: !!def.boss, thickness: 0.05 });
+    toonify(model.root, { outline: true, thickness: def.boss ? 0.05 : 0.07 });
     const level = biome === 'fora' ? 0 : BIOMES.find((b) => b.id === biome).level;
     const y = groundAt(biome, x, z);
     model.root.position.set(x, y, z);
