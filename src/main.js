@@ -102,6 +102,19 @@ function buildWorld() {
   const game = createGame({ scene, biomes, walker, hud, fx });
   // the seals: the walker cannot step through a locked floor's ramp or the trunk's mouth
   biomes.noGo.push((x, z, fl) => !!game.blockedAt(x, z, fl));
+  // big trunks, rocks and crystals of every floor are solid too; any that would sit on top of
+  // something you must reach (a villager, a bench, a quest object, a resource) is left out
+  const reach = game.debug.items.filter((i) => i.radius > 0);
+  let solidCount = 0;
+  for (const [id, list] of Object.entries(biomes.obstacles ?? {})) {
+    const y = id === 'fora' ? 0 : (BIOMES.find((b) => b.id === id)?.level ?? 0);
+    for (const o of list) {
+      if (reach.some((i) => Math.abs(i.pos.y - 1 - y) < 12 && Math.hypot(i.pos.x - o.x, i.pos.z - o.z) < o.r + 1.6)) continue;
+      walker.addObstacle(o.x, o.z, o.r, y - 2, y + 25);
+      solidCount++;
+    }
+  }
+  window.__solidCount = solidCount;
   const combat = createCombat({ scene, camera, walker, character, biomes, game, hud, reduceMotion, fx });
   game.onFaint(() => combat.resetBosses());
   // crafted gear shows on the explorer: the weapon recolours the staff, the outfit the clothes
