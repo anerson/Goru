@@ -298,7 +298,7 @@ function renderParty(members, code) {
     list.append(li);
   }
 }
-const REGION_ORDER = ['raizes', 'deserto', 'oceano', 'fornalha', 'niveria', 'selva', 'pantano', 'cristais', 'suspensa', 'copa'];
+const REGION_ORDER = BIOMES.map((b) => b.id);
 function markPing(p) {
   const floor = world.walker.floorAt(p.x, p.z, world.walker.state.feet);
   world.fx.ring(V3(p.x, floor + 0.2, p.z), '#ffd76a', 5, 2.2);

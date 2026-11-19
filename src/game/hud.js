@@ -14,7 +14,7 @@ export function createHud(root) {
       <div class="lvl"><span id="hudLevel">Nível 1</span><i><b id="hudXp"></b></i></div>
     </div>
     <div class="hud-quest" aria-live="polite">
-      <small id="hudAct">Andar 1 de 10 · Floresta das Raízes</small>
+      <small id="hudAct">Andar 1 de 5 · Floresta das Raízes</small>
       <strong id="hudObjective"></strong>
       <div class="qbar" id="hudQBar" hidden><i id="hudQFill"></i><span id="hudQText"></span></div>
       <div class="guide" id="hudGuide"><span class="arrow" id="hudArrow">▲</span><span id="hudDist"></span><em id="hudHint"></em></div>
@@ -120,7 +120,7 @@ export function createHud(root) {
     bind(h) { handlers = h; },
     objective(text, act = 1, floor = 1, place = '') {
       $('hudObjective').textContent = text;
-      $('hudAct').textContent = floor === 0 ? 'Prólogo · Fora da árvore · Níveis 1-5' : `Ato ${['I', 'II', 'III'][act - 1] ?? 'I'} · Andar ${floor} de 10 · Níveis ${(floor - 1) * 10 || 5}-${floor * 10}`;
+      $('hudAct').textContent = floor === 0 ? 'Prólogo · Fora da árvore · Níveis 1-5' : `Ato ${['I', 'II', 'III'][act - 1] ?? 'I'} · Andar ${floor} de 5 · Níveis ${(floor - 1) * 10 || 5}-${floor * 10}`;
     },
     workbench: renderBench,
     // quest progress under the objective (3/3 springs...)

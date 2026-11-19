@@ -62,6 +62,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     return biomes.terrains[biome](x, z) > b.level - 0.5 && !game.nearSafeZone(biome, x, z, 18);
   };
   for (const [biome, list] of Object.entries(FAUNA)) {
+    if (biome !== 'fora' && !BIOMES.some((b) => b.id === biome)) continue;   // floors that are not in the tree any more
     for (const [type, n] of list) {
       for (let k = 0, tries = 0; k < n && tries < 200; tries++) {
         // in the clearing most creatures roam near the one trail toward the tree (the missions' way)
@@ -167,7 +168,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     fx?.kill(m.pos.clone().setY(m.pos.y + m.model.height * 0.5), m.boss ? '#ffcf4a' : '#ff9a6a');
     if (!m.boss) sfx('kill');
     lane.visible = ring.visible = false;
-    if (m.boss !== 'gm' && !m.temp) game.onKill(m.biome, m.boss ?? null);
+    if (m.boss !== 'gm' && (!m.temp || m.ambush)) game.onKill(m.biome, m.boss ?? null);
     if (m.boss) {
       hud.boss(null);
       if (m.boss !== 'gm') game.bossDefeated(m.boss);   // a boss the GM summoned is not the story's
@@ -653,6 +654,20 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     b.model.root.visible = true;
   }
   game.onBossOutcome(applyOutcome);
+  // ambushes: a few creatures of the floor around a quest spot; done() when all have fallen
+  const ambushes = [];
+  game.setAmbushHook?.((biome, pos, n, done) => {
+    const types = (FAUNA[biome] ?? []).map(([t]) => t);
+    const pool = types.length ? types : (FAUNA.raizes ?? []).map(([t]) => t);
+    const group = [];
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2 + 0.6, x = pos.x + Math.cos(a) * 5, z = pos.z + Math.sin(a) * 5;
+      const m = spawn(pool[k % pool.length], biome, x, z, { temp: true, ambush: true, state: 'chase' });
+      m.sense = true;
+      group.push(m);
+    }
+    ambushes.push({ group, done });
+  });
   // hunting objectives point at the nearest living creature of that place (never the camp)
   game.setMobFinder((biome) => {
     const me = walker.state;
@@ -729,6 +744,10 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
       }
     }
     comboT -= dt;
+    for (let i = ambushes.length - 1; i >= 0; i--) {
+      const a = ambushes[i];
+      if (a.group.every((m) => m.state === 'dead' || !mobs.includes(m))) { ambushes.splice(i, 1); a.done(); }
+    }
     if (comboT <= 0 && combo) dropCombo();
     const me = walker.state;
     const r = Math.hypot(me.x, me.z);

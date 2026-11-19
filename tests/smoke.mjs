@@ -199,7 +199,22 @@ const act = await page.evaluate(() => {
   const log = [];
   const item = (id) => { const it = D.items.find((i) => i.id === id); if (!it) throw new Error('missing ' + id); return it; };
   const use = (id) => { const it = item(id); if (!it.enabled()) throw new Error('disabled ' + id + ' at ' + G.state.stage); it.use(); };
-  const useGroup = (g, n) => { const list = D.items.filter((i) => i.group === g && i.kind === 'quest' && i.enabled()).slice(0, n); if (list.length < n) throw new Error(`only ${list.length} of ${g}`); list.forEach((it) => it.use()); };
+  // a step may cost materials (the test hands them over) or be guarded by an ambush (the test
+  // defeats the creatures, lets combat notice, and uses the spot again)
+  const useGroup = (g, n) => {
+    const list = D.items.filter((i) => i.group === g && i.kind === 'quest' && i.enabled()).slice(0, n);
+    if (list.length < n) throw new Error(`only ${list.length} of ${g}`);
+    for (const it of list) {
+      for (const [k, v] of Object.entries(it.def?.cost ?? {})) G.state.inv[k] = (G.state.inv[k] ?? 0) + v;
+      it.use();
+      if (it.def?.ambush && it.enabled()) {
+        for (const m of C.mobs.filter((x) => x.ambush && x.state !== 'dead')) C.hurtMob(m, 1e7, m.pos.clone().setX(m.pos.x + 1));
+        O.combat.update(0.05, 0);
+        it.use();
+        checks.ambushes = (checks.ambushes ?? 0) + 1;
+      }
+    }
+  };
   const converse = (npc) => { use(npc); for (let k = 0; k < 20 && D.dialogue; k++) O.hud.pick(0); O.hud.closeDialogue(); };
   const tick = () => { closeStory(); G.update(0.05, 0, { running: false, flying: false, camYaw: 0 }); };
   // gather what a recipe needs from that floor's resource nodes (each node gives one, then regrows)
@@ -299,12 +314,12 @@ const act = await page.evaluate(() => {
   checks.juice = { banner: !!document.getElementById('hudBanner'), progressBar: !!document.getElementById('hudQBar') };
   const allYielded = Object.values(bosses).every((b) => b.yielded) && Object.keys(bosses).length === 20;
   checks.levelCapOk = G.state.level <= 100;
-  const ok = G.state.stage === 'campanha_fim' && misplaced.length === 0 && allYielded && endTitle.includes('Final B') && D.intact() === 10
-    && checks.gateWeak < checks.gateStrong * 0.25 && checks.benchShown !== undefined && checks.wrongOrder?.reset && checks.wrongOrder?.hurt && chestsOpened >= 30 && (G.state.bonus.hp + G.state.bonus.dmg * 100) >= 5 * 6;
+  const ok = G.state.stage === 'campanha_fim' && misplaced.length === 0 && allYielded && endTitle.includes('Final B') && D.intact() === 5
+    && checks.gateWeak < checks.gateStrong * 0.25 && checks.benchShown !== undefined && checks.wrongOrder?.reset && checks.wrongOrder?.hurt && chestsOpened >= 15 && (G.state.bonus.hp + G.state.bonus.dmg * 100) >= 5 * 2;
   return { log, checks, bosses, misplaced, endTitle, ending, intact: D.intact(), level: G.state.level, equip: G.state.equip, ok };
 });
 
-for (const place of ['raizes', 'fornalha', 'pantano', 'copa']) {
+for (const place of ['raizes', 'fornalha', 'niveria']) {
   await page.evaluate((p) => window.__oliveira.goTo(p), place);
   await page.waitForTimeout(3000);
   await page.screenshot({ path: `tests/smoke-${place}.png`, timeout: 240000 });

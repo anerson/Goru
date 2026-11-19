@@ -31,18 +31,21 @@ export const gapAngles = (y) => theta0.map((_, i) => {
 });
 
 // ---- walkways ------------------------------------------------------------
-// Spiral ramp hugging the inner wall: 4 turns, 300 m of climb over ~1.8 km of path.
-export const RAMP = { rin: 66, rout: 74, top: 300, turns: 4 };
+// Spiral ramp hugging the inner wall up to the fifth (last) floor: the same slope as before
+// (4 turns per 300 m), 133 m of climb.
+const STEP = 300 / 9;                       // 33.3 m between floors
+export const FLOORS = 5;
+export const RAMP = { rin: 66, rout: 74, top: STEP * (FLOORS - 1), turns: (4 * STEP * (FLOORS - 1)) / 300 };
 export const rampStart = 0.2;
 export const rampAt = (f) => ({ a: rampStart + f * RAMP.turns * TAU, y: f * RAMP.top });
 // metres of height per radian of ramp
 export const RAMP_RISE = RAMP.top / (RAMP.turns * TAU);
 
 // ---- the ecosystems -------------------------------------------------------
-// Ten levels inside the trunk, one every 33.3 m, each its own world: a terrain disk inside
+// Five levels inside the trunk, one every 33.3 m, each its own world: a terrain disk inside
 // the ramp, lit by its own "sun" hanging from the floor above. The floor of each level is a
 // 6 m slab whose underside (roots, glowing moss) is the sky of the level below.
-export const LEVEL_STEP = RAMP.top / 9;
+export const LEVEL_STEP = STEP;
 export const DISK_R = RAMP.rin;   // 66 m: biome floors stop where the ramp begins
 export const SLAB = 6;            // m: thickness of each floor (27 m of headroom per level)
 const B = (id, name, k, color, light) => ({ id, name, level: +(k * LEVEL_STEP).toFixed(3), color, light });
@@ -53,11 +56,6 @@ export const BIOMES = [
   B('oceano', 'Oceano Interior', 2, '#6fd6e3', '#c4f1ff'),
   B('fornalha', 'Fornalha de Ignar', 3, '#ff5a36', '#ff8a5c'),
   B('niveria', 'Nivéria, o Reino Congelado', 4, '#9fd2ff', '#d6e9ff'),
-  B('selva', 'Selva dos Gigantes', 5, '#4fd18b', '#d9ffb8'),
-  B('pantano', 'Pântano da Decomposição', 6, '#9bbf4a', '#cfe08a'),
-  B('cristais', 'Reino dos Cristais', 7, '#c59bff', '#d8c4ff'),
-  B('suspensa', 'Floresta Suspensa', 8, '#7fe08a', '#e8ffd0'),
-  B('copa', 'Jardim da Copa', 9, '#ffd76a', null), // open to the sky
 ];
 export const LEVEL_COLORS = Object.fromEntries(BIOMES.map((b) => [b.level, b.color]));
 
@@ -93,7 +91,7 @@ export const ROUTES = (() => {
     entradas: ['anel_externo', 'raizes'],
     raizes: ['entradas', 'rampa'],
     rampa: ['raizes'],
-    pontes_topo: ['galeria_copa', 'mirantes'],
+    pontes_topo: [`galeria_${BIOMES[BIOMES.length - 1].id}`, 'mirantes'],
     mirantes: ['pontes_topo'],
   };
   for (const b of BIOMES.slice(1)) {
@@ -102,6 +100,6 @@ export const ROUTES = (() => {
     g[gal] = ['rampa', b.id];
     g[b.id] = [gal, 'rampa'];
   }
-  g.galeria_copa.push('pontes_topo');
+  g[`galeria_${BIOMES[BIOMES.length - 1].id}`].push('pontes_topo');
   return g;
 })();

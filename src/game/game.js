@@ -23,6 +23,8 @@ const SAVE_PREFIX = 'aetherion-v3-vaga-';   // one save per character slot (4 sl
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const PLAN = Object.fromEntries(REGIONS_PLAN.map((r) => [r.id, r]));
 const ORDER = REGIONS_PLAN.map((r) => r.id);
+const LAST = REGIONS_PLAN[REGIONS_PLAN.length - 1];   // the last floor: its guardian decides the ending
+const FINAL_BOSS = LAST.boss.type;
 const ROMAN = ['I', 'II', 'III', 'IV'];
 
 function freshState(profile = {}) {
@@ -233,7 +235,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
           id: flag, group: def.group, kind: 'quest', pos: p.clone().setY(p.y + 1), radius: def.look === 'station' ? 5 : 3.8,
           label: () => `${def.label ?? LABELS[def.look] ?? 'Examinar'}${def.ordered ? ` ${ROMAN[i]}` : ''}`,
           enabled: () => stageIndex(state.stage) >= stageIndex(stageOfGroup[def.group]) && !state.flags[flag] && (!def.side || state.flags[`lado_${L}`] === def.side),
-          use: () => useObject(def, i, ri),
+          def, use: () => useObject(def, i, ri),
         });
       }
     };
@@ -442,13 +444,13 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     if (stage().region === 'fora') { hud.banner('Prólogo', 'Clareira de Aetherion', 'Chegue ao nível 5 para entrar na árvore'); return; }
     const r = PLAN[stage().region];
     const name = REGION_NAMES[r.id].replace(/^(a|o) /, '');
-    hud.banner(`Andar ${regionIndex()} de 10`, name[0].toUpperCase() + name.slice(1), `Missão: ${r.mission}`);
+    hud.banner(`Andar ${regionIndex()} de 5`, name[0].toUpperCase() + name.slice(1), `Missão: ${r.mission}`);
   }
   function finish() {
     ended = true;
     sfx('ending');
-    const how = state.flags.escolha_devoradorSeiva ?? 'destruir';
-    const outcome = PLAN.copa.boss.options.find((o) => o[0] === how)?.[2] ?? '';
+    const how = state.flags[`escolha_${FINAL_BOSS}`] ?? 'destruir';
+    const outcome = LAST.boss.options.find((o) => o[0] === how)?.[2] ?? '';
     hud.ending(ENDINGS[how] ?? 'Fim da campanha', `${outcome}${choicesSummary()}`);
   }
   // how far the current objective is: [done, total]
@@ -561,8 +563,33 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   }
 
   // ---- quest objects ----
+  // ambush: creatures guard the spot and must fall first; cost: the step takes materials
+  const ambushActive = {};
+  let ambushHook = null;
+  const costText = (cost) => Object.entries(cost).map(([k, v]) => `${v} ${ITEMS[k].name.toLowerCase()}`).join(' e ');
   function useObject(def, i, ri) {
     const flag = `${def.group}_${i}`;
+    if (def.cost && !state.flags[`${flag}_pago`]) {
+      if (!has(def.cost)) { hud.message(`Para isso você precisa de ${costText(def.cost)}. Colete pelo andar e volte.`); return; }
+      for (const [k, v] of Object.entries(def.cost)) take(k, v);
+      state.flags[`${flag}_pago`] = true;
+      hud.toast(`Usou ${costText(def.cost)}`, 'loot');
+    }
+    if (def.ambush && !state.flags[`${flag}_livre`]) {
+      if (ambushActive[flag]) { hud.toast('Derrote as criaturas que vigiam o lugar primeiro', 'xp'); return; }
+      const it = items.find((x) => x.id === flag);
+      if (ambushHook && it) {
+        ambushActive[flag] = true;
+        sfx('boss');
+        hud.banner('Emboscada!', 'Criaturas guardavam este lugar', 'Derrote-as para continuar', 'boss');
+        ambushHook(REGIONS_PLAN[ri]?.id ?? 'raizes', it.pos, def.ambush, () => {
+          delete ambushActive[flag];
+          state.flags[`${flag}_livre`] = true;
+          hud.toast('Lugar livre: termine a tarefa (E)', 'loot');
+        });
+        return;
+      }
+    }
     const n = state.count[def.group] ?? 0;
     if (def.ordered && i !== n) {
       // out of order: the sequence resets, and it hurts
@@ -732,7 +759,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     updateSeals(t, dt);
     if (storyPending && Math.hypot(walker.state.x, walker.state.z) < 98 && !dialogue) {
       const r = storyPending; storyPending = null;
-      tellStory(r, () => hud.banner('Andar 1 de 10', 'Floresta das Raízes', `Missão: ${PLAN.raizes.mission}`));
+      tellStory(r, () => hud.banner('Andar 1 de 5', 'Floresta das Raízes', `Missão: ${PLAN.raizes.mission}`));
     }
     hud.progress(...stageProgress());
     for (const n of nodes) if (n.timer > 0) { n.timer -= dt; if (n.timer <= 0) n.mesh.visible = true; }
@@ -817,7 +844,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     const [fid] = b.fragment;
     if (!state.inv[fid]) give(fid, 1);
     if (how !== 'destruir') state.flags[`intacto_${fid}`] = true;
-    hud.reveal(how === 'destruir' ? 'Fragmento rachado' : 'Fragmento do Coração', ITEMS[fid].name, [ITEMS[fid].fragment, `Fragmentos: ${held()}/10 · intactos ${intact()}/10`], how === 'destruir' ? '#a8a8a8' : '#9dffcf');
+    hud.reveal(how === 'destruir' ? 'Fragmento rachado' : 'Fragmento do Coração', ITEMS[fid].name, [ITEMS[fid].fragment, `Fragmentos: ${held()}/5 · intactos ${intact()}/5`], how === 'destruir' ? '#a8a8a8' : '#9dffcf');
   }
   // killed outright (no yield, e.g. by the GM's staff): counts as destroying it
   function bossDefeated(id, remote = false) {
@@ -853,14 +880,14 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   function choicesSummary() {
     const rows = bossList.filter((b) => b.kind === 'boss' && state.flags[`escolha_${b.id}`]).map((b) => `${bossName(b.id)}: ${CHOICE_NAMES[state.flags[`escolha_${b.id}`]]}`);
     const sides = Object.keys(SIDES).filter((P) => state.flags[`lado_${P}`]).map((P) => SIDES[P][state.flags[`lado_${P}`]].after);
-    return (rows.length ? ` ${STRINGS.ESCOLHAS} ${rows.join(' · ')}. Fragmentos intactos: ${intact()}/10.` : '') + (sides.length ? ` Pelos andares: ${sides.join(' ')}` : '');
+    return (rows.length ? ` ${STRINGS.ESCOLHAS} ${rows.join(' · ')}. Fragmentos intactos: ${intact()}/5.` : '') + (sides.length ? ` Pelos andares: ${sides.join(' ')}` : '');
   }
   // each guardian's special rules, from its mechanic (counted in state.count)
   const mechDone = (m) => (state.count[m.group] ?? 0) >= m.count;
   function bossRules(id) {
     const b = bossList.find((x) => x.id === id);
     if (!b) return {};
-    if (id === 'devoradorSeiva') return { armorMul: Math.min(1, 0.3 + 0.07 * held()) };
+    if (id === FINAL_BOSS) return { armorMul: Math.min(1, 0.5 + 0.1 * held()), ...(b.mechanic?.effect === 'summon' ? {} : {}) };
     const m = b.mechanic;
     const out = {};
     if (id === 'devoradorTroncos' || id === 'sacerdotisa') out.stationary = true;
@@ -941,7 +968,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     if (!st || state.seen?.[region]) { then?.(); return; }
     state.seen = { ...(state.seen ?? {}), [region]: true };
     storyOpen = true;
-    const kicker = region === 'fora' ? 'Prólogo' : `Andar ${ORDER.indexOf(region) + 1} de 10`;
+    const kicker = region === 'fora' ? 'Prólogo' : `Andar ${ORDER.indexOf(region) + 1} de 5`;
     hud.story(kicker, st.title, st.lines, () => { storyOpen = false; save(); then?.(); });
   }
 
@@ -1041,12 +1068,13 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     profiles, deleteSlot, openFloors, blockedAt, onKill, tellStory,
     get cls() { return cls(); },
     setMobFinder: (f) => { mobFinder = f; },
+    setAmbushHook: (f) => { ambushHook = f; },
     onBossEvent: (f) => bossEvents.push(f),
     onIdentity: (f) => { identityHooks.push(f); f(state); },
     // a friend decided a guardian's fate: the same outcome here, without the conversation
     remoteBoss(id, how) {
       if (!bossList.some((b) => b.id === id) || state.flags[`boss_${id}`]) return;
-      if (!['destruir', 'poupar', 'restaurar'].includes(how) || id === 'devoradorSeiva') return;
+      if (!['destruir', 'poupar', 'restaurar'].includes(how) || id === FINAL_BOSS) return;
       const b = bossList.find((x) => x.id === id);
       if (stageIndex(state.stage) < stageIndex(b.wakeFrom)) return;     // not there yet: no skipping
       how = 'destruir';                                                  // the fragment comes cracked
