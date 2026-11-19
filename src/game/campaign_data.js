@@ -98,10 +98,10 @@ export const REGIONS_PLAN = [
     sub: { type: 'matriarca', mechanic: { group: 'placa', count: 3, look: 'icePlate', label: 'Derreter a placa de gelo', text: 'Derreta as placas que bloqueiam a nascente: enquanto existem, a Matriarca chama a matilha', effect: 'summon' },
       reveal: 'Filhotes. A toca fica junto à nascente: ela convocava a matilha para proteger a cria.' },
     boss: { type: 'reiInverno', fragment: ['cristal_glacial', 'Cristal Glacial', 'Conservação térmica'],
-      reveal: 'O núcleo no peito do dragão é o regulador do coração de Aetherion: guardava a energia de toda a árvore congelada para que nada se perdesse. Os cinco fragmentos que você carrega pulsam juntos.',
+      reveal: 'O núcleo no peito do dragão é o regulador do coração de Aetherion: guardava a energia de toda a árvore congelada para que nada se perdesse. Os quatro fragmentos que você carrega pulsam juntos.',
       options: [
         ['destruir', 'Final A — Destruir o núcleo', 'A energia guardada se solta de uma vez. A árvore sobrevive, mas perde parte da regulação: andares inteiros precisarão ser reconstruídos.'],
-        ['restaurar', 'Final B — Sincronizar os cinco fragmentos e recalibrar o núcleo', 'Os cinco fragmentos entram em ressonância e o núcleo volta a regular o coração. A água corre, o calor volta ao equilíbrio e um guardião mortal passa a acompanhar os ciclos.', { fragments: 5 }],
+        ['restaurar', 'Final B — Sincronizar os quatro fragmentos e recalibrar o núcleo', 'Os quatro fragmentos entram em ressonância e o núcleo volta a regular o coração. A água corre, o calor volta ao equilíbrio e um guardião mortal passa a acompanhar os ciclos.', { fragments: 4 }],
         ['simbiose', 'Final C — Dividir a carga do coração com o Rei do Inverno', 'Você se conecta ao núcleo e divide a carga. A árvore recupera a estabilidade; você assume uma responsabilidade que não termina.'],
       ] },
   },

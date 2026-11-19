@@ -135,7 +135,7 @@ const walk = await page.evaluate(() => {
   face(Math.cos(ta), Math.sin(ta));
   O.keys.clear(); O.keys.add('KeyW'); O.keys.add('ShiftLeft');
   O.step(400);
-  out.bridgeToLookout = { r: +r().toFixed(1), feet: +w().feet.toFixed(1), ok: r() > L.LOOKOUT.centre && Math.abs(w().feet - 300) < 0.6 };
+  out.bridgeToLookout = { r: +r().toFixed(1), feet: +w().feet.toFixed(1), ok: r() > L.LOOKOUT.centre && Math.abs(w().feet - L.RAMP.top) < 0.6 };
   O.keys.clear();
 
   // flying up from the forest stops under the floor of the lake level
