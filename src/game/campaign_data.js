@@ -265,7 +265,8 @@ for (const [ri, r] of REGIONS_PLAN.entries()) {
   if (ri < REGIONS_PLAN.length - 1) STAGES.push({ id: `${P}_nivel`, act: r.act, region: P, text: `Alcance o nível ${(ri + 1) * 10} para abrir o selo do próximo andar: cace criaturas do andar (a seta mostra a mais próxima)`, target: `mob:${P}`, kind: 'level', need: { nivel: (ri + 1) * 10 } });
 }
 STAGES.push({ id: 'campanha_fim', act: 2, region: REGIONS_PLAN[REGIONS_PLAN.length - 1].id, text: 'A campanha terminou', target: null, kind: 'end' });
-export const stageIndex = (id) => STAGES.findIndex((s) => s.id === id);
+let STAGE_INDEX = null;
+export const stageIndex = (id) => { if (STAGE_INDEX?.size !== STAGES.length) STAGE_INDEX = new Map(STAGES.map((s, i) => [s.id, i])); return STAGE_INDEX.get(id) ?? -1; };
 
 export function dialogueFor(npc, stage) {
   if (npc === 'thalor') return stage === 'fora_chegada' ? 'thalor_chegada' : 'thalor_geral';

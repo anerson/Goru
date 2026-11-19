@@ -169,8 +169,8 @@ export function buildWalkways(scene, mats) {
       const th = ang + s * (TAU / TRUNK.strands / 2), y = top - 80;
       beams.push([c.clone().setY(top - 0.6).add(V(-Math.sin(ang) * s * 6, 0, Math.cos(ang) * s * 6)), polar(ringR(y), th, y), 1.2]);
     }
-    scene.add(label('Mirante', LEVEL_COLORS[300], c.clone().setY(top + 9), 18));
-    for (let k = 0; k < 8; k++) lanterns.push([c.clone().add(polar(LOOKOUT.radius - 0.15, (k / 8) * TAU, 1.4)), LEVEL_COLORS[300]]);
+    scene.add(label('Mirante', LEVEL_COLORS[RAMP.top] ?? "#ffcf8a", c.clone().setY(top + 9), 18));
+    for (let k = 0; k < 8; k++) lanterns.push([c.clone().add(polar(LOOKOUT.radius - 0.15, (k / 8) * TAU, 1.4)), LEVEL_COLORS[RAMP.top] ?? "#ffcf8a"]);
   }
 
   // ---- ground outside: nine trails to the entrances, loop, approach ------------

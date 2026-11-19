@@ -444,7 +444,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     if (stage().region === 'fora') { hud.banner('Prólogo', 'Clareira de Aetherion', 'Chegue ao nível 5 para entrar na árvore'); return; }
     const r = PLAN[stage().region];
     const name = REGION_NAMES[r.id].replace(/^(a|o) /, '');
-    hud.banner(`Andar ${regionIndex()} de 5`, name[0].toUpperCase() + name.slice(1), `Missão: ${r.mission}`);
+    hud.banner(`Andar ${regionIndex()} de ${REGIONS_PLAN.length}`, name[0].toUpperCase() + name.slice(1), `Missão: ${r.mission}`);
   }
   function finish() {
     ended = true;
@@ -759,7 +759,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     updateSeals(t, dt);
     if (storyPending && Math.hypot(walker.state.x, walker.state.z) < 98 && !dialogue) {
       const r = storyPending; storyPending = null;
-      tellStory(r, () => hud.banner('Andar 1 de 5', 'Floresta das Raízes', `Missão: ${PLAN.raizes.mission}`));
+      tellStory(r, () => hud.banner(`Andar 1 de ${REGIONS_PLAN.length}`, 'Floresta das Raízes', `Missão: ${PLAN.raizes.mission}`));
     }
     hud.progress(...stageProgress());
     for (const n of nodes) if (n.timer > 0) { n.timer -= dt; if (n.timer <= 0) n.mesh.visible = true; }
@@ -844,7 +844,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     const [fid] = b.fragment;
     if (!state.inv[fid]) give(fid, 1);
     if (how !== 'destruir') state.flags[`intacto_${fid}`] = true;
-    hud.reveal(how === 'destruir' ? 'Fragmento rachado' : 'Fragmento do Coração', ITEMS[fid].name, [ITEMS[fid].fragment, `Fragmentos: ${held()}/5 · intactos ${intact()}/5`], how === 'destruir' ? '#a8a8a8' : '#9dffcf');
+    hud.reveal(how === 'destruir' ? 'Fragmento rachado' : 'Fragmento do Coração', ITEMS[fid].name, [ITEMS[fid].fragment, `Fragmentos: ${held()}/${FRAGMENTS.length} · intactos ${intact()}/${FRAGMENTS.length}`], how === 'destruir' ? '#a8a8a8' : '#9dffcf');
   }
   // killed outright (no yield, e.g. by the GM's staff): counts as destroying it
   function bossDefeated(id, remote = false) {
@@ -880,7 +880,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   function choicesSummary() {
     const rows = bossList.filter((b) => b.kind === 'boss' && state.flags[`escolha_${b.id}`]).map((b) => `${bossName(b.id)}: ${CHOICE_NAMES[state.flags[`escolha_${b.id}`]]}`);
     const sides = Object.keys(SIDES).filter((P) => state.flags[`lado_${P}`]).map((P) => SIDES[P][state.flags[`lado_${P}`]].after);
-    return (rows.length ? ` ${STRINGS.ESCOLHAS} ${rows.join(' · ')}. Fragmentos intactos: ${intact()}/5.` : '') + (sides.length ? ` Pelos andares: ${sides.join(' ')}` : '');
+    return (rows.length ? ` ${STRINGS.ESCOLHAS} ${rows.join(' · ')}. Fragmentos intactos: ${intact()}/${FRAGMENTS.length}.` : '') + (sides.length ? ` Pelos andares: ${sides.join(' ')}` : '');
   }
   // each guardian's special rules, from its mechanic (counted in state.count)
   const mechDone = (m) => (state.count[m.group] ?? 0) >= m.count;
@@ -968,7 +968,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     if (!st || state.seen?.[region]) { then?.(); return; }
     state.seen = { ...(state.seen ?? {}), [region]: true };
     storyOpen = true;
-    const kicker = region === 'fora' ? 'Prólogo' : `Andar ${ORDER.indexOf(region) + 1} de 5`;
+    const kicker = region === 'fora' ? 'Prólogo' : `Andar ${ORDER.indexOf(region) + 1} de ${REGIONS_PLAN.length}`;
     hud.story(kicker, st.title, st.lines, () => { storyOpen = false; save(); then?.(); });
   }
 

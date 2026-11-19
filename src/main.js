@@ -171,7 +171,7 @@ const PLACES = {
   },
   mirante() {
     const a = TOP_BRIDGES[0], p = at(LOOKOUT.centre + 4, a);
-    return { ...p, feet: RAMP.top, yaw: yawToward(Math.cos(a), Math.sin(a)), pitch: 0.05, label: 'Mirante · 300 m' };
+    return { ...p, feet: RAMP.top, yaw: yawToward(Math.cos(a), Math.sin(a)), pitch: 0.05, label: `Mirante · ${Math.round(RAMP.top)} m` };
   },
 };
 

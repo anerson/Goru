@@ -34,7 +34,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   const bosses = {};
   // outside the trunk, near the ground, is the clearing ('fora'), levels 1-5
   const FORA = { id: 'fora', level: 0, name: 'Clareira de Aetherion' };
-  const levelOf = (feet, r) => (r > DISK_R + 20 ? (feet < 30 ? FORA : null) : BIOMES.filter((b) => feet > b.level - 1.5 && feet < b.level + 26).pop() ?? null);
+  const levelOf = (feet, r) => (r > DISK_R + 20 ? (feet < 30 ? FORA : null) : BIOMES.findLast((b) => feet > b.level - 1.5 && feet < b.level + 26) ?? null);
   const groundAt = (biome, x, z) => (biome === 'fora' ? walker.floorAt(x, z, 30) : biomes.terrains[biome](x, z));
 
   // ---------- spawning ----------
