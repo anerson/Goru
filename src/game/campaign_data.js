@@ -18,7 +18,7 @@ export const REGIONS_PLAN = [
     outfit: { id: 'gibao_musgo', name: 'Gibão de Musgo', guard: 0.05, recipe: { fibra: 3, ambar: 1 }, look: { shirt: '#4f7a35', pants: '#3a3a22', hat: '#5a7a3a' } },
     steps: [
       { group: 'nascente', count: 3, look: 'spring', text: 'Investigue 3 nascentes: nível, cor e cheiro da água', done: 'Nível baixo, água turva e cheiro de fungo.' },
-      { ambush: 2, group: 'marca', count: 3, look: 'tracks', text: 'Siga as marcas de escavação até a galeria dos Besouros-Rachadores (cuidado: elas são vigiadas)', done: 'Galerias escavadas junto às raízes primárias.' },
+      { ambush: 2, group: 'marca', count: 3, look: 'tracks', text: 'Examine 3 marcas de escavação. Besouros-Rachadores vigiam cada marca: derrote-os antes (E)', done: 'Galerias escavadas junto às raízes primárias.' },
       { cost: { fibra: 2 }, group: 'coletor', count: 1, look: 'rescue', text: 'Resgate o coletor preso numa câmara de raízes (leve 2 fibras de raiz para amarrar a maca)', done: 'O coletor sai tossindo: "Um tatu de âmbar fechou a câmara!"' },
     ],
     sub: { type: 'escavadorAmbar', mechanic: { group: 'trama', count: 3, look: 'web', label: 'Tecer a trama de raízes', text: 'Teça a trama de raízes e atraia o Escavador de Âmbar', effect: 'armor' },
@@ -36,7 +36,7 @@ export const REGIONS_PLAN = [
     weapon: { id: 'lanca_solar', name: 'Lança de Casca Solar', tier: 2, recipe: { casca: 3, resina: 2, ferrao: 1 }, look: { color: '#a8642a', tip: '#ffd76a' } },
     outfit: { id: 'manto_casca', name: 'Manto de Casca', guard: 0.1, recipe: { casca: 2, resina: 2 }, look: { shirt: '#b8834a', pants: '#6a4a2a', hat: '#e0c080', cape: '#8a5a2a' } },
     steps: [
-      { group: 'jarro', count: 3, look: 'barrel', text: 'Escolte a caravana: leve 3 jarros de água entre os oásis', done: 'Jarro entregue sem derramar.' },
+      { group: 'jarro', count: 3, look: 'spring', text: 'Sondeie 3 poços secos e meça o lençol de água (E)', done: 'Ainda há água lá embaixo, mas pouca.' },
       { ambush: 2, group: 'ferroada', count: 3, look: 'tracksRed', text: 'Investigue o sumiço dos coletores: ache 3 marcas de ferrão (escorpiões rondam as marcas)', done: 'Marcas de ferrão grande, quentes ao toque.' },
       { cost: { resina: 1 }, group: 'reservatorio', count: 3, look: 'sand', text: 'Desobstrua 3 reservatórios bloqueados por sedimento (cada um pede 1 resina para vedar)', done: 'O sedimento cede e o reservatório respira.' },
     ],
@@ -57,7 +57,7 @@ export const REGIONS_PLAN = [
     steps: [
       { cost: { concha: 1 }, group: 'amostra', count: 3, look: 'sample', text: 'Colete amostras de água em 3 profundidades (cada amostra vai numa concha)', done: 'Transparência baixa, odor podre, pouco oxigênio.' },
       { group: 'estacao_filtro', count: 1, look: 'station', text: 'Localize a estação natural de filtragem', done: 'A estação está entupida de matéria orgânica.' },
-      { ambush: 1, group: 'filtro', count: 3, look: 'algae', text: 'Desobstrua a entrada sem destruir os organismos filtradores (algo defende a entrada)', done: 'A água volta a passar pelos filtros vivos.' },
+      { ambush: 1, group: 'filtro', count: 3, look: 'algae', text: 'Desobstrua as 3 entradas dos filtros vivos: criaturas defendem cada uma, derrote-as antes (E)', done: 'A água volta a passar pelos filtros vivos.' },
     ],
     sub: { type: 'guardiaoMares', mechanic: { group: 'comporta', count: 3, look: 'valve', label: 'Fechar o canal', text: 'Feche os 3 canais que alimentam a barreira do Guardião, na ordem certa (I, II, III)', effect: 'armor', ordered: true },
       reveal: 'Sem a barreira, a tartaruga colossal para. Ela só protegia as zonas de filtragem.' },
@@ -76,7 +76,7 @@ export const REGIONS_PLAN = [
     steps: [
       { ambush: 2, group: 'mineiro', count: 3, look: 'rescue', text: 'Resgate os 3 mineiros presos (as criaturas da fornalha cercam os escombros)', done: 'O mineiro sai dos escombros e corre para o acampamento.' },
       { cost: { obsidiana: 1 }, group: 'ruptura', count: 3, look: 'crack', text: 'Sele as 3 rupturas nas barreiras térmicas com obsidiana (1 por ruptura)', done: 'Ruptura marcada no mapa.' },
-      { group: 'chamine', count: 3, look: 'chimney', text: 'Regule as 3 chaminés na ordem gravada no instrumento (I, II, III)', done: 'A pressão cai.', ordered: true },
+      { group: 'chamine', count: 3, look: 'chimney', text: 'Regule as 3 chaminés na ordem I, II, III (os números aparecem sobre elas)', done: 'A pressão cai.', ordered: true },
     ],
     sub: { type: 'ferreiro', mechanic: { group: 'forja', count: 3, look: 'forge', label: 'Desligar a fornalha', text: 'Desligue as 3 fornalhas em sequência (I, II, III) e enfrente o Ferreiro Vulcânico', effect: 'armor', ordered: true },
       reveal: 'Os registros da forja mostram: o Ferreiro acendeu tudo porque o calor crescente parecia um ataque.' },
@@ -151,7 +151,7 @@ export const RESOURCES = [
   { biome: 'fora', item: 'erva', count: 6, respawn: 90 },
   { biome: 'fora', item: 'cogumelo', count: 6, respawn: 90 },
   { biome: 'fora', item: 'madeira', count: 4, respawn: 120 },
-  ...REGIONS_PLAN.flatMap((r) => r.mats.nodes.map(([item]) => ({ biome: r.id, item, count: 7, respawn: 90 }))),
+  ...REGIONS_PLAN.flatMap((r) => r.mats.nodes.map(([item]) => ({ biome: r.id, item, count: 9, respawn: 90 }))),
   ...REGIONS_PLAN.map((r) => ({ biome: r.id, item: r.mats.drop[0], count: 3, respawn: 120 })),
   ...REGIONS_PLAN.map((r) => ({ biome: r.id, item: 'cogumelo', count: r.id === 'raizes' ? 8 : 4, respawn: 120 })),
   ...REGIONS_PLAN.map((r) => ({ biome: r.id, item: 'erva', count: 4, respawn: 150 })),
@@ -177,12 +177,12 @@ export const SIDES = {
     b: { who: 'Guardiãs da Nascente', say: 'Água suja mata devagar. Plante filtros de musgo antes de abrir.', task: 'Plante 3 filtros de musgo nas nascentes', look: 'flower', label: 'Plantar o filtro de musgo', bless: 'Bênção da Nascente', after: 'A água voltou devagar, mas limpa.' } },
   deserto: { q: 'Tarek quer a água para a caravana atravessar a casca; os eremitas querem guardá-la nos reservatórios antigos para a próxima seca.',
     a: { who: 'Caravana de Tarek', say: 'Sem água a caravana morre no meio do caminho. Leve os jarros.', task: 'Leve 3 jarros de água até a caravana', look: 'barrel', label: 'Entregar o jarro', bless: 'Força da Caravana', after: 'A caravana atravessou e o comércio voltou.' },
-    b: { who: 'Eremitas da Casca', say: 'Gastar tudo agora é morrer na próxima seca. Sele os reservatórios.', task: 'Sele 3 reservatórios antigos', look: 'valve', label: 'Selar o reservatório', bless: 'Paciência dos Eremitas', after: 'Os reservatórios guardaram água para o próximo ano.' } },
+    b: { who: 'Eremitas da Casca', say: 'Gastar tudo agora é morrer na próxima seca. Sele os reservatórios.', task: 'Cubra 3 reservatórios antigos com lona de casca', look: 'valve', label: 'Cobrir o reservatório', bless: 'Paciência dos Eremitas', after: 'Os reservatórios guardaram água para o próximo ano.' } },
   oceano: { q: 'Os pescadores querem limpar a zona morta com redes; os mergulhadores querem alimentar os filtros vivos do fundo.',
     a: { who: 'Pescadores de Ilian', say: 'Tire o lixo da água e os peixes respiram.', task: 'Recolha 3 redes cheias de lodo', look: 'algae', label: 'Puxar a rede de lodo', bless: 'Braço dos Pescadores', after: 'A superfície clareou e os barcos voltaram.' },
     b: { who: 'Mergulhadores do Fundo', say: 'Os filtros vivos limpam tudo, se tiverem alimento.', task: 'Leve alimento a 3 colônias de filtro', look: 'sample', label: 'Alimentar a colônia', bless: 'Fôlego do Fundo', after: 'O fundo voltou a filtrar sozinho.' } },
   fornalha: { q: 'Os mineiros querem reforçar as barreiras com obsidiana; os forjadores querem abrir respiros para o calor sair.',
-    a: { who: 'Mineiros de Kaela', say: 'Barreira forte segura qualquer calor. Reforce com obsidiana.', task: 'Reforce 3 barreiras térmicas', look: 'crack', label: 'Reforçar a barreira', bless: 'Fúria da Forja', after: 'As barreiras aguentam, mas a pressão continua lá dentro.' },
+    a: { who: 'Mineiros de Kaela', say: 'Barreira forte segura qualquer calor. Reforce com obsidiana.', task: 'Reforce 3 juntas de contenção', look: 'valve', label: 'Reforçar a junta', bless: 'Fúria da Forja', after: 'As barreiras aguentam, mas a pressão continua lá dentro.' },
     b: { who: 'Forjadores', say: 'Calor preso explode. Abra respiros e deixe a fornalha respirar.', task: 'Abra 3 respiros de calor', look: 'vent', label: 'Abrir o respiro', bless: 'Pele de Brasa', after: 'O calor sai devagar e as câmaras esfriaram.' } },
   niveria: { q: 'A expedição quer derreter o gelo para a água correr; os guardiões do gelo querem preservar a reserva intacta.',
     a: { who: 'Expedição de Sora', say: 'Água parada não mata a sede de ninguém. Acenda as pedras de calor.', task: 'Acenda 3 pedras de calor', look: 'crystal', label: 'Acender a pedra de calor', bless: 'Chama da Expedição', after: 'A água corre de novo pelos canais.' },
@@ -209,7 +209,7 @@ STAGES.push(
   { id: 'fora_chegada', act: 0, region: 'fora', text: 'Fale com Thalor, o guia, no acampamento (siga a trilha de luz)', target: 'thalor', kind: 'talk' },
   { id: 'fora_ervas', act: 0, region: 'fora', text: 'Siga a trilha rumo à árvore e colete 3 ervas medicinais pelo caminho', target: 'node:erva', kind: 'collect', need: { erva: 3 } },
   { id: 'fora_caravana', act: 0, region: 'fora', text: 'Uma caravana tombou mais adiante na trilha: recupere 3 caixotes de mantimentos', target: 'caixote', kind: 'group', need: { caixote: 3 } },
-  { id: 'fora_caca', act: 0, region: 'fora', text: 'Criaturas rondam a caravana: derrote 5 delas perto da trilha (clique ou Espaço)', target: 'mob:fora', kind: 'kill', need: { abate_fora: 5 } },
+  { id: 'fora_caca', act: 0, region: 'fora', text: 'Criaturas rondam a caravana: derrote 7 delas perto da trilha (clique ou Espaço)', target: 'mob:fora', kind: 'kill', need: { abate_fora: 7 } },
   { id: 'fora_lanternas', act: 0, region: 'fora', text: 'Acenda as 3 lanternas do último trecho, até o anel da árvore', target: 'lanterna', kind: 'group', need: { lanterna: 3 } },
   { id: 'fora_portal', act: 0, region: 'fora', text: 'Chegue ao nível 5 (cace criaturas e abra o baú da trilha) e atravesse o Portal das Raízes', target: 'portal', kind: 'level', need: { nivel: 5 } },
 );
@@ -241,7 +241,7 @@ for (const [ri, r] of REGIONS_PLAN.entries()) {
     STAGES.push({ id: `${P}_tarefa`, act: r.act, region: P, text: '', textBySide: { a: sd.a.task, b: sd.b.task }, target: null, kind: 'side', groups: { a: `${P}_lado_a`, b: `${P}_lado_b` } });
   }
   // 2. craft the region's weapon and outfit
-  STAGES.push({ id: `${P}_bancada`, act: r.act, region: P, text: `Colete materiais e crie na bancada: ${r.weapon.name} e ${r.outfit.name}`, target: `bancada_${P}`, kind: 'craft', need: { [r.weapon.id]: 1, [r.outfit.id]: 1 } });
+  STAGES.push({ id: `${P}_bancada`, act: r.act, region: P, text: `Crie ${r.weapon.name} e ${r.outfit.name} na bancada do acampamento (a seta mostra o próximo material que falta)`, target: `bancada_${P}`, kind: 'craft', need: { [r.weapon.id]: 1, [r.outfit.id]: 1 } });
   // 3. the manual's investigation steps
   for (const s of r.steps) STAGES.push({ id: `${P}_${s.group}`, act: r.act, region: P, text: s.text, target: s.group, kind: 'group', need: { [s.group]: s.count } });
   // 4. sub-boss, 5. boss
@@ -262,7 +262,7 @@ for (const [ri, r] of REGIONS_PLAN.entries()) {
       fim: { end: true } } };
   }
   // 6. the seal to the next floor opens at level 10 x floor
-  if (ri < REGIONS_PLAN.length - 1) STAGES.push({ id: `${P}_nivel`, act: r.act, region: P, text: `Alcance o nível ${(ri + 1) * 10} para abrir o selo do próximo andar (cace criaturas, abra baús)`, target: `mob:${P}`, kind: 'level', need: { nivel: (ri + 1) * 10 } });
+  if (ri < REGIONS_PLAN.length - 1) STAGES.push({ id: `${P}_nivel`, act: r.act, region: P, text: `Alcance o nível ${(ri + 1) * 10} para abrir o selo do próximo andar: cace criaturas do andar (a seta mostra a mais próxima)`, target: `mob:${P}`, kind: 'level', need: { nivel: (ri + 1) * 10 } });
 }
 STAGES.push({ id: 'campanha_fim', act: 2, region: REGIONS_PLAN[REGIONS_PLAN.length - 1].id, text: 'A campanha terminou', target: null, kind: 'end' });
 export const stageIndex = (id) => STAGES.findIndex((s) => s.id === id);
@@ -346,9 +346,9 @@ export function bandXp(region) {
   for (let L = from; L < to; L++) sum += xpNeed(L);
   return sum;
 }
-// what each action is worth, as a share of the floor's band (about: 40% quests and bosses,
-// 10% crafting and chests, the rest creatures, about 25-30 kills a floor)
-export const XP_SHARE = { stage: 0.12, object: 0.035, craft: 0.04, chest: 0.035, sub: 0.1, boss: 0.16, mob: 0.022, party: 0.25 };
+// what each action is worth, as a share of the floor's band: quests, crafting and chests give
+// about two thirds; the rest comes from hunting (about 12-15 kills a floor), so fights matter
+export const XP_SHARE = { stage: 0.12, object: 0.012, craft: 0.04, chest: 0.035, sub: 0.1, boss: 0.16, mob: 0.03, party: 0.25 };
 
 // the player's own look, chosen when the character is made (skin, hair, shirt, trousers)
 export const APPEARANCE = {

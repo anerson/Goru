@@ -388,7 +388,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     if (partyNear) n *= 1 + XP_SHARE.party;
     if (state.level >= capNow()) {
       state.xp = Math.min(xpNeed(state.level), state.xp + Math.round(n));
-      if (performance.now() > capToast) { capToast = performance.now() + 20000; hud.toast(`Nível máximo deste lugar (${capNow()}). Derrote o guardião e suba para continuar evoluindo.`, 'xp'); }
+      if (performance.now() > capToast) { capToast = performance.now() + 20000; hud.toast(`Nível máximo deste andar (${capNow()}). Conclua o andar para subir o teto.`, 'xp'); }
       return;
     }
     hud.toast(`+${Math.round(n)} XP${partyNear ? ' (bônus de grupo)' : ''}`, 'xp');
