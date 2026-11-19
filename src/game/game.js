@@ -13,7 +13,7 @@ import { createCharacter } from '../character.js';
 import {
   REGIONS_PLAN, ITEMS, RECIPES, RESOURCES, STAGES, stageIndex, DIALOGUES, dialogueFor, SPEAKERS, STRINGS, BOSSES,
   NEEDS, FLASK, HAZARD_NAMES, BASE_WEAPON, weaponStats, FRAGMENTS, ENDINGS, guardianName, REGION_NAMES,
-  FLOOR_IDS, levelCap, xpNeed, bandXp, XP_SHARE, CLASSES, STORIES, MAX_LEVEL, DEFAULT_APPEARANCE, SIDES, SIDE_BONUS,
+  FLOOR_IDS, levelCap, xpNeed, bandXp, XP_SHARE, CLASSES, STORIES, MAX_LEVEL, DEFAULT_APPEARANCE, SIDES, SIDE_BONUS, TRAIL_NPCS,
 } from './campaign_data.js';
 import { makeNode, makeObject, makeWorkbench, makeChest } from './looks.js';
 import { makeHut, makeTent, makeCampfire, makeWagon, makePortal, makeMistWall } from './props.js';
