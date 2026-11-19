@@ -193,25 +193,56 @@ export const SIDE_BONUS = { a: { dmg: 0.04 }, b: { hp: 15 } };
 // ---- the prologue, outside the tree (levels 1-5): a guided start ----
 SPEAKERS.thalor = 'Thalor, o guia';
 STRINGS.FORA_1 = 'Você chegou, viajante. Aquele é Aetherion: um único carvalho, doze mil anos, um mundo inteiro dentro dele.';
-STRINGS.FORA_2 = 'Antes de entrar, aprenda a sobreviver aqui fora. Colete ervas, enfrente as criaturas da clareira e volte mais forte. Nível 5, e as raízes deixam você passar.';
-STRINGS.FORA_3 = 'Siga a trilha de luz no chão: ela sempre leva ao próximo objetivo.';
-STRINGS.FORA_G = 'A trilha de luz no chão mostra o caminho. Ervas curam, cogumelos matam a fome, e o barril enche o cantil.';
+STRINGS.FORA_2 = 'Antes de entrar, aprenda a sobreviver aqui fora. A trilha até a árvore tem gente que precisa de ajuda: cada um vai te mandar ao próximo. Nível 5, e as raízes deixam você passar.';
+STRINGS.FORA_3 = 'Primeiro: colha 3 ervas medicinais pela trilha e leve à curandeira Mira, mais adiante. Siga a trilha de luz no chão.';
+STRINGS.FORA_G = 'A trilha de luz no chão mostra o caminho. Ervas e cogumelos curam, e a fonte do acampamento enche vida, mana e poções.';
 DIALOGUES.thalor_chegada = { start: 'a', nodes: {
   a: { speaker: 'thalor', line: 'FORA_1', next: 'b' },
   b: { speaker: 'thalor', line: 'FORA_2', next: 'c' },
   c: { speaker: 'thalor', line: 'FORA_3', choices: [{ text: 'OPT_SEGUIR', to: 'fim', do: { advance: true } }] },
   fim: { end: true } } };
 DIALOGUES.thalor_geral = { start: 'a', nodes: { a: { speaker: 'thalor', line: 'FORA_G', next: 'fim' }, fim: { end: true } } };
+// the people along the trail: each one receives what the last asked for and sends you on
+export const TRAIL_NPCS = {
+  mira: { name: 'Mira, a curandeira', look: { shirt: '#6a8a5a', pants: '#4a3a2a', hat: '#8a6a9a', skin: '#c89a78' },
+    lines: ['Ervas de Thalor? Que bênção, meus feridos precisam disso.', 'Uma caravana tombou mais à frente: os mantimentos se espalharam pela trilha. Recupere 3 caixotes e leve ao mercador Bram, ao lado da carroça.'],
+    idle: 'Os caixotes estão espalhados perto da carroça. Bram espera por eles.' },
+  bram: { name: 'Bram, o mercador', look: { shirt: '#8a5a3a', pants: '#3a3a4a', hat: '#5a3a2a', skin: '#b07a58' },
+    lines: ['Meus mantimentos! Achei que tinha perdido tudo.', 'Mas as criaturas ainda rondam a carroça. Derrote 7 delas e depois avise a caçadora Kael, na fogueira adiante: ela guarda o último trecho.'],
+    idle: 'Enquanto as criaturas rondarem, ninguém atravessa a trilha.' },
+  kael: { name: 'Kael, a caçadora', look: { shirt: '#4a5a3a', pants: '#2a2a20', hat: '#3a4a2a', skin: '#9a6a48' },
+    lines: ['Trilha limpa? Você luta bem, viajante.', 'Falta pouco. As lanternas do último trecho se apagaram: acenda as 3 e fale com Lyra, a guardiã do portal, junto às raízes.'],
+    idle: 'As lanternas mostram o caminho até as raízes. Lyra espera lá.' },
+  lyra: { name: 'Lyra, a guardiã do portal', look: { shirt: '#c9b07a', pants: '#5a4a3a', hat: '#e8d8a8', skin: '#d8a888' },
+    lines: ['Você veio de longe, e ajudou cada um pelo caminho. As raízes sentem isso.', 'O Portal das Raízes se abre para quem chega ao nível 5. Cace as criaturas da clareira e abra o baú da trilha se ainda faltar. Depois, atravesse.'],
+    idle: 'Nível 5, e o portal se abre. A névoa sai do caminho.' },
+};
+for (const [id, n] of Object.entries(TRAIL_NPCS)) {
+  SPEAKERS[id] = n.name;
+  const k = id.toUpperCase();
+  n.lines.forEach((l, i) => { STRINGS[`${k}_${i}`] = l; });
+  STRINGS[`${k}_G`] = n.idle;
+  DIALOGUES[`${id}_entrega`] = { start: 'n0', nodes: {
+    ...Object.fromEntries(n.lines.map((_, i) => [`n${i}`, i < n.lines.length - 1
+      ? { speaker: id, line: `${k}_${i}`, next: `n${i + 1}` }
+      : { speaker: id, line: `${k}_${i}`, choices: [{ text: 'OPT_SEGUIR', to: 'fim', do: { advance: true } }] }])),
+    fim: { end: true } } };
+  DIALOGUES[`${id}_geral`] = { start: 'a', nodes: { a: { speaker: id, line: `${k}_G`, next: 'fim' }, fim: { end: true } } };
+}
 // each mission a little closer to the tree, along the one trail: the camp far out (940 m), the
 // herbs (900-800 m), the tipped caravan (690 m), the wolves around it, the lanterns of the last
 // stretch (470-350 m) and the Portal das Raízes at the trunk, open from level 5
 STAGES.push(
   { id: 'fora_chegada', act: 0, region: 'fora', text: 'Fale com Thalor, o guia, no acampamento (siga a trilha de luz)', target: 'thalor', kind: 'talk' },
-  { id: 'fora_ervas', act: 0, region: 'fora', text: 'Siga a trilha rumo à árvore e colete 3 ervas medicinais pelo caminho', target: 'node:erva', kind: 'collect', need: { erva: 3 } },
-  { id: 'fora_caravana', act: 0, region: 'fora', text: 'Uma caravana tombou mais adiante na trilha: recupere 3 caixotes de mantimentos', target: 'caixote', kind: 'group', need: { caixote: 3 } },
-  { id: 'fora_caca', act: 0, region: 'fora', text: 'Criaturas rondam a caravana: derrote 7 delas perto da trilha (clique ou Espaço)', target: 'mob:fora', kind: 'kill', need: { abate_fora: 7 } },
-  { id: 'fora_lanternas', act: 0, region: 'fora', text: 'Acenda as 3 lanternas do último trecho, até o anel da árvore', target: 'lanterna', kind: 'group', need: { lanterna: 3 } },
-  { id: 'fora_portal', act: 0, region: 'fora', text: 'Chegue ao nível 5 (cace criaturas e abra o baú da trilha) e atravesse o Portal das Raízes', target: 'portal', kind: 'level', need: { nivel: 5 } },
+  { id: 'fora_ervas', act: 0, region: 'fora', text: 'Thalor pediu: colha 3 ervas medicinais pela trilha', target: 'node:erva', kind: 'collect', need: { erva: 3 } },
+  { id: 'fora_mira', act: 0, region: 'fora', text: 'Leve as ervas à curandeira Mira, na tenda mais adiante na trilha', target: 'mira', kind: 'talk' },
+  { id: 'fora_caravana', act: 0, region: 'fora', text: 'Mira pediu: a caravana tombou na trilha, recupere 3 caixotes de mantimentos', target: 'caixote', kind: 'group', need: { caixote: 3 } },
+  { id: 'fora_bram', act: 0, region: 'fora', text: 'Devolva os caixotes ao mercador Bram, ao lado da carroça', target: 'bram', kind: 'talk' },
+  { id: 'fora_caca', act: 0, region: 'fora', text: 'Bram pediu: derrote 7 criaturas que rondam a carroça (clique ou Espaço)', target: 'mob:fora', kind: 'kill', need: { abate_fora: 7 } },
+  { id: 'fora_kael', act: 0, region: 'fora', text: 'Avise a caçadora Kael, na fogueira adiante, que a trilha está limpa', target: 'kael', kind: 'talk' },
+  { id: 'fora_lanternas', act: 0, region: 'fora', text: 'Kael pediu: acenda as 3 lanternas do último trecho, até o anel da árvore', target: 'lanterna', kind: 'group', need: { lanterna: 3 } },
+  { id: 'fora_lyra', act: 0, region: 'fora', text: 'Fale com Lyra, a guardiã do portal, junto às raízes da árvore', target: 'lyra', kind: 'talk' },
+  { id: 'fora_portal', act: 0, region: 'fora', text: 'Lyra pediu: chegue ao nível 5 (cace criaturas e abra o baú da trilha) e atravesse o Portal das Raízes', target: 'portal', kind: 'level', need: { nivel: 5 } },
 );
 
 for (const [ri, r] of REGIONS_PLAN.entries()) {
@@ -270,6 +301,7 @@ export const stageIndex = (id) => { if (STAGE_INDEX?.size !== STAGES.length) STA
 
 export function dialogueFor(npc, stage) {
   if (npc === 'thalor') return stage === 'fora_chegada' ? 'thalor_chegada' : 'thalor_geral';
+  if (TRAIL_NPCS[npc]) return stage === `fora_${npc}` ? `${npc}_entrega` : `${npc}_geral`;
   const r = REGIONS_PLAN.find((x) => x.npc.id === npc);
   if (!r) return null;
   if (stage === `${r.id}_lado`) return `${npc}_lado`;

@@ -175,6 +175,14 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     tent(spot(L, 0, f - 0.012, 9), 0.6); tent(spot(L, 0, f + 0.014, -10), 2.1); tent(spot(L, 0, f + 0.03, 10), 4.0);
     fire(spot(L, 0, f, 4));
     villager('thalor', spot(L, 0, f + 0.004, -3.5), { shirt: '#5a4a2a', pants: '#3a3020', hat: '#7a5a2a', skin: '#a87a58' });
+    // the people along the trail, each a little closer to the tree, each with a small camp
+    const posts = { mira: [805, -7], bram: [690, -5], kael: [545, -7], lyra: [330, -6] };
+    for (const [id, [r, sd]] of Object.entries(posts)) {
+      const p = spot(L, 0, along0(r), sd);
+      villager(id, p, TRAIL_NPCS[id].look);
+      if (id === 'mira') tent(spot(L, 0, along0(r) + 0.01, sd - 6), 1.2);
+      if (id === 'kael') fire(spot(L, 0, along0(r) - 0.006, sd - 3));
+    }
     const barrel = spot(L, 0, f - 0.006, -5);
     put(makeObject('barrel').root, barrel);
     solid(barrel, 0.6);

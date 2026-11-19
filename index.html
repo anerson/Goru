@@ -168,17 +168,22 @@ body:not(.journey) .journey-only { display: none !important; }
 .story-box button { justify-self: end; }
 .hud-skills { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(66px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 4px; flex-wrap: nowrap; justify-content: center; max-width: calc(100vw - 24px); }
 .hud-skills[hidden] { display: none; }
-.hud-skills button { display: grid; gap: 1px; min-width: 0; max-width: 132px; padding: 4px 7px; border-color: #9a8aff; text-align: left; overflow: hidden; }
-.hud-skills span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.hud-skills kbd { font: 700 11px/1 var(--mono); color: #9a8aff; }
-.hud-skills span { font: 600 11px/1.2 var(--mono); }
-.hud-skills button:disabled { opacity: 0.5; cursor: default; }
-@media (max-width: 700px) { .hud-skills button { max-width: 19vw; } .hud-skills span { font-size: 10px; } }
+.hud-skills button { position: relative; width: 50px; height: 50px; min-width: 0; padding: 0; display: grid; place-items: center; border-radius: 12px; border: 2px solid var(--c, #9a8aff); color: var(--c, #9a8aff); background: radial-gradient(circle at 50% 35%, rgba(255,255,255,0.12), rgba(10,8,6,0.82)); box-shadow: 0 2px 8px rgba(0,0,0,0.45), inset 0 0 10px rgba(0,0,0,0.5); overflow: hidden; }
+.hud-skills button svg { width: 28px; height: 28px; filter: drop-shadow(0 0 4px currentColor); }
+.hud-skills button:last-of-type { border-width: 3px; box-shadow: 0 0 14px var(--c, #9a8aff), inset 0 0 10px rgba(0,0,0,0.5); }
+.hud-skills kbd { position: absolute; right: 3px; bottom: 1px; font: 700 10px/1 var(--mono); color: #f4ecda; text-shadow: 0 1px 2px #000; }
+.hud-skills .cd { position: absolute; inset: 0; background: conic-gradient(rgba(0,0,0,0.68) var(--f, 0deg), transparent 0); pointer-events: none; }
+.hud-skills .cdn { position: absolute; inset: 0; display: grid; place-items: center; font: 700 16px/1 var(--mono); color: #fff; text-shadow: 0 1px 3px #000; pointer-events: none; }
+.hud-skills button.cooling { cursor: default; }
+.hud-skills button:not(.cooling):hover { transform: translateY(-2px); }
+.skill-tip { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); width: min(280px, 80vw); padding: 8px 10px; border-radius: 10px; background: rgba(16,12,8,0.94); border: 1px solid rgba(244,236,218,0.25); color: #f4ecda; font: 400 12px/1.35 system-ui, sans-serif; pointer-events: none; text-align: left; z-index: 5; }
+.skill-tip small { color: #c9b98a; font: 500 11px/1 var(--mono); }
+.skill-tip p { margin: 4px 0 0; }
 /* phones: skills become a column of round keys on the right, above a big round Atacar */
 @media (max-width: 560px), (pointer: coarse) and (max-width: 900px) {
   .hud-skills { left: auto; right: max(10px, env(safe-area-inset-right, 0px)); transform: none; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); flex-direction: column; gap: 6px; }
-  .hud-skills button { width: 46px; height: 46px; min-width: 0; padding: 0; border-radius: 50%; display: grid; place-items: center; }
-  .hud-skills span { display: none; }
+  .hud-skills button { width: 46px; height: 46px; border-radius: 50%; }
+  .skill-tip { left: auto; right: calc(100% + 8px); bottom: 0; transform: none; }
   .hud-skills kbd { font-size: 15px; }
   #hudAttack { width: 72px; height: 72px; border-radius: 50%; font-size: 13px; }
   .hud-quest { top: calc(172px + env(safe-area-inset-top, 0px)); width: calc(100vw - 32px); right: 16px; }

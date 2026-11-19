@@ -3,6 +3,7 @@
 // dialogue box with choices, a backpack, short notices and the end-of-act card.
 // Pure DOM; the game calls these functions, the player's clicks and keys call back into it.
 import { ITEMS, FLASK, NEEDS } from './campaign_data.js';
+import { abilityIcon } from './icons.js';
 
 export function createHud(root) {
   root.innerHTML = `
@@ -131,19 +132,38 @@ export function createHud(root) {
       const list = [...cls.abilities.map((a, i) => [i, a]), [4, cls.ultimate]];
       if (!box.dataset.cls || box.dataset.cls !== cls.name) {
         box.dataset.cls = cls.name;
-        box.innerHTML = list.map(([i, a]) => `<button type="button" data-k="${i}" title="${a.text.replace(/"/g, '&quot;')}"><kbd>${i === 4 ? 'R' : i + 1}</kbd><span></span></button>`).join('');
-        box.querySelectorAll('button').forEach((b) => { b.onclick = () => handlers.skill(Number(b.dataset.k)); });
+        const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+        box.innerHTML = list.map(([i, a]) => `<button type="button" data-k="${i}" aria-label="${esc(a.name)}" style="--c:${cls.color ?? '#9a8aff'}">${abilityIcon(a.id)}<kbd>${i === 4 ? 'R' : i + 1}</kbd><i class="cd"></i><span class="cdn"></span></button>`).join('')
+          + '<div class="skill-tip" id="hudSkillTip" hidden></div>';
+        const tip = box.querySelector('.skill-tip');
+        box.querySelectorAll('button').forEach((b) => {
+          const i = Number(b.dataset.k), a = i === 4 ? cls.ultimate : cls.abilities[i];
+          b.onclick = () => handlers.skill(i);
+          // hover (or long-press on a phone) shows what the ability does
+          const show = () => {
+            tip.innerHTML = `<b>${esc(a.name)}</b> <small>${i === 4 ? 'R' : i + 1} · ${a.mana ?? (i === 4 ? 50 : 20)} mana · ${a.cd}s</small><p>${esc(a.text)}</p>`;
+            tip.hidden = false;
+          };
+          b.onmouseenter = show; b.onfocus = show;
+          b.onmouseleave = b.onblur = () => { tip.hidden = true; };
+          let press = 0;
+          b.ontouchstart = () => { press = setTimeout(show, 450); };
+          b.ontouchend = () => { clearTimeout(press); setTimeout(() => { tip.hidden = true; }, 1600); };
+        });
       }
       box.hidden = false;
       box.querySelectorAll('button').forEach((b) => {
         const i = Number(b.dataset.k), a = i === 4 ? cls.ultimate : cls.abilities[i];
         const left = cds[i] ?? 0;
         const cost = a.mana ?? (i === 4 ? 50 : 20);
-        const txt = left > 0 ? `${a.name} · ${Math.ceil(left)}s` : `${a.name} · ${cost}`;
-        const sp = b.querySelector('span');
+        const txt = left > 0 ? String(Math.ceil(left)) : '';
+        const sp = b.querySelector('.cdn');
         if (sp.textContent !== txt) sp.textContent = txt;
-        b.disabled = left > 0;
-        b.classList.toggle('nomana', mana < cost);
+        // the dark sweep shrinks clockwise as the cooldown runs out
+        const frac = left > 0 ? Math.min(1, left / a.cd) : 0;
+        b.querySelector('.cd').style.setProperty('--f', `${Math.round(frac * 360)}deg`);
+        b.classList.toggle('cooling', left > 0);   // not `disabled`: a disabled button gets no hover, so no tooltip
+        b.classList.toggle('nomana', mana < cost && !(left > 0));
       });
     },
     progress(done, total, label) {
