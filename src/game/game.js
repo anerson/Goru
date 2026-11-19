@@ -8,7 +8,7 @@
 // objective. Game state lives in one plain object (`state`); meshes only show it.
 import * as THREE from 'three';
 import { mulberry32 } from '../noise.js';
-import { BIOMES, DISK_R, ENTRANCES, junctionAngle, APPROACH, LOOP_R, rampAt, TRUNK } from '../tree/layout.js';
+import { BIOMES, DISK_R, ENTRANCES, junctionAngle, APPROACH, LOOP_R, rampAt, TRUNK, RAMP } from '../tree/layout.js';
 import { createCharacter } from '../character.js';
 import {
   REGIONS_PLAN, ITEMS, RECIPES, RESOURCES, STAGES, stageIndex, DIALOGUES, dialogueFor, SPEAKERS, STRINGS, BOSSES,
@@ -996,15 +996,15 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     const open = openFloors();
     const r = Math.hypot(x, z);
     if (open === 0 && r < 104) return sealReason(1);                       // the trunk's mouth
-    if (open < 10 && r > 58 && r < 84 && fl >= BIOMES[open].level - 1) return sealReason(open + 1);  // the ramp up to the locked floor
+    if (open < BIOMES.length && r > 58 && r < 84 && fl >= BIOMES[open].level - 1) return sealReason(open + 1);  // the ramp up to the locked floor
     return null;
   }
   // seal visuals: a glowing rune wall across the ramp above each locked floor, and rings at the
   // tree's entrances while the outside is not done
   const sealMat = new THREE.MeshBasicMaterial({ color: '#ffb347', transparent: true, opacity: 0.35, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
   const seals = [];
-  for (let n = 2; n <= 10; n++) {
-    const y = BIOMES[n - 2].level + 16, { a } = rampAt(y / 300);
+  for (let n = 2; n <= BIOMES.length; n++) {
+    const y = BIOMES[n - 2].level + 16, { a } = rampAt(y / RAMP.top);
     const wall = new THREE.Mesh(new THREE.PlaneGeometry(9, 6), sealMat);
     wall.position.set(Math.cos(a) * 70, y + 3, Math.sin(a) * 70);
     wall.lookAt(wall.position.x - Math.sin(a), wall.position.y, wall.position.z + Math.cos(a));
