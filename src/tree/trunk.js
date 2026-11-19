@@ -2,7 +2,7 @@
 // out at the top into a main limb. Buttress roots spread from every strand's foot.
 import * as THREE from 'three';
 import { fbm, vnoise, mulberry32 } from '../noise.js';
-import { TAU, TRUNK, ringR, strandR, strandTheta, SEED } from './layout.js';
+import { TAU, TRUNK, ringR, strandR, strandTheta, gapAngles, SEED, RAMP, TOP_BRIDGES } from './layout.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const BARK_TILE = 8; // metres covered by one repeat of the bark texture
@@ -83,6 +83,8 @@ export function buildTrunk(group, barkMat) {
     limbEnds.push({ p: curve.getPointAt(1), d: curve.getTangentAt(1), r: radii[radii.length - 1] });
   }
 
+  buildWall(group, barkMat);
+
   const rr = [26, 21, 16, 12, 8.5, 6, 3.8];
   for (let i = 0; i < TRUNK.strands; i++) {
     const pts = [];
@@ -102,4 +104,57 @@ export function buildTrunk(group, barkMat) {
   }
 
   return { limbEnds, limbMids, rootMeshes, rootSegs };
+}
+
+// The wood that grew between the strands: a knobbly sleeve along the strands' centre line that
+// fills the gaps, so from outside the trunk reads as one solid, fluted column and the hollow
+// stays hidden. Left open: an arch at the foot of every gap (the ground entrances, ~28 m tall)
+// and a window where each top bridge leaves for its lookout.
+function buildWall(group, barkMat) {
+  const COLS = 324, Y0 = 30, Y1 = TRUNK.top + 14, DY = 4;
+  const rows = Math.ceil((Y1 - Y0) / DY) + 1;            // row 0 is the arch line
+  const angDist = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
+  const nearestGap = (a, y) => Math.min(...gapAngles(y).map((g) => angDist(a, g)));
+  const archY = (a) => {                                  // high over the gap centre, low inside the strands
+    const d = nearestGap(a, 20) * ringR(20);
+    const t = Math.min(d / 13, 1);
+    return 28 - 22 * t * t;
+  };
+  const rep = Math.round((TAU * ringR(150)) / BARK_TILE);
+  const pos = [], uv = [], idx = [], open = [];
+  for (let i = 0; i < rows; i++) {
+    for (let j = 0; j <= COLS; j++) {
+      const a = (j / COLS) * TAU;
+      const y = i === 0 ? archY(a) : Math.min(Y0 + (i - 1) * DY + 2, Y1);
+      const x0 = Math.cos(a), z0 = Math.sin(a);
+      // lumps and vertical grooves, slightly recessed between the strands
+      let r = ringR(y) * 0.985 * (1 + 0.05 * (fbm(x0 * 3 + 9, y * 0.02, z0 * 3) - 0.5) * 2);
+      r *= 1 - 0.035 * Math.pow(Math.abs(Math.sin(a * 60 + y * 0.01)), 0.7);
+      pos.push(x0 * r, y, z0 * r);
+      uv.push((j / COLS) * rep, y / BARK_TILE);
+      // the top-bridge windows: about 16 m wide, from just under the deck to 13 m over it
+      open.push(y > RAMP.top - 4 && y < RAMP.top + 13 && TOP_BRIDGES.some((b) => angDist(a, b) * r < 8));
+    }
+  }
+  for (let i = 0; i < rows - 1; i++) {
+    for (let j = 0; j < COLS; j++) {
+      const a = i * (COLS + 1) + j, b = a + COLS + 1;
+      if (open[a] || open[a + 1] || open[b] || open[b + 1]) continue;
+      idx.push(a, b, a + 1, b, b + 1, a + 1);   // outward-facing
+    }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  geo.setIndex(idx);
+  geo.computeVertexNormals();
+  // seen from both sides (from the galleries you look out at it), same wind sway as the bark
+  const mat = barkMat.clone();
+  mat.side = THREE.DoubleSide;
+  mat.onBeforeCompile = barkMat.onBeforeCompile;
+  mat.customProgramCacheKey = barkMat.customProgramCacheKey;
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.name = 'trunk-wall';
+  mesh.receiveShadow = true;   // casts none, so the hollow keeps the light it had through the gaps
+  group.add(mesh);
 }
