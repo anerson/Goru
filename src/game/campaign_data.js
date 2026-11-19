@@ -131,7 +131,7 @@ export const ITEMS = {
   cogumelo: { name: 'Cogumelo comestível', use: { hunger: 25 }, verb: 'Comer' },
   erva: { name: 'Erva medicinal', use: { health: 30 }, verb: 'Usar' },
   pocao: { name: 'Poção de Seiva', use: { health: 70 }, verb: 'Beber' },
-  fruta: { name: 'Fruta da selva', use: { hunger: 35 }, verb: 'Comer' },
+  fruta: { name: 'Fruta do oásis', use: { hunger: 35 }, verb: 'Comer' },
 };
 export const RECIPES = [
   { id: 'pocao', name: 'Poção de Seiva', inputs: { erva: 1, cogumelo: 1 }, output: 'pocao', kind: 'consumivel' },
@@ -155,7 +155,7 @@ export const RESOURCES = [
   ...REGIONS_PLAN.map((r) => ({ biome: r.id, item: r.mats.drop[0], count: 3, respawn: 120 })),
   ...REGIONS_PLAN.map((r) => ({ biome: r.id, item: 'cogumelo', count: r.id === 'raizes' ? 8 : 4, respawn: 120 })),
   ...REGIONS_PLAN.map((r) => ({ biome: r.id, item: 'erva', count: 4, respawn: 150 })),
-  { biome: 'selva', item: 'fruta', count: 6, respawn: 120 },
+  { biome: 'oceano', item: 'fruta', count: 6, respawn: 120 },
 ];
 
 // ---------------------------------------------------------------- stages, dialogues and strings
@@ -319,7 +319,7 @@ export function validateCampaign() {
 export function validateRecipes() {
   const problems = [];
   const order = REGIONS_PLAN.map((r) => r.id);
-  const gatherable = (item, region) => RESOURCES.some((n) => n.item === item && order.indexOf(n.biome) <= order.indexOf(region ?? 'copa'));
+  const gatherable = (item, region) => RESOURCES.some((n) => n.item === item && order.indexOf(n.biome) <= order.indexOf(region ?? order[order.length - 1]));
   for (const rc of RECIPES) for (const [item, n] of Object.entries(rc.inputs)) {
     if (!ITEMS[item]) problems.push(`${rc.id}: unknown input ${item}`);
     else if (!gatherable(item, rc.region)) problems.push(`${rc.id}: ${item} cannot be gathered by ${rc.region}`);
