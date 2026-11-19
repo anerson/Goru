@@ -68,8 +68,9 @@ export function createInput(canvas, joyEl, knobEl, { isWalking, onLook }) {
     el.addEventListener('pointercancel', stop);
   }
 
-  return {
+  const api = {
     keys,
+    runLock: false,            // the on-screen Correr button keeps running on
     read() {
       let forward = 0, right = 0;
       if (keys.has('KeyW') || keys.has('ArrowUp')) forward += 1;
@@ -78,7 +79,7 @@ export function createInput(canvas, joyEl, knobEl, { isWalking, onLook }) {
       if (keys.has('KeyA') || keys.has('ArrowLeft')) right -= 1;
       forward -= joy.y;
       right += joy.x;
-      const run = keys.has('ShiftLeft') || keys.has('ShiftRight') || Math.hypot(joy.x, joy.y) > 0.95;
+      const run = api.runLock || keys.has('ShiftLeft') || keys.has('ShiftRight') || Math.hypot(joy.x, joy.y) > 0.95;
       let up = 0;
       if (keys.has('Space') || keys.has('KeyE')) up += 1;
       if (keys.has('KeyC') || keys.has('KeyQ') || keys.has('ControlLeft')) up -= 1;
@@ -89,4 +90,5 @@ export function createInput(canvas, joyEl, knobEl, { isWalking, onLook }) {
       try { if (document.pointerLockElement) document.exitPointerLock(); } catch { /* ignore */ }
     },
   };
+  return api;
 }

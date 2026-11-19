@@ -7,9 +7,8 @@ import { ITEMS, FLASK, NEEDS } from './campaign_data.js';
 export function createHud(root) {
   root.innerHTML = `
     <div class="hud-needs" aria-label="Estado do explorador">
-      <div class="bar" data-k="health"><span>Vida</span><i><b></b></i></div>
-      <div class="bar" data-k="thirst"><span>Sede</span><i><b></b></i></div>
-      <div class="bar" data-k="hunger"><span>Fome</span><i><b></b></i></div>
+      <div class="bar" data-k="health"><span>Vida</span><i><b></b><em></em></i></div>
+      <div class="bar" data-k="mana"><span>Mana</span><i><b></b></i></div>
       <div class="flask" id="hudFlask"></div>
       <div class="lvl"><span id="hudLevel">Nível 1</span><i><b id="hudXp"></b></i></div>
     </div>
@@ -26,7 +25,7 @@ export function createHud(root) {
       <button type="button" id="hudAttack">Atacar</button>
       <button type="button" id="hudDodge">Esquivar (C)</button>
       <div class="hud-skills" id="hudSkills" hidden></div>
-      <button type="button" id="hudDrink">Beber (Q)</button>
+      <button type="button" id="hudDrink">Poção (Q)</button>
       <button type="button" id="hudBag" aria-expanded="false">Mochila (I)</button>
     </div>
     <div class="hud-bag" id="hudBagPanel" hidden></div>
@@ -75,7 +74,7 @@ export function createHud(root) {
       return `<li><span>${it.name}${tag}</span><b>× ${n}</b>${btn}</li>`;
     });
     const gear = `<p class="gear">Arma: <b>${eq.weapon ? ITEMS[eq.weapon].name : 'Galho do explorador'}</b> · Roupa: <b>${eq.outfit ? ITEMS[eq.outfit].name : 'roupa de viagem'}</b></p>`;
-    const flask = `<li><span>Cantil</span><b>${state.flask}/${FLASK.capacity} goles</b><button type="button" data-drink>Beber</button></li>`;
+    const flask = `<li><span>Poções de cura</span><b>${state.flask}/${FLASK.capacity}</b><button type="button" data-drink>Beber</button></li>`;
     $('hudBagPanel').innerHTML = `<h3>Mochila</h3>${gear}<ul>${flask}${rows.join('')}</ul>`;
     $('hudBagPanel').querySelectorAll('[data-use]').forEach((b) => { b.onclick = () => handlers.useItem(b.dataset.use); });
     $('hudBagPanel').querySelector('[data-drink]')?.addEventListener('click', () => handlers.drink());
@@ -172,16 +171,19 @@ export function createHud(root) {
       el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
     },
     get benchOpen() { return !$('hudBench').hidden; },
-    needs(state, { maxHealth = 100, xpFrac = 0 } = {}) {
-      for (const k of ['health', 'thirst', 'hunger']) {
+    needs(state, { maxHealth = 100, maxMana = 100, xpFrac = 0 } = {}) {
+      for (const k of ['health', 'mana']) {
         const el = root.querySelector(`.bar[data-k="${k}"]`);
-        const v = Math.round((state[k] / (k === 'health' ? maxHealth : 100)) * 100);
+        const v = Math.round((state[k] / (k === 'health' ? maxHealth : maxMana)) * 100);
         el.querySelector('b').style.width = `${v}%`;
         el.classList.toggle('low', v <= NEEDS.warnAt);
       }
-      $('hudLevel').textContent = `Nível ${state.level ?? 1} · vida ${Math.round(state.health)}/${maxHealth}`;
+      // the shield sits on top of the life bar, as a bright layer that breaks first
+      const sh = root.querySelector('.bar[data-k="health"] em');
+      sh.style.width = `${Math.round(Math.min(1, (state.barrier ?? 0) / maxHealth) * 100)}%`;
+      $('hudLevel').textContent = `Nível ${state.level ?? 1} · vida ${Math.round(state.health)}/${maxHealth}${state.barrier > 0 ? ` +${Math.round(state.barrier)} escudo` : ''}`;
       $('hudXp').style.width = `${Math.round(Math.min(1, xpFrac) * 100)}%`;
-      $('hudFlask').textContent = `Cantil ${state.flask}/${FLASK.capacity}`;
+      $('hudFlask').textContent = `Poções ${state.flask}/${FLASK.capacity}`;
     },
     inventory(state) { lastState = state; if (!$('hudBagPanel').hidden) renderBag(state); },
     prompt(label) {

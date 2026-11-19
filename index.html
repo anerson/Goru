@@ -114,8 +114,9 @@ body:not(.journey) .journey-only { display: none !important; }
 .bar i { display: block; height: 7px; border-radius: 4px; background: rgba(244, 236, 218, 0.15); overflow: hidden; }
 .bar b { display: block; height: 100%; border-radius: 4px; transition: width 0.3s; }
 .bar[data-k="health"] b { background: #e2574c; }
-.bar[data-k="thirst"] b { background: #4aa8e0; }
-.bar[data-k="hunger"] b { background: #e0a94a; }
+.bar[data-k="mana"] b { background: #4a8ae8; }
+.bar i { position: relative; }
+.bar em { position: absolute; left: 0; top: 0; height: 100%; width: 0; border-radius: 4px; background: rgba(210, 236, 255, 0.85); box-shadow: 0 0 6px #9ad0ff; transition: width 0.2s; }
 .bar.low span { color: #ff8a7a; }
 .bar.low i { outline: 1px solid #ff8a7a; animation: pulse 1s infinite; }
 @keyframes pulse { 50% { opacity: 0.55; } }
@@ -360,7 +361,7 @@ body.walking .orbit-only { display: none !important; }
 
 <div class="walkbar walk-only">
   <button id="bPlaces" type="button" aria-expanded="false" aria-controls="places">Lugares</button>
-  <button id="bFly" type="button" aria-pressed="false">Voar (F)</button>
+  <button id="bRun" type="button" aria-pressed="false">Correr (Shift)</button>
   <button id="bGM" class="journey-only" type="button" hidden>Mestre</button>
   <button id="bSound" class="journey-only" type="button" aria-pressed="true">Som (M)</button>
   <button id="bParty" class="journey-only" type="button" hidden aria-expanded="false">Grupo</button>

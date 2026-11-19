@@ -151,7 +151,7 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
   let phase = 0, heading = 0, amount = 0, swingT = 0, rollT = 0;
 
   // speed in m/s on the ground, flying flag, the direction of travel (yaw) and dt
-  function update(dt, { x, y, z, speed, flying, moveYaw }) {
+  function update(dt, { x, y, z, speed, flying, moveYaw, back = false }) {
     root.position.set(x, y, z);
     if (speed > 0.3 && moveYaw !== null) {
       // turn toward the direction of travel, frame-rate independent, through the short way round
@@ -161,7 +161,7 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
     root.rotation.y = heading;
     const target = flying ? 0 : Math.min(speed / 6, 1.6);
     amount += (target - amount) * (1 - Math.exp(-10 * dt));
-    phase += dt * (4 + speed * 0.9);
+    phase += dt * (4 + speed * 0.9) * (back ? -1 : 1);   // backpedal: the legs cycle in reverse
     const swing = Math.sin(phase) * 0.7 * Math.min(amount, 1.2);
     legL.rotation.x = swing; legR.rotation.x = -swing;
     armL.rotation.x = -swing * 0.8; armR.rotation.x = swing * 0.8;

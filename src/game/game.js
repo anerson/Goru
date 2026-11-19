@@ -36,7 +36,7 @@ function freshState(profile = {}) {
     inv: {},                 // item id -> count
     flask: FLASK.capacity,   // sips left
     flags: { cantil: true }, // done objects, bosses, choices, intact fragments
-    health: 100, thirst: 100, hunger: 100,
+    health: 100, mana: 100, barrier: 0,
     count: {},               // quest counters per group
     equip: { weapon: null, outfit: null },
     camp: 'fora',            // where you wake after fainting
@@ -178,7 +178,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     const barrel = spot(L, 0, f - 0.006, -5);
     put(makeObject('barrel').root, barrel);
     solid(barrel, 0.6);
-    add({ id: 'agua_fora', kind: 'water', pos: barrel.clone().setY(barrel.y + 1), radius: 3, label: () => 'Beber e encher o cantil', use: () => water() });
+    add({ id: 'agua_fora', kind: 'water', pos: barrel.clone().setY(barrel.y + 1), radius: 3, label: () => 'Fonte: recuperar vida, mana e poções', use: () => water() });
     // 3. the caravan tipped over on the trail, its crates scattered
     const wagon = makeWagon();
     wagon.position.copy(spot(L, 0, along0(690), 9));
@@ -217,7 +217,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     const barrel = spot(L, lo, 0.075, -5);
     put(makeObject('barrel').root, barrel);
     solid(barrel, 0.6);
-    add({ id: `agua_${L}`, kind: 'water', pos: barrel.clone().setY(barrel.y + 1), radius: 3, label: () => 'Beber e encher o cantil', use: () => water() });
+    add({ id: `agua_${L}`, kind: 'water', pos: barrel.clone().setY(barrel.y + 1), radius: 3, label: () => 'Fonte: recuperar vida, mana e poções', use: () => water() });
 
     // the investigation steps along the loop trail
     const slots = [0.2, 0.26, 0.32, 0.38, 0.44, 0.74, 0.8, 0.86, 0.92];
@@ -492,17 +492,19 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     sfx('pickup');
   }
   function water() {
-    state.thirst = 100;
+    state.health = maxHealth(); state.mana = NEEDS.mana;
     state.flask = FLASK.capacity;
-    hud.toast('Sede saciada. Cantil cheio (3 goles).');
+    hud.toast(`Vida e mana cheias. Poções: ${FLASK.capacity}.`);
     sfx('water');
     hud.inventory(state);
   }
   function drink() {
-    if (state.flask <= 0) return hud.toast('O cantil está vazio. Encha no barril de um acampamento.');
+    if (state.flask <= 0) return hud.toast('Sem poções. Encha na fonte de um acampamento.');
     state.flask -= 1;
-    state.thirst = Math.min(100, state.thirst + FLASK.sip);
-    hud.toast(`Um gole. Restam ${state.flask}.`);
+    state.health = Math.min(maxHealth(), state.health + maxHealth() * FLASK.sip);
+    state.mana = Math.min(NEEDS.mana, state.mana + NEEDS.mana * FLASK.sip);
+    fx?.pickup(new THREE.Vector3(walker.state.x, walker.state.feet + 1, walker.state.z), '#ff8a8a');
+    hud.toast(`Poção! Restam ${state.flask}.`);
     hud.inventory(state);
   }
   function useItem(id) {
@@ -511,7 +513,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     if (it.weapon || it.outfit) return equip(id);
     if (!it.use) return;
     take(id, 1);
-    if (it.use.hunger) state.hunger = Math.min(100, state.hunger + it.use.hunger);
+    if (it.use.hunger) state.health = Math.min(maxHealth(), state.health + maxHealth() * it.use.hunger / 200);
     if (it.use.health) state.health = Math.min(maxHealth(), state.health + it.use.health);
     hud.toast(`${it.verb}: ${it.name}`);
     sfx('eat');
@@ -773,15 +775,10 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     setAmbience(here?.id ?? 'fora');
 
     if (!dialogue && !storyOpen) {
-      // needs drain on the game clock
-      const k = flying ? NEEDS.flyFactor : running ? NEEDS.runFactor : 1;
-      if (cheats.frozenNeeds) { state.thirst = 100; state.hunger = 100; }
-      else {
-        state.thirst = Math.max(0, state.thirst - NEEDS.thirstPerSec * k * dt);
-        state.hunger = Math.max(0, state.hunger - NEEDS.hungerPerSec * dt);
-      }
-      if (state.thirst <= 0 || state.hunger <= 0) state.health = Math.max(0, state.health - NEEDS.starvePerSec * dt * ((state.thirst <= 0) + (state.hunger <= 0)));
-      else if (state.thirst > 50 && state.hunger > 50) state.health = Math.min(maxHealth(), state.health + NEEDS.regenPerSec * (cls().regen ?? 1) * dt);
+      // mana refills steadily; life comes back on its own a few seconds after the last hit
+      state.mana = Math.min(NEEDS.mana, (state.mana ?? NEEDS.mana) + NEEDS.manaPerSec * dt);
+      sinceHurt += dt;
+      if (sinceHurt > 5) state.health = Math.min(maxHealth(), state.health + NEEDS.regenPerSec * (cls().regen ?? 1) * dt * (1 + state.level * 0.1));
       // heat, cold or spores: the region's outfit protects; the camp is always safe
       const hz = here && PLAN[here.id]?.hazard;
       hazardToast -= dt;
@@ -816,7 +813,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
       const dx = wp.pos.x - me.x, dz = wp.pos.z - me.z;
       hud.guide(Math.hypot(dx, dz, (wp.pos.y || me.feet) - me.feet), Math.atan2(-dx, -dz) - camYaw, wp.hint);
     } else hud.guide(null);
-    hud.needs(state, { maxHealth: maxHealth(), xpFrac: state.xp / xpNeed(state.level) });
+    hud.needs(state, { maxHealth: maxHealth(), maxMana: NEEDS.mana, xpFrac: state.xp / xpNeed(state.level) });
 
     saveTimer += dt;
     if (saveTimer > 15) { saveTimer = 0; save(); }
@@ -825,9 +822,14 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
 
   // ---- combat hooks ----
   const cheats = { invulnerable: false, frozenNeeds: false };
+  let sinceHurt = 99;
   function hurt(n) {
     if (cheats.invulnerable) return;
-    state.health = Math.max(0, state.health - n * (1 - Math.min(0.65, (outfitDef()?.guard ?? 0) + cls().guard)));
+    sinceHurt = 0;
+    let dmg = n * (1 - Math.min(0.65, (outfitDef()?.guard ?? 0) + cls().guard));
+    // the shield layer takes the blow first
+    if (state.barrier > 0) { const a = Math.min(state.barrier, dmg); state.barrier -= a; dmg -= a; if (state.barrier <= 0) hud.toast('O escudo quebrou!', 'xp'); }
+    state.health = Math.max(0, state.health - dmg);
     hud.hurt();
     if (state.health <= 0) faint();
   }
@@ -902,7 +904,7 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
   function faint() {
     hud.message(`Você desmaiou. A comunidade de ${REGION_NAMES[state.camp]} te encontrou e cuidou de você.`);
     onFaint.forEach((f) => f());
-    state.health = Math.round(maxHealth() * 0.6); state.thirst = 60; state.hunger = 60;
+    state.health = Math.round(maxHealth() * 0.6); state.mana = NEEDS.mana; state.barrier = 0;
     spawnAtCamp();
   }
   function spawnAtCamp() {
@@ -1100,7 +1102,11 @@ export function createGame({ scene, biomes, walker, hud, fx }) {
     onGear: (f) => { gearHooks.push(f); f(weaponDef(), outfitDef()); },
     onBossOutcome: (f) => outcomeHooks.push(f),
     bossChoice: (id) => state.flags[`escolha_${id}`] ?? null,
-    heal() { state.health = maxHealth(); state.thirst = 100; state.hunger = 100; },
+    heal() { state.health = maxHealth(); state.mana = NEEDS.mana; },
+    // mana for abilities: false (and a notice) when there is not enough
+    spendMana(n) { if (cheats.invulnerable || (state.mana ?? 0) >= n) { if (!cheats.invulnerable) state.mana -= n; return true; } hud.toast(`Mana insuficiente (${Math.floor(state.mana)}/${n})`, 'xp'); return false; },
+    gainMana(n) { state.mana = Math.min(NEEDS.mana, (state.mana ?? 0) + n); },
+    addBarrier(n) { state.barrier = Math.min(maxHealth(), (state.barrier ?? 0) + n); },
     // GM: jump to any stage with the world made consistent (what the stages before it needed)
     jumpTo(id) {
       const i = stageIndex(id);

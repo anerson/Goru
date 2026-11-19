@@ -5,7 +5,7 @@
 //   R  Onda de Seiva   every creature within 18 m falls
 //   T  Acalmar         creatures within 25 m stop hunting for 30 s (the base of negotiating)
 //   V  Invocar         the chosen creature or boss appears 6 m ahead, on the current level
-//   H  Curar           health, thirst and hunger back to full
+//   H  Curar           health and mana back to full
 // plus invulnerability, frozen needs, reviving the bosses and jumping to any story stage.
 import { STAGES } from './campaign_data.js';
 
@@ -16,7 +16,7 @@ export function createGM({ root, game, combat, hud, isJourney }) {
     <p class="gm-weapon">Arma: <b>Cajado do GM</b> · dano <b>999.999.999</b> · mire e ataque até 40 m</p>
     <div class="gm-row">
       <button type="button" data-t="invulnerable" aria-pressed="false">Invencível</button>
-      <button type="button" data-t="frozenNeeds" aria-pressed="false">Sem fome e sede</button>
+      
     </div>
     <div class="gm-row">
       <button type="button" data-a="wave">Onda de Seiva <kbd>R</kbd></button>

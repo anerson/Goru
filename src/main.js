@@ -213,7 +213,6 @@ function setFly(on) {
   if (!world) return;
   if (on && journey && !world.gm?.on) { world.hud.toast('Na jornada não se voa: suba pelas rampas e abra os selos.', 'xp'); return; }
   world.walker.setFlying(on);
-  $('bFly').setAttribute('aria-pressed', String(on));
   document.body.classList.toggle('flying', on);
 }
 
@@ -231,7 +230,7 @@ addEventListener('keydown', (e) => {
     if (['Enter', 'Space', 'KeyE'].includes(e.code) && !e.repeat) { h.pick(0); e.preventDefault(); return; }
   }
   if (e.repeat) return;
-  if (e.code === 'KeyF') setFly(!world.walker.state.flying);
+  if (e.code === 'KeyF' && world.gm?.on) setFly(!world.walker.state.flying);   // flying is a Game Master power only
   if (!journey) return;
   if (e.code === 'KeyE') g.interact();
   if (e.code === 'KeyJ' || (e.code === 'Space' && !world.walker.state.flying)) { world.combat.attack(); e.preventDefault(); }
@@ -546,7 +545,7 @@ $('bExit').onclick = exitWalk;
 $('bGM').hidden = location.hash !== '#mestre';
 addEventListener('hashchange', () => { $('bGM').hidden = location.hash !== '#mestre'; });
 $('bGM').onclick = () => world?.gm.toggle();
-$('bFly').onclick = () => setFly(!world.walker.state.flying);
+$('bRun').onclick = () => { input.runLock = !input.runLock; $('bRun').setAttribute('aria-pressed', String(input.runLock)); };
 $('bPlaces').onclick = () => {
   const open = $('places').hidden;
   $('places').hidden = !open;
@@ -596,7 +595,7 @@ renderer.setAnimationLoop(() => {
         world.combat.shake(dt);
         world.fx.update(dt);
       }
-      world.character.update(dt, { x: s.x, y: s.feet, z: s.z, speed: s.speed, flying: s.flying, moveYaw: s.moveYaw });
+      world.character.update(dt, { x: s.x, y: s.feet, z: s.z, speed: s.speed, flying: s.flying, moveYaw: s.moveYaw, back: !!s.back });
       env.setShadowFocus(shadowCenter.set(s.x, s.feet, s.z), 220);
     } else {
       env.setShadowFocus(shadowCenter.set(0, 300, 0), 1100);

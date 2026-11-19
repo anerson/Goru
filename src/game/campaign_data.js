@@ -111,13 +111,13 @@ export const REGION_NAMES = { fora: 'a Clareira de Aetherion', raizes: 'a Flores
 
 // ---------------------------------------------------------------- needs
 // survival-crafting: attrition, warnings at 30%, no instant death. Thirst empties in 10 min,
-// hunger in 18; at 0 health drains slowly; fainting sends you back to the last camp.
+// life and mana; fainting sends you back to the last camp.
 export const NEEDS = {
-  thirstPerSec: 100 / 600, hungerPerSec: 100 / 1080, runFactor: 1.8, flyFactor: 1.3,
-  warnAt: 30, starvePerSec: 0.25, regenPerSec: 0.5,
+  warnAt: 30, regenPerSec: 1.2,          // life comes back slowly out of combat
+  mana: 100, manaPerSec: 6, manaPerHit: 4, // abilities spend mana; basic hits refill it
   hazardPerSec: 0.35,      // heat, cold or spores without the region's outfit
 };
-export const FLASK = { capacity: 3, sip: 35 };
+export const FLASK = { capacity: 3, sip: 0.35 };   // healing potions: 35% of life and mana each
 export const HAZARD_NAMES = { calor: 'O calor da Fornalha queima. Uma Capa de Cinzas protege.', frio: 'O frio de Nivéria corta. Um Casaco de Geada protege.', esporos: 'Os esporos do Pântano ardem nos pulmões. Um Traje de Filtragem protege.' };
 
 // weapons: the starting branch is tier 0; each tier hits 28% harder. Against a guardian, a weapon
@@ -385,12 +385,12 @@ export const CLASSES = {
     hp: 1.4, dmg: 1.0, guard: 0.15, range: 3.0, cooldown: 0.5, crit: 0, dodgeCd: 0.9, weapon: 'espada',
     passive: 'Postura Firme: −15% de dano físico recebido. Treino de Armas: +1 em armas de lâmina.',
     abilities: [
-      { id: 'escudo', name: 'Golpe de Escudo', cd: 6, text: 'Golpe que causa dano e interrompe conjurações.', fx: [{ v: 'hit', mult: 1.2, radius: 3, stun: 1 }] },
-      { id: 'provocar', name: 'Provocar', cd: 10, text: 'Criaturas próximas vêm até você por 6 s.', fx: [{ v: 'taunt', radius: 12, time: 6 }] },
-      { id: 'investida', name: 'Investida', cd: 9, text: 'Avança e atinge o que está à frente.', fx: [{ v: 'dash', dist: 6, ready: true }, { v: 'hit', mult: 1.6, radius: 3, knock: 4 }] },
-      { id: 'ultima_linha', name: 'Última Linha', cd: 18, text: 'Por 6 s você recebe 50% menos dano e empurra criaturas próximas.', fx: [{ v: 'shield', time: 6, reduce: 0.5 }, { v: 'knock', radius: 4, dist: 3 }] },
+      { id: 'investida', name: 'Investida', cd: 7, mana: 20, text: 'Parte com a espada para cima da criatura da mira (até 12 m) e golpeia: 1,6× o dano.', fx: [{ v: 'charge', dist: 12, mult: 1.6, knock: 3 }] },
+      { id: 'sismico', name: 'Golpe Sísmico', cd: 8, mana: 25, text: 'Crava a espada no chão e arremessa uma pedra na criatura da mira: 2× o dano e atordoa.', fx: [{ v: 'rock', mult: 2, radius: 3, stun: 1.2 }] },
+      { id: 'avanco_escudo', name: 'Avanço de Escudo', cd: 10, mana: 25, text: 'Ergue o escudo e avança 9 m atropelando tudo no caminho: empurra e atordoa.', fx: [{ v: 'bash', dist: 9, mult: 1.3, knock: 6, stun: 1 }] },
+      { id: 'muralha', name: 'Muralha', cd: 16, mana: 30, text: 'Escudo de 40% da sua vida por cima da barra de vida (absorve o dano primeiro) e atrai as criaturas próximas.', fx: [{ v: 'barrier', pct: 0.4 }, { v: 'taunt', radius: 10, time: 5 }] },
     ],
-    ultimate: { id: 'bastiao', name: 'Bastião Vivo', cd: 90, text: 'Zona defensiva de 12 s: 60% menos dano para você e as criaturas próximas são empurradas.', fx: [{ v: 'shield', time: 12, reduce: 0.6 }, { v: 'knock', radius: 7, dist: 6 }] },
+    ultimate: { id: 'bastiao', name: 'Bastião Vivo', cd: 60, mana: 50, text: 'Invoca do chão o Bastião, um guardião de pedra que ataca as criaturas por 10 s.', fx: [{ v: 'summon', time: 10, mult: 1.1 }] },
     look: { shirt: '#7a3a2a', pants: '#3a3a3a', hat: '#8a8a8a' } },
   mago: { name: 'Mago', title: 'Tecelão da Seiva Arcana', role: 'Dano mágico à distância e controle', color: '#9a8aff',
     hp: 0.8, dmg: 1.0, guard: 0, range: 2.6, reach: 24, cooldown: 0.6, crit: 0.03, dodgeCd: 0.7, weapon: 'cajado',

@@ -25,12 +25,8 @@ const dialogueProblems = validateCampaign();
 // ---- 1b'. every recipe input can be gathered on or below its floor (survival-crafting) ----
 const recipeProblems = validateRecipes();
 
-// ---- 1c. needs timing (survival-crafting skill): minutes from full to warning and to empty ----
-const minutes = (perSec, k) => ({ warn: +((100 - NEEDS.warnAt) / (perSec * k) / 60).toFixed(1), empty: +(100 / (perSec * k) / 60).toFixed(1) });
-const needsTiming = {
-  thirstIdle: minutes(NEEDS.thirstPerSec, 1), thirstRunning: minutes(NEEDS.thirstPerSec, NEEDS.runFactor),
-  hungerIdle: minutes(NEEDS.hungerPerSec, 1),
-};
+// ---- 1c. mana: an empty bar refills in seconds, not minutes ----
+const needsTiming = { manaRefillSec: +(NEEDS.mana / NEEDS.manaPerSec).toFixed(1) };
 
 // ---- 2. the page renders without errors ----
 const { chromium } = createRequire(import.meta.url)('playwright');
@@ -187,8 +183,15 @@ const fight = await page.evaluate(async () => {
   O.step(8);
   const dodged = +Math.hypot(W.x - x0, W.z - z0).toFixed(2);
   // every class ability of the explorer's class runs without error (the four keys and R)
+  // the Warrior's kit: charge, boulder, shield run, the shield layer and the summoned Bastião
+  O.game.state.mana = 1000;
   const abilityRun = [0, 1, 2, 3, 4].map((i) => { O.combat.useAbility(i); return true; });
-  return { hit, state: m.state, playerHurt: O.game.state.health < health0, dodged, invulnerable, abilityRun: abilityRun.length, ok: hit && m.state !== 'idle' && dodged > 2.5 && invulnerable };
+  const warrior = O.game.cls.id === 'guerreiro';
+  const barrier = O.game.state.barrier, summoned = C.summons.length;
+  const manaSpent = O.game.state.mana < 1000;
+  O.game.state.mana = 0; const cdBefore = 0;
+  return { hit, state: m.state, playerHurt: O.game.state.health < health0, dodged, invulnerable, abilityRun: abilityRun.length, warrior, barrier, summoned, manaSpent,
+    ok: hit && m.state !== 'idle' && dodged > 2.5 && invulnerable && manaSpent && (!warrior || (barrier > 0 && summoned === 1)) };
 });
 
 // ---- 5. the whole campaign, floor 1 to floor 10, every stage through its own action ----

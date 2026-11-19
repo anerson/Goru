@@ -137,7 +137,9 @@ export function createWalker({ walkables, rootMeshes, rootSegs, noGo = [] }) {
       blockSlabs(prevFeet);
       state.feet = Math.max(state.feet, floorAt(state.x, state.z, state.feet), 0);
     } else {
-      const speed = (input.run ? METRICS.run : METRICS.walk) * dt;
+      // walking backward is a real backpedal: slower, never a run, and the body keeps facing forward
+      state.back = f < -0.1 && Math.abs(r) < Math.abs(f) && !(state.dodgeT > 0);
+      const speed = (state.back ? METRICS.walk * 0.6 : input.run ? METRICS.run : METRICS.walk) * dt;
       let mx = (-sy * f + cy * r) * speed, mz = (-cy * f - sy * r) * speed;
       // a dodge roll: a short burst along its own direction, whatever the stick says
       if (state.dodgeT > 0) { mx = dashX * DODGE.speed * dt; mz = dashZ * DODGE.speed * dt; }
@@ -167,7 +169,7 @@ export function createWalker({ walkables, rootMeshes, rootSegs, noGo = [] }) {
     // what the character animation needs: how fast and which way it actually moved
     const mx = state.x - x0, mz = state.z - z0, moved = Math.hypot(mx, mz);
     state.speed = dt > 0 ? moved / dt : 0;
-    state.moveYaw = moved > 1e-4 ? Math.atan2(-mx, -mz) : null;
+    state.moveYaw = moved > 1e-4 ? (state.back ? Math.atan2(mx, mz) : Math.atan2(-mx, -mz)) : null;
   }
 
   // Is this camera point inside something solid?

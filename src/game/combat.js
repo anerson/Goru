@@ -90,7 +90,8 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   const slash = new THREE.Mesh(new THREE.RingGeometry(1.2, 2.4, 24, 1, -Math.PI / 3, (Math.PI * 2) / 3).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ color: '#fff2c8', transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
   scene.add(slash);
-  let slashT = 0, attackCd = 0;
+  let slashT = 0, attackCd = 0, chainStep = 2, chainT = 0, chainMult = 1;
+  const NEEDS_MANA_HIT = 4;
   // the explorer's weapon is whatever the game says is equipped (crafted at the workbenches);
   // in Modo Mestre it is the Cajado do GM
   let gmOn = false;
@@ -257,7 +258,8 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     const crit = readyCrit > 0 || rand() < (combo >= 10 ? 0.2 : 0.12) + (c.crit ?? 0) + steady + opportunist;
     const ready = readyCrit > 0 ? readyMult : 1;
     if (readyCrit > 0) { readyCrit = 0; readyMult = 1; }
-    const bonus = (boss && c.bossBonus ? 1 + c.bossBonus : 1) * buff.dmg * ready;
+    const bonus = (boss && c.bossBonus ? 1 + c.bossBonus : 1) * buff.dmg * ready * chainMult;
+    game.gainMana?.(NEEDS_MANA_HIT);
     hurtMob(m, rollDamage(w) * game.power() * (1 + Math.min(combo - 1, 10) * 0.05) * (crit ? 1.8 : 1) * bonus, from, crit);
   }
   // ---- class abilities: four active (keys 1-4) and the supreme one (R). Each is data (campaign_data
@@ -272,13 +274,13 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   };
   // ---- what each ability looks like ----
   const shots = [];                       // projectiles in flight: { mesh, from, to, t, dur, color, splash }
-  const shotGeo = { orb: new THREE.SphereGeometry(0.35, 16, 12), arrow: new THREE.CylinderGeometry(0.04, 0.04, 1.4, 6).rotateX(Math.PI / 2) };
+  const shotGeo = { rock: new THREE.DodecahedronGeometry(0.55, 0), orb: new THREE.SphereGeometry(0.35, 16, 12), arrow: new THREE.CylinderGeometry(0.04, 0.04, 1.4, 6).rotateX(Math.PI / 2) };
   function launch(kind, from, to, color, splash) {
-    const mesh = new THREE.Mesh(shotGeo[kind], new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(2) }));
+    const mesh = new THREE.Mesh(shotGeo[kind], kind === 'rock' ? new THREE.MeshStandardMaterial({ color: '#8a7458', roughness: 0.9, flatShading: true }) : new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(2) }));
     mesh.position.copy(from);
     mesh.lookAt(to);
     scene.add(mesh);
-    shots.push({ mesh, from: from.clone(), to: to.clone(), t: 0, dur: Math.max(0.12, from.distanceTo(to) / 45), color, splash, kind });
+    shots.push({ mesh, from: from.clone(), to: to.clone(), t: 0, dur: Math.max(0.12, from.distanceTo(to) / (kind === 'rock' ? 28 : 45)), color, splash, kind });
   }
   const bubble = new THREE.Mesh(new THREE.SphereGeometry(1.25, 28, 20), new THREE.MeshBasicMaterial({ color: '#9ad0ff', transparent: true, opacity: 0.22, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending }));
   const aura = new THREE.Mesh(new THREE.TorusGeometry(0.9, 0.06, 6, 40).rotateX(Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffd76a', transparent: true, opacity: 0.8, depthWrite: false, blending: THREE.AdditiveBlending }));
@@ -354,6 +356,64 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
         if (e.dist < 0) invul = 0.5;
         break;
       }
+      case 'charge': {
+        // run at the aimed creature with the weapon forward and strike on arrival
+        const t = target && t0ok(target) && target.pos.distanceTo(self) < e.dist + 2 ? target : null;
+        let nx, nz;
+        if (t) { const d = V(t.pos.x - me.x, 0, t.pos.z - me.z); const L = Math.max(0, d.length() - 1.6); d.normalize(); nx = me.x + d.x * L; nz = me.z + d.z * L; }
+        else { nx = me.x - Math.sin(me.yaw) * e.dist * 0.6; nz = me.z - Math.cos(me.yaw) * e.dist * 0.6; }
+        dashTo(nx, nz, game.cls.color ?? '#ffb08a');
+        character.setHeading(t ? Math.atan2(-(t.pos.x - nx), -(t.pos.z - nz)) : me.yaw);
+        character.swing();
+        runEffect({ v: 'hit', mult: e.mult, radius: 3, knock: e.knock, at: 'self' }, target);
+        break;
+      }
+      case 'rock': {
+        // the blade goes into the ground, the floor cracks and a boulder flies at the target
+        fx?.ring(V(me.x, me.feet + 0.1, me.z), '#b08a5a', 3.5, 0.5);
+        fx?.burst(V(me.x, me.feet + 0.3, me.z), { n: 40, color: '#a07a4a', speed: 6, up: 3, life: 0.7, size: 1.4 });
+        character.swing();
+        const to = target ? V(target.pos.x, target.pos.y + 1, target.pos.z) : aimPoint(null).setY(me.feet + 1);
+        launch('rock', V(me.x, me.feet + 0.6, me.z), to, '#a07a4a', e.radius);
+        runEffect({ v: 'hit', mult: e.mult, radius: e.radius, stun: e.stun, at: 'aim' }, target);
+        break;
+      }
+      case 'bash': {
+        // shield up, a straight run: everything on the way is hit, pushed aside and dazed
+        shield = { t: Math.max(shield.t, 0.8), red: Math.max(shield.red, 0.8) };
+        bubble.material.color.set('#c8e4ff');
+        const fx0 = -Math.sin(me.yaw), fz0 = -Math.cos(me.yaw), sx = me.x, sz = me.z;
+        let L = 0;
+        for (let s = 1; s <= 9; s++) {
+          const x = sx + fx0 * e.dist * s / 9, z = sz + fz0 * e.dist * s / 9, fl = walker.floorAt(x, z, me.feet);
+          if (Math.abs(fl - me.feet) > 1.5 || biomes.noGo.some((f) => f(x, z, fl))) break;
+          L = e.dist * s / 9;
+        }
+        for (const m of mobs) {
+          if (!t0ok(m)) continue;
+          const rx = m.pos.x - sx, rz = m.pos.z - sz, along = rx * fx0 + rz * fz0, side = Math.abs(rx * fz0 - rz * fx0);
+          if (along < -1 || along > L + 1.5 || side > 2.2 + m.model.radius || Math.abs(m.pos.y - me.feet) > 3) continue;
+          hurtMob(m, rollDamage(cur()) * game.power() * e.mult * buff.dmg, self, false, { skill: '#c8e4ff' });
+          if (m.state !== 'dead') {
+            const sgn = (rx * fz0 - rz * fx0) >= 0 ? 1 : -1;
+            m.knock.set(fx0 * e.knock + fz0 * sgn * 3, 0, fz0 * e.knock - fx0 * sgn * 3);
+            if (e.stun && !m.boss) { m.state = 'recover'; m.timer = e.stun; }
+          }
+        }
+        dashTo(sx + fx0 * L, sz + fz0 * L, '#c8e4ff');
+        fx?.ring(V(me.x, me.feet + 0.3, me.z), '#c8e4ff', 3, 0.4);
+        break;
+      }
+      case 'barrier': {
+        game.addBarrier?.(game.maxHealth() * e.pct);
+        shield = { t: Math.max(shield.t, 1.2), red: shield.red };
+        bubble.material.color.set('#9ad0ff');
+        fx?.ring(V(me.x, me.feet + 0.2, me.z), '#9ad0ff', 3, 0.7);
+        fx?.ring(V(me.x, me.feet + 1.2, me.z), '#ffffff', 2, 0.6);
+        fx?.burst(V(me.x, me.feet + 1, me.z), { n: 40, color: '#9ad0ff', speed: 2, up: 1, rise: 2, gravity: -1, life: 1, size: 1.1 });
+        break;
+      }
+      case 'summon': summonBastion(e.time, e.mult); break;
       case 'reveal': {
         const t = target ?? aimed;
         if (t) { hud.toast(`${t.def.name}: ${Math.max(0, Math.round(t.hp))}/${t.def.hp} de vida${t.boss ? ' · guardião' : ''}`, 'xp'); fx?.ring(V(t.pos.x, t.pos.y + 0.1, t.pos.z), '#7fe0b0', 2.5, 1); fx?.burst(V(t.pos.x, t.pos.y + 3, t.pos.z), { n: 20, color: '#7fe0b0', speed: 0.5, up: -1, gravity: 3, life: 1 }); }
@@ -362,11 +422,88 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
       }
     }
   }
+  const t0ok = (m) => !(['dead', 'dormant', 'rise', 'gone', 'retreat', 'yield'].includes(m.state) || m.ally);
+  // a quick slide to a point on the same floor, leaving a streak
+  function dashTo(nx, nz, color) {
+    const me = walker.state, fl = walker.floorAt(nx, nz, me.feet);
+    if (Math.abs(fl - me.feet) > 1.5 || biomes.noGo.some((f) => f(nx, nz, fl))) return;
+    for (let k = 0; k <= 8; k++) fx?.burst(V(me.x + (nx - me.x) * k / 8, me.feet + 0.8, me.z + (nz - me.z) * k / 8), { n: 4, color, speed: 0.6, up: 0.3, gravity: 0, life: 0.5 });
+    walker.teleport({ x: nx, z: nz, feet: fl, yaw: me.yaw, pitch: me.pitch });
+  }
+  // ---- the Bastião: a stone guardian that rises from the ground and fights for 10 s ----
+  const summons = [];
+  function buildBastion(color) {
+    const g = new THREE.Group();
+    const stone = new THREE.MeshStandardMaterial({ color: '#8a8478', roughness: 0.9 });
+    const moss = new THREE.MeshStandardMaterial({ color: '#5a7a3a', roughness: 1 });
+    const glow = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1.6 });
+    const add = (geo, mat, x, y, z, s = 1) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.scale.setScalar(s); m.castShadow = true; g.add(m); return m; };
+    add(new THREE.DodecahedronGeometry(0.9, 0), stone, 0, 1.7, 0).scale.set(1.2, 1, 0.9);
+    add(new THREE.DodecahedronGeometry(0.5, 0), moss, 0, 2.55, -0.1).scale.set(1.6, 0.4, 1.1);
+    const head = add(new THREE.DodecahedronGeometry(0.42, 0), stone, 0, 2.75, 0.05);
+    add(new THREE.SphereGeometry(0.08, 8, 6), glow, -0.16, 2.8, -0.33); add(new THREE.SphereGeometry(0.08, 8, 6), glow, 0.16, 2.8, -0.33);
+    add(new THREE.OctahedronGeometry(0.22, 0), glow, 0, 1.85, -0.78);
+    const arms = [-1, 1].map((sd) => {
+      const pivot = new THREE.Group(); pivot.position.set(sd * 1.15, 2.2, 0); g.add(pivot);
+      const a = new THREE.Mesh(new THREE.DodecahedronGeometry(0.42, 0), stone); a.position.y = -0.45; a.scale.set(0.9, 1.4, 0.9); pivot.add(a);
+      const fist = new THREE.Mesh(new THREE.DodecahedronGeometry(0.4, 0), stone); fist.position.y = -1.15; pivot.add(fist);
+      return pivot;
+    });
+    for (const sd of [-1, 1]) add(new THREE.CylinderGeometry(0.28, 0.36, 0.9, 7), stone, sd * 0.45, 0.45, 0);
+    toonify(g, { outline: true, thickness: 0.05 });
+    return { root: g, arms, head };
+  }
+  function summonBastion(time, mult) {
+    const me = walker.state;
+    const x = me.x - Math.sin(me.yaw) * 2.5, z = me.z - Math.cos(me.yaw) * 2.5, y = walker.floorAt(x, z, me.feet);
+    const b = buildBastion(game.cls.color ?? '#ff8a5a');
+    b.root.position.set(x, y - 3.2, z);
+    b.root.rotation.y = me.yaw;
+    scene.add(b.root);
+    summons.push({ ...b, pos: V(x, y, z), t: time, rise: 0, hitCd: 0.4, swing: 0, mult });
+    fx?.ring(V(x, y + 0.1, z), '#b08a5a', 4, 0.8);
+    fx?.burst(V(x, y + 0.3, z), { n: 60, color: '#a07a4a', speed: 5, up: 4, life: 1, size: 1.6 });
+    hud.banner?.('Bastião Vivo', 'O guardião de pedra se ergue', 'Ele luta ao seu lado por 10 s', 'epic');
+  }
+  function updateSummons(dt) {
+    const me = walker.state;
+    for (let i = summons.length - 1; i >= 0; i--) {
+      const s = summons[i];
+      s.t -= dt; s.rise = Math.min(1, s.rise + dt / 0.7); s.hitCd -= dt; s.swing = Math.max(0, s.swing - dt);
+      const ground = walker.floorAt(s.pos.x, s.pos.z, s.pos.y + 1);
+      if (s.t <= 0) {
+        s.root.position.y -= dt * 4;                                   // sinks back into the ground
+        if (s.root.position.y < ground - 3.5) { scene.remove(s.root); summons.splice(i, 1); fx?.burst(V(s.pos.x, ground + 0.3, s.pos.z), { n: 30, color: '#a07a4a', speed: 4, up: 2, life: 0.8 }); }
+        continue;
+      }
+      // nearest creature around the explorer
+      let foe = null, best = 26;
+      for (const m of mobs) { if (!t0ok(m) || Math.abs(m.pos.y - me.feet) > 4) continue; const d = m.pos.distanceTo(s.pos); if (d < best && m.pos.distanceTo(V(me.x, me.feet, me.z)) < 30) { best = d; foe = m; } }
+      const goal = foe ? foe.pos : V(me.x + 2, me.feet, me.z + 2);
+      const dx = goal.x - s.pos.x, dz = goal.z - s.pos.z, dist = Math.hypot(dx, dz);
+      const reach = foe ? 2 + foe.model.radius : 3;
+      if (s.rise >= 1 && dist > reach) { const st = Math.min(dist - reach, 9 * dt); s.pos.x += dx / dist * st; s.pos.z += dz / dist * st; }
+      if (dist > 0.1) s.root.rotation.y = Math.atan2(-dx, -dz);
+      s.pos.y = walker.floorAt(s.pos.x, s.pos.z, s.pos.y + 1);
+      s.root.position.set(s.pos.x, s.rise < 1 ? s.pos.y - 3.2 * (1 - s.rise) ** 2 : s.pos.y + Math.abs(Math.sin(performance.now() / 160)) * 0.08 * (dist > reach), s.pos.z);
+      if (foe && dist <= reach + 0.3 && s.hitCd <= 0 && s.rise >= 1) {
+        s.hitCd = 0.75; s.swing = 0.35;
+        hurtMob(foe, rollDamage(cur()) * game.power() * s.mult, s.pos, false, { skill: game.cls.color });
+        fx?.ring(V(foe.pos.x, foe.pos.y + 0.15, foe.pos.z), '#c8a87a', 2.2, 0.35);
+        fx?.burst(V(foe.pos.x, foe.pos.y + 1, foe.pos.z), { n: 22, color: '#d8c8a0', speed: 6, up: 2, life: 0.45 });
+        sfx('hit');
+      }
+      const k = s.swing > 0 ? Math.sin((s.swing / 0.35) * Math.PI) : 0;
+      s.arms[0].rotation.x = -k * 1.8 + Math.sin(performance.now() / 300) * 0.1;
+      s.arms[1].rotation.x = -k * 1.2 - Math.sin(performance.now() / 300) * 0.1;
+    }
+  }
   function useAbility(slot) {
     if (game.busy || walker.state.flying) return;
     const cls = game.cls;
     const a = slot === 4 ? cls.ultimate : cls.abilities[slot];
     if (!a || cds[slot] > 0) return;
+    if (!game.spendMana?.(a.mana ?? (slot === 4 ? 50 : 20)) && game.spendMana) return;
     cds[slot] = a.cd * (cls.id === 'mago' ? 0.9 : 1);
     const target = findAim();
     for (const e of a.fx) runEffect(e, target);
@@ -377,6 +514,8 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
   const ability = () => useAbility(4);       // R: the supreme ability
   // a different character (or a new one) starts without the last one's cooldowns and effects
   function resetCharacter() {
+    for (const s of summons) scene.remove(s.root);
+    summons.length = 0;
     cds.fill(0); shield = { t: 0, red: 0 }; buff = { t: 0, dmg: 1, plan: false }; invul = 0; readyCrit = 0; readyMult = 1;
     for (const t of traps) scene.remove(t.mesh);
     traps = [];
@@ -391,6 +530,10 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     sfx('swing');
     slash.material.color.set(PLAYER.color);
     slash.scale.setScalar(PLAYER.range / 2.6);
+    // melee chain: a cut down the middle, one from the left, one from the right (the third hits harder)
+    chainStep = chainT > 0 ? (chainStep + 1) % 3 : 0;
+    chainT = 0.95;
+    chainMult = PLAYER.reach ? 1 : [1, 1.1, 1.6][chainStep];
     // swing toward the crosshair: the explorer turns to where the camera looks
     character.setHeading(walker.state.yaw);
     character.swing();
@@ -411,7 +554,16 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     const heading = walker.state.yaw;
     const fwd = V(-Math.sin(heading), 0, -Math.cos(heading));
     slash.position.set(me.x, me.feet + 1, me.z);
+    slash.rotation.order = 'YXZ';
     slash.rotation.y = heading;
+    slash.rotation.z = [Math.PI / 2, 0.35, -0.35][chainStep];
+    slash.scale.x *= chainStep === 2 ? -1 : 1;
+    if (!PLAYER.reach && chainStep === 2) {
+      const tip = V(me.x - Math.sin(heading) * 1.8, me.feet + 1, me.z - Math.cos(heading) * 1.8);
+      fx?.ring(V(tip.x, me.feet + 0.15, tip.z), PLAYER.color ?? '#fff2c8', 2.6, 0.35);
+      fx?.burst(tip, { n: 26, color: PLAYER.color ?? '#fff2c8', speed: 7, up: 1.5, life: 0.45 });
+      sfx('hit');
+    }
     const from = V(me.x, me.feet, me.z);
     for (const m of mobs) {
       if (['dead', 'dormant', 'rise', 'yield', 'gone', 'retreat'].includes(m.state) || m.ally) continue;
@@ -721,6 +873,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
       sh.t += dt;
       const k = Math.min(1, sh.t / sh.dur);
       sh.mesh.position.lerpVectors(sh.from, sh.to, k);
+      if (sh.kind === 'rock') { sh.mesh.position.y += Math.sin(k * Math.PI) * 2.5; sh.mesh.rotation.x += dt * 12; sh.mesh.rotation.z += dt * 7; }
       if (sh.kind === 'orb') fx?.burst(sh.mesh.position, { n: 2, color: sh.color, speed: 0.4, up: 0.2, gravity: 0, life: 0.35 });
       if (k >= 1) {
         fx?.ring(V(sh.to.x, sh.to.y - 0.8, sh.to.z), sh.color, sh.splash, 0.45);
@@ -744,6 +897,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
       }
     }
     comboT -= dt;
+    updateSummons(dt);
     for (let i = ambushes.length - 1; i >= 0; i--) {
       const a = ambushes[i];
       if (a.group.every((m) => m.state === 'dead' || !mobs.includes(m))) { ambushes.splice(i, 1); a.done(); }
@@ -809,6 +963,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     beam.material.opacity = Math.max(0, beamT / 0.18) * 0.9;
     // slash fade
     slashT -= dt;
+    chainT -= dt;
     slash.material.opacity = Math.max(0, slashT / 0.18) * 0.7;
     // damage numbers float up and fade (projected to the screen)
     for (let i = numbers.length - 1; i >= 0; i--) {
@@ -843,7 +998,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     dodge, ability, useAbility, resetCharacter,
     update, attack, shake, resetBosses, gm, syncBossesWithStory,
     debug: {
-      mobs, bosses, wake,
+      mobs, bosses, wake, summons,
       killBoss(id) { const b = bosses[id]; if (b.state === 'dormant') wake(id); b.state = 'chase'; hurtMob(b, b.hp + 1, b.pos.clone().add(V(0, 0, 1))); },
       hurtMob,
     },
