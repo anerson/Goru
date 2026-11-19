@@ -864,7 +864,7 @@ export function createCombat({ scene, camera, walker, character, biomes, game, h
     const now = performance.now() / 1000;
     const sim = now < stopUntil ? dt * 0.05 : dt;           // hit-stop slows combat only
     attackCd -= dt;
-    hud.skills(game.cls, cds);
+    hud.skills(game.cls, cds, game.state?.mana ?? Infinity);
     shield.t -= dt; buff.t -= dt; if (buff.t <= 0) { buff.dmg = 1; buff.plan = false; } invul -= dt;
     for (let i = 0; i < cds.length; i++) cds[i] = Math.max(0, cds[i] - dt);
     traps = traps.filter((t) => { t.t -= dt; if (t.t > 0) { t.mesh.material.opacity = 0.25 + Math.sin(performance.now() / 150) * 0.1; return true; } scene.remove(t.mesh); t.mesh.geometry.dispose(); return false; });

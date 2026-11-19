@@ -125,7 +125,7 @@ export function createHud(root) {
     // quest progress under the objective (3/3 springs...)
     // the class ability button: its name and the seconds left on its cooldown
     // the five skill buttons of the class (1-4 and R): name and seconds left on each cooldown
-    skills(cls, cds) {
+    skills(cls, cds, mana = Infinity) {
       const box = $('hudSkills');
       if (!cls) { box.hidden = true; return; }
       const list = [...cls.abilities.map((a, i) => [i, a]), [4, cls.ultimate]];
@@ -138,8 +138,12 @@ export function createHud(root) {
       box.querySelectorAll('button').forEach((b) => {
         const i = Number(b.dataset.k), a = i === 4 ? cls.ultimate : cls.abilities[i];
         const left = cds[i] ?? 0;
-        b.querySelector('span').textContent = left > 0 ? `${a.name} · ${Math.ceil(left)}s` : a.name;
+        const cost = a.mana ?? (i === 4 ? 50 : 20);
+        const txt = left > 0 ? `${a.name} · ${Math.ceil(left)}s` : `${a.name} · ${cost}`;
+        const sp = b.querySelector('span');
+        if (sp.textContent !== txt) sp.textContent = txt;
         b.disabled = left > 0;
+        b.classList.toggle('nomana', mana < cost);
       });
     },
     progress(done, total, label) {
