@@ -1,5 +1,7 @@
-// The explorer you play in third person: a simple figure built from primitives (1.8 m tall,
-// facing -z), with a backpack and a lantern, and a procedural walk / run / fly animation.
+// The explorer you play in third person: a rounded cartoon figure (about 1.9 m with the hat,
+// facing -z) with a big friendly head, a tunic that flares at the hem, bending elbows and knees,
+// mitten hands and chunky boots, a backpack and a lantern, and a procedural walk / run / fly
+// animation.
 import * as THREE from 'three';
 
 // Options let the same figure dress the villagers: colours, no lantern light, no backpack.
@@ -9,7 +11,7 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
   root.userData.character = true;   // the cartoon pass gives characters an outline
   root.scale.setScalar(scale);
   const skin = new THREE.MeshStandardMaterial({ color: skinC, roughness: 0.75 });
-  const shirt = new THREE.MeshStandardMaterial({ color: shirtC, roughness: 0.8 });
+  const shirt = new THREE.MeshStandardMaterial({ color: shirtC, roughness: 0.8, side: THREE.DoubleSide });
   const pants = new THREE.MeshStandardMaterial({ color: pantsC, roughness: 0.9 });
   const leather = new THREE.MeshStandardMaterial({ color: hat, roughness: 0.7 });
   const add = (parent, geo, mat, x, y, z) => {
@@ -24,29 +26,43 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
   body.position.y = 0.95;
   root.add(body);
   // torso: a rounded chest a little deeper at the top, a belt with a buckle, a scarf
-  add(body, new THREE.CapsuleGeometry(0.2, 0.4, 8, 24), shirt, 0, 0.32, 0).scale.set(1.05, 1, 0.78);
+  // a tapered limb: rounded at both ends, radius r0 at the joint (y = 0) and r1 at the far end
+  const pill = (len, r0, r1, seg = 18) => {
+    const pts = [];
+    for (let k = 0; k <= 6; k++) { const a = -Math.PI / 2 + (k / 6) * (Math.PI / 2); pts.push(new THREE.Vector2(Math.cos(a) * r1, -len + r1 + Math.sin(a) * r1)); }
+    for (let k = 0; k <= 6; k++) { const a = (k / 6) * (Math.PI / 2); pts.push(new THREE.Vector2(Math.cos(a) * r0 + 1e-4, -r0 + Math.sin(a) * r0)); }
+    return new THREE.LatheGeometry(pts, seg);
+  };
+  // torso: a soft tunic, narrow at the waist, full in the chest, flaring into a hem over the hips
+  const torsoProfile = [[0.255, -0.2], [0.24, -0.12], [0.212, -0.02], [0.193, 0.07], [0.2, 0.18], [0.218, 0.3], [0.222, 0.4], [0.205, 0.5], [0.16, 0.575], [0.09, 0.62], [0.001, 0.635]];
+  add(body, new THREE.LatheGeometry(torsoProfile.map(([r, y]) => new THREE.Vector2(r, y)), 28), shirt, 0, 0, 0).scale.set(1, 1, 0.8);
   const dark = new THREE.MeshStandardMaterial({ color: '#2a2018', roughness: 0.6 });
   const hairMat = dark;   // hair shares the dark material so it can be recoloured
   const metal = new THREE.MeshStandardMaterial({ color: '#c9a24a', metalness: 0.8, roughness: 0.35 });
-  add(body, new THREE.TorusGeometry(0.205, 0.035, 8, 32), dark, 0, 0.06, 0).rotation.x = Math.PI / 2;
-  add(body, new THREE.BoxGeometry(0.07, 0.06, 0.03), metal, 0, 0.06, -0.165);
+  const belt = add(body, new THREE.TorusGeometry(0.2, 0.03, 8, 32), dark, 0, 0.07, 0);
+  belt.rotation.x = Math.PI / 2; belt.scale.set(1, 0.8, 1);
+  add(body, new THREE.TorusGeometry(0.03, 0.012, 6, 16), metal, 0, 0.07, -0.168);   // round buckle
   add(body, new THREE.TorusGeometry(0.12, 0.045, 8, 24), leather, 0, 0.62, 0).rotation.x = Math.PI / 2;   // scarf
   add(body, new THREE.CylinderGeometry(0.06, 0.07, 0.1, 16), skin, 0, 0.64, 0);                         // neck
   // head: face, eyes, nose, ears, hair under the hat
   const head = new THREE.Group();
-  head.position.set(0, 0.78, 0);
+  head.position.set(0, 0.79, 0);
+  head.scale.setScalar(1.2);          // a big friendly cartoon head
   body.add(head);
   add(head, new THREE.SphereGeometry(0.14, 32, 24), skin, 0, 0, 0).scale.set(0.92, 1.08, 1);
   const eye = new THREE.MeshStandardMaterial({ color: '#1a120c', roughness: 0.2 });
   const white = new THREE.MeshStandardMaterial({ color: '#f4efe6', roughness: 0.4 });
+  const blush = new THREE.MeshStandardMaterial({ color: '#f08a7a', roughness: 0.8, transparent: true, opacity: 0.55 });
   for (const sx of [-1, 1]) {
     add(head, new THREE.SphereGeometry(0.042, 16, 12), white, sx * 0.052, 0.02, -0.112).scale.set(1, 1.1, 0.55);   // big cartoon eyes
-    add(head, new THREE.SphereGeometry(0.024, 12, 10), eye, sx * 0.052, 0.015, -0.13);
+    add(head, new THREE.SphereGeometry(0.026, 12, 10), eye, sx * 0.052, 0.012, -0.13);
+    add(head, new THREE.SphereGeometry(0.008, 8, 6), white, sx * 0.052 + 0.008, 0.024, -0.152);           // eye sparkle
+    add(head, new THREE.SphereGeometry(0.026, 12, 8), blush, sx * 0.085, -0.04, -0.105).scale.set(1, 0.6, 0.4); // rosy cheeks
     add(head, new THREE.SphereGeometry(0.035, 12, 10), skin, sx * 0.132, 0.0, 0).scale.set(0.5, 1, 0.8); // ears
     add(head, new THREE.BoxGeometry(0.045, 0.01, 0.01), dark, sx * 0.05, 0.058, -0.125).rotation.z = sx * -0.15; // brows
   }
   add(head, new THREE.SphereGeometry(0.022, 12, 10), skin, 0, -0.02, -0.14).scale.set(0.9, 1.2, 1);       // nose
-  add(head, new THREE.BoxGeometry(0.05, 0.008, 0.01), new THREE.MeshStandardMaterial({ color: '#8a4a3a' }), 0, -0.065, -0.128); // mouth
+  add(head, new THREE.TorusGeometry(0.026, 0.006, 6, 16, Math.PI), new THREE.MeshStandardMaterial({ color: '#7a3a2e' }), 0, -0.055, -0.13).rotation.z = Math.PI; // smile
   add(head, new THREE.SphereGeometry(0.145, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.5), dark, 0, 0.02, 0.012).scale.set(0.96, 0.9, 1.02); // hair
   // a wide-brimmed explorer's hat with a band (one of the head styles)
   const hatParts = [
@@ -61,31 +77,47 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
   }
   const lantern = add(body, new THREE.SphereGeometry(0.07, 16, 12), new THREE.MeshBasicMaterial({ color: new THREE.Color('#ffd28a').multiplyScalar(2) }), 0.16, 0.1, 0.32);
 
-  const limb = (parent, x, y, len, rad, mat, end) => {
+  // two-part limbs: upper pivot at the shoulder / hip, lower pivot at the elbow / knee
+  const limb = (parent, x, y, len1, len2, r0, r1, r2, mat, end) => {
     const pivot = new THREE.Group();
     pivot.position.set(x, y, 0);
     parent.add(pivot);
-    add(pivot, new THREE.CapsuleGeometry(rad, len - rad * 2, 8, 16), mat, 0, -len / 2, 0);
-    end?.(pivot, len);
+    add(pivot, pill(len1 + r1, r0, r1), mat, 0, 0, 0);
+    const lower = new THREE.Group();
+    lower.position.y = -len1;
+    pivot.add(lower);
+    add(lower, pill(len2, r1 * 0.98, r2), mat, 0, 0, 0);
+    end?.(lower, len2);
+    pivot.userData.lower = lower;
     return pivot;
   };
-  const boot = (p, len) => {   // boots: a rounded toe pointing forward and a cuff
-    add(p, new THREE.CapsuleGeometry(0.075, 0.12, 8, 16), dark, 0, -len + 0.04, -0.05).rotation.x = Math.PI / 2;
-    add(p, new THREE.CylinderGeometry(0.095, 0.09, 0.14, 20), dark, 0, -len + 0.15, 0);
+  const sole = new THREE.MeshStandardMaterial({ color: '#4a3424', roughness: 0.8 });
+  const boot = (p, len) => {   // chunky boots: a round toe, a thick sole and a folded cuff
+    add(p, new THREE.CylinderGeometry(0.088, 0.095, 0.2, 20), dark, 0, -len + 0.1, 0);
+    add(p, new THREE.TorusGeometry(0.093, 0.026, 8, 24), leather, 0, -len + 0.2, 0).rotation.x = Math.PI / 2;
+    add(p, new THREE.CapsuleGeometry(0.082, 0.13, 8, 16), dark, 0, -len + 0.025, -0.07).rotation.x = Math.PI / 2;
+    const so = add(p, new THREE.CapsuleGeometry(0.088, 0.15, 6, 16), sole, 0, -len - 0.015, -0.07);
+    so.rotation.x = Math.PI / 2; so.scale.set(1.05, 1, 0.3);
   };
-  const hand = (p, len) => add(p, new THREE.SphereGeometry(0.05, 16, 12), skin, 0, -len + 0.01, 0).scale.set(0.9, 1.1, 0.8);
-  const legL = limb(root, -0.1, 0.95, 0.9, 0.085, pants, boot);
-  const legR = limb(root, 0.1, 0.95, 0.9, 0.085, pants, boot);
-  const armL = limb(body, -0.27, 0.56, 0.6, 0.065, shirt, hand);
-  const armR = limb(body, 0.27, 0.56, 0.6, 0.065, shirt, hand);
+  const hand = (p, len) => {   // a mitten with a thumb
+    add(p, new THREE.SphereGeometry(0.058, 16, 12), skin, 0, -len - 0.01, -0.005).scale.set(0.85, 1.15, 0.75);
+    add(p, new THREE.SphereGeometry(0.024, 10, 8), skin, 0, -len + 0.005, -0.045).scale.set(1, 1.4, 1);
+  };
+  const legL = limb(root, -0.1, 0.95, 0.43, 0.45, 0.105, 0.078, 0.064, pants, boot);
+  const legR = limb(root, 0.1, 0.95, 0.43, 0.45, 0.105, 0.078, 0.064, pants, boot);
+  const armL = limb(body, -0.255, 0.54, 0.27, 0.27, 0.07, 0.058, 0.05, shirt, hand);
+  const armR = limb(body, 0.255, 0.54, 0.27, 0.27, 0.07, 0.058, 0.05, shirt, hand);
+  for (const a of [armL, armR]) add(a, new THREE.SphereGeometry(0.088, 18, 14), shirt, 0, -0.01, 0).scale.set(1, 0.95, 0.95);   // puffed shoulders
+  for (const a of [armL, armR]) add(a.userData.lower, new THREE.TorusGeometry(0.056, 0.016, 6, 18), leather, 0, -0.2, 0).rotation.x = Math.PI / 2;   // cuffs
+  const shinL = legL.userData.lower, shinR = legR.userData.lower, foreL = armL.userData.lower, foreR = armR.userData.lower;
   let staffMesh = null, sceptre = null;
   if (pack) {
     // the explorer's staff, held in the right hand
     const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 1.5, 6), leather);
-    staff.position.set(0, -0.6, -0.15);
+    staff.position.set(0, -0.3, -0.15);
     staff.rotation.x = 1.2;
     staff.castShadow = true;
-    armR.add(staff);
+    foreR.add(staff);
     const tip = new THREE.Mesh(new THREE.OctahedronGeometry(0.07, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color('#9dffcf').multiplyScalar(1.5) }));
     tip.position.set(0, 0.75, 0);
     staff.add(tip);
@@ -105,7 +137,7 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
     sceptre.add(shaft, crown, heart, aura);
     sceptre.visible = false;
     sceptre.userData.heart = heart;
-    armR.add(sceptre);
+    foreR.add(sceptre);
   }
 
   // A soft light carried by the explorer, so dark corners stay readable.
@@ -133,13 +165,20 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
     const swing = Math.sin(phase) * 0.7 * Math.min(amount, 1.2);
     legL.rotation.x = swing; legR.rotation.x = -swing;
     armL.rotation.x = -swing * 0.8; armR.rotation.x = swing * 0.8;
-    armL.rotation.z = armR.rotation.z = 0;
+    armL.rotation.z = 0.08; armR.rotation.z = -0.08;
+    // knees fold as each foot comes through, elbows stay soft and pump when running
+    const a1 = Math.min(amount, 1.2);
+    shinL.rotation.x = -Math.max(0, Math.sin(phase + 1.1)) * 1.0 * a1 - 0.05;
+    shinR.rotation.x = -Math.max(0, Math.sin(phase + 1.1 + Math.PI)) * 1.0 * a1 - 0.05;
+    foreL.rotation.x = foreR.rotation.x = 0.25 + 0.55 * Math.min(amount, 1.4);
     body.position.y = 0.95 + Math.abs(Math.cos(phase)) * 0.05 * amount;
     body.rotation.x = -0.12 * Math.max(0, amount - 0.8);
     if (flying) {
       // arms out like a glider, legs trailing
       armL.rotation.z = 1.2; armR.rotation.z = -1.2; armL.rotation.x = armR.rotation.x = 0;
       legL.rotation.x = legR.rotation.x = 0.35 + Math.sin(phase * 0.5) * 0.08;
+      shinL.rotation.x = shinR.rotation.x = -0.5;
+      foreL.rotation.x = foreR.rotation.x = 0.15;
       body.rotation.x = -0.25;
     }
     if (swingT > 0) {
@@ -156,7 +195,8 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
       const k = 1 - rollT / 0.32;
       body.rotation.x = -Math.PI * 2 * k;
       body.position.y = 0.6 + Math.sin(Math.PI * k) * 0.15;
-      legL.rotation.x = legR.rotation.x = -1.4 * Math.sin(Math.PI * k);
+      legL.rotation.x = legR.rotation.x = 1.4 * Math.sin(Math.PI * k);
+      shinL.rotation.x = shinR.rotation.x = -2.2 * Math.sin(Math.PI * k);
     }
     lantern.material.color.setScalar(1.6 + Math.sin(phase * 0.7) * 0.15).multiply(new THREE.Color('#ffd28a'));
   }
@@ -170,6 +210,9 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
     }
     body.position.y = 0.95 + Math.sin(t * 1.6) * 0.012;
     armL.rotation.x = Math.sin(t * 1.1) * 0.05; armR.rotation.x = -armL.rotation.x;
+    armL.rotation.z = 0.1; armR.rotation.z = -0.1;
+    foreL.rotation.x = foreR.rotation.x = 0.3 + Math.sin(t * 1.3) * 0.04;
+    shinL.rotation.x = shinR.rotation.x = -0.04;
   }
 
   function setWeapon(id) {
@@ -228,18 +271,18 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
       parent.add(o); gearParts.push({ parent, mesh: o });
     };
     if (kind === 'guerreiro') {
-      put(armR, new THREE.BoxGeometry(0.05, 0.75, 0.09), gearMat('#c9ced6', '#3a4a5a'), 0, -0.55, -0.12);
-      put(armR, new THREE.BoxGeometry(0.12, 0.12, 0.05), gearMat('#7a5a2a'), 0, -0.17, -0.12);
-      put(armL, new THREE.CylinderGeometry(0.27, 0.27, 0.05, 20), gearMat('#7a4a2a'), -0.05, -0.2, -0.1, Math.PI / 2, 0, 0);
-      put(armL, new THREE.TorusGeometry(0.22, 0.03, 6, 20), gearMat('#c9a24a', '#5a3a08'), -0.05, -0.2, -0.1, 0, Math.PI / 2, 0);
+      put(foreR, new THREE.BoxGeometry(0.05, 0.75, 0.09), gearMat('#c9ced6', '#3a4a5a'), 0, -0.28, -0.12);
+      put(foreR, new THREE.BoxGeometry(0.12, 0.12, 0.05), gearMat('#7a5a2a'), 0, 0.1, -0.12);
+      put(foreL, new THREE.CylinderGeometry(0.27, 0.27, 0.05, 20), gearMat('#7a4a2a'), -0.05, 0.07, -0.1, Math.PI / 2, 0, 0);
+      put(foreL, new THREE.TorusGeometry(0.22, 0.03, 6, 20), gearMat('#c9a24a', '#5a3a08'), -0.05, 0.07, -0.1, 0, Math.PI / 2, 0);
     } else if (kind === 'sabio') {
-      put(armL, new THREE.BoxGeometry(0.22, 0.03, 0.3), gearMat('#7a4a2a'), 0.02, -0.42, -0.14);
-      put(armL, new THREE.BoxGeometry(0.2, 0.02, 0.27), gearMat('#f0e6c8'), 0.02, -0.44, -0.14);
+      put(foreL, new THREE.BoxGeometry(0.22, 0.03, 0.3), gearMat('#7a4a2a'), 0.02, -0.15, -0.14);
+      put(foreL, new THREE.BoxGeometry(0.2, 0.02, 0.27), gearMat('#f0e6c8'), 0.02, -0.17, -0.14);
     } else if (kind === 'ladino') {
-      put(armR, new THREE.BoxGeometry(0.03, 0.03, 0.36), gearMat('#c0c4cc'), 0, -0.62, -0.08, Math.PI / 2);
-      put(armL, new THREE.BoxGeometry(0.03, 0.03, 0.36), gearMat('#c0c4cc'), 0, -0.62, -0.08, Math.PI / 2);
+      put(foreR, new THREE.BoxGeometry(0.03, 0.03, 0.36), gearMat('#c0c4cc'), 0, -0.35, -0.08, Math.PI / 2);
+      put(foreL, new THREE.BoxGeometry(0.03, 0.03, 0.36), gearMat('#c0c4cc'), 0, -0.35, -0.08, Math.PI / 2);
     } else if (kind === 'arqueiro') {
-      put(armL, new THREE.TorusGeometry(0.45, 0.025, 6, 24, Math.PI), gearMat('#8a5a2a'), -0.05, -0.45, -0.05, 0, Math.PI / 2, Math.PI / 2);
+      put(foreL, new THREE.TorusGeometry(0.45, 0.025, 6, 24, Math.PI), gearMat('#8a5a2a'), -0.05, -0.18, -0.05, 0, Math.PI / 2, Math.PI / 2);
       put(body, new THREE.BoxGeometry(0.2, 0.5, 0.12), gearMat('#4a3018'), 0.05, 0.42, 0.25, 0.25);
       for (let k = 0; k < 3; k++) put(body, new THREE.CylinderGeometry(0.01, 0.01, 0.5, 4), gearMat('#e8e2d0'), 0.05 + (k - 1) * 0.03, 0.54, 0.25, 0.25);
     }

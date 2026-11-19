@@ -15,8 +15,11 @@ export const TRUNK = {
 };
 
 // distance from the axis to each strand's centre line, and one strand's radius
-export const ringR = (y) => 120 + 40 * Math.exp(-Math.max(y, 0) / 40) + 4 * Math.sin(y * 0.02 + 1.3);
-export const strandR = (y) => 30 + 18 * Math.exp(-Math.max(y, 0) / 60);
+// Above the entrances (y > ~15 m) both grow by the same amount: the strands get fatter on the
+// outside while the hollow the player walks in (ringR - strandR) stays exactly as wide.
+const fatten = (y) => { const t = Math.min(Math.max((y - 14) / 26, 0), 1); return 6 * t * t * (3 - 2 * t); };
+export const ringR = (y) => 120 + 40 * Math.exp(-Math.max(y, 0) / 40) + 4 * Math.sin(y * 0.02 + 1.3) + fatten(y);
+export const strandR = (y) => 30 + 18 * Math.exp(-Math.max(y, 0) / 60) + fatten(y);
 
 const rand = mulberry32(SEED);
 const theta0 = Array.from({ length: TRUNK.strands }, (_, i) => (i / TRUNK.strands) * TAU + 0.15 + (rand() - 0.5) * 0.04);

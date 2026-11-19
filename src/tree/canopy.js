@@ -4,10 +4,12 @@
 import * as THREE from 'three';
 import { mulberry32 } from '../noise.js';
 import { SEED, TAU } from './layout.js';
+import { lumpy } from '../organic.js';
+import { addWind } from '../wind.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const MAX_DEPTH = 8;
-const SPRIGS_PER_SPOT = 60;
+const SPRIGS_PER_SPOT = 34;   // fringe of single leaves around the solid clumps below
 const CLUSTER_RADIUS = 22; // m
 
 // One oak sprig, 1 unit long: eight broad leaves alternating up a stem, plus a tip leaf.
@@ -100,8 +102,8 @@ export function buildCanopy(group, trunk, mats) {
   for (let i = total - 1; i > 0; i--) { const j = (rand() * (i + 1)) | 0; [order[i], order[j]] = [order[j], order[i]]; }
 
   const leaves = new THREE.InstancedMesh(sprigGeometry(), mats.leaf, total);
-  const greens = ['#2f4a1f', '#3a5a25', '#46682b', '#2a4019', '#55772f', '#3d5f22'].map((h) => new THREE.Color(h));
-  const silver = new THREE.Color('#7f9a4a');
+  const greens = ['#6f9e36', '#82b240', '#5e8f2f', '#93c24a', '#76a83a', '#4f8029'].map((h) => new THREE.Color(h));
+  const silver = new THREE.Color('#c4d870');
   const col = new THREE.Color(), e = new THREE.Euler(), pp = new THREE.Vector3(), out = new THREE.Vector3();
   const tipPoints = [];
   let n = 0, maxY = 0, crownR = 0;
@@ -123,6 +125,34 @@ export function buildCanopy(group, trunk, mats) {
       crownR = Math.max(crownR, Math.hypot(pp.x, pp.z));
     }
   }
+  // The body of the crown: one big rounded clump of foliage per twig cluster, plus a smaller
+  // one hanging under it, so the crown reads as a dense green mass from anywhere (cartoon
+  // style). Two instanced meshes, a few thousand instances, ~80 triangles each.
+  const clumpMat = addWind(new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9 }));
+  const clumpGeos = [lumpy({ detail: 1, amp: 0.24, seed: 3, flatten: 0.72 }), lumpy({ detail: 1, amp: 0.3, seed: 11, flatten: 0.8 })];
+  const clumpTones = ['#2c681e', '#357524', '#3f8229', '#245a18', '#4a8c2e', '#2f6e22'].map((h) => new THREE.Color(h));
+  const sun = new THREE.Color('#7fb03a');
+  const clumps = clumpGeos.map((g, k) => {
+    const m = new THREE.InstancedMesh(g, clumpMat, spots.length);
+    m.name = `leaf-clumps-${k}`;
+    m.castShadow = m.receiveShadow = true;
+    return m;
+  });
+  spots.forEach((sp, i) => {
+    for (let k = 0; k < 2; k++) {
+      const big = k === 0;
+      const s = (big ? 23 : 16) * (0.8 + rand() * 0.4);
+      pp.copy(sp).add(rv(big ? 6 : 18));
+      if (!big) pp.y -= 9;
+      q.setFromEuler(e.set((rand() - 0.5) * 0.4, rand() * TAU, (rand() - 0.5) * 0.4));
+      clumps[k].setMatrixAt(i, m4.compose(pp, q, sc.set(s * (1 + rand() * 0.3), s, s * (1 + rand() * 0.3))));
+      // higher clumps catch more sun
+      const lift = Math.min(Math.max((pp.y - 330) / 180, 0), 1);
+      clumps[k].setColorAt(i, col.copy(clumpTones[(rand() * clumpTones.length) | 0]).lerp(sun, lift * 0.25 + rand() * 0.08));
+    }
+  });
+  group.add(...clumps);
+
   leaves.name = 'leaves';
   leaves.castShadow = leaves.receiveShadow = true;
   group.add(leaves);
