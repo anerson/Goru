@@ -112,14 +112,17 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
   const shinL = legL.userData.lower, shinR = legR.userData.lower, foreL = armL.userData.lower, foreR = armR.userData.lower;
   let staffMesh = null, sceptre = null;
   if (pack) {
-    // the explorer's staff, held in the right hand
+    // the explorer's staff: upright in the right fist, a little forward and out from the hip (the arm hangs outward,
+    // so the shaft never passes through the body)
     const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.035, 1.5, 6), leather);
-    staff.position.set(0, -0.3, -0.15);
-    staff.rotation.x = 1.2;
+    staff.geometry.translate(0, 0.2, 0);   // grip a third of the way up the shaft
+    staff.position.set(0.02, -0.29, -0.02);
+    staff.rotation.set(-0.3, 0, -0.12);
     staff.castShadow = true;
+    staff.userData.gear = true;
     foreR.add(staff);
     const tip = new THREE.Mesh(new THREE.OctahedronGeometry(0.07, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color('#9dffcf').multiplyScalar(1.5) }));
-    tip.position.set(0, 0.75, 0);
+    tip.position.set(0, 0.95, 0);
     staff.add(tip);
     staffMesh = staff;
     // the Cajado do GM: gold shaft, a crown of leaves and a living sap crystal
@@ -128,12 +131,14 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
     sceptre.rotation.copy(staff.rotation);
     const gold = new THREE.MeshStandardMaterial({ color: '#d9a531', metalness: 0.9, roughness: 0.25, emissive: '#5a3a08', emissiveIntensity: 0.4 });
     const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 1.7, 8), gold);
+    shaft.position.y = 0.2;
     const crown = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.03, 6, 14), gold);
-    crown.position.y = 0.85; crown.rotation.x = Math.PI / 2;
+    crown.position.y = 1.05; crown.rotation.x = Math.PI / 2;
     const heart = new THREE.Mesh(new THREE.OctahedronGeometry(0.16, 0), new THREE.MeshBasicMaterial({ color: new THREE.Color('#9dffcf').multiplyScalar(2.4) }));
-    heart.position.y = 1.02;
+    heart.position.y = 1.22;
     const aura = new THREE.PointLight('#9dffcf', 12, 8, 2);
-    aura.position.y = 1.05;
+    aura.position.y = 1.25;
+    for (const m of [shaft, crown, heart]) m.userData.gear = true;
     sceptre.add(shaft, crown, heart, aura);
     sceptre.visible = false;
     sceptre.userData.heart = heart;
@@ -149,6 +154,8 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
   lantern.visible = pack;
 
   let phase = 0, heading = 0, amount = 0, swingT = 0, rollT = 0;
+  // arms hang a little away from the body, so hands and held gear clear the tunic's hem
+  const ARM_OUT = 0.13;
 
   // speed in m/s on the ground, flying flag, the direction of travel (yaw) and dt
   function update(dt, { x, y, z, speed, flying, moveYaw }) {
@@ -165,7 +172,7 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
     const swing = Math.sin(phase) * 0.7 * Math.min(amount, 1.2);
     legL.rotation.x = swing; legR.rotation.x = -swing;
     armL.rotation.x = -swing * 0.8; armR.rotation.x = swing * 0.8;
-    armL.rotation.z = 0.08; armR.rotation.z = -0.08;
+    armL.rotation.z = -ARM_OUT; armR.rotation.z = ARM_OUT;
     // knees fold as each foot comes through, elbows stay soft and pump when running
     const a1 = Math.min(amount, 1.2);
     shinL.rotation.x = -Math.max(0, Math.sin(phase + 1.1)) * 1.0 * a1 - 0.05;
@@ -175,19 +182,23 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
     body.rotation.x = -0.12 * Math.max(0, amount - 0.8);
     if (flying) {
       // arms out like a glider, legs trailing
-      armL.rotation.z = 1.2; armR.rotation.z = -1.2; armL.rotation.x = armR.rotation.x = 0;
+      armL.rotation.z = -1.2; armR.rotation.z = 1.2; armL.rotation.x = armR.rotation.x = 0;
       legL.rotation.x = legR.rotation.x = 0.35 + Math.sin(phase * 0.5) * 0.08;
       shinL.rotation.x = shinR.rotation.x = -0.5;
       foreL.rotation.x = foreR.rotation.x = 0.15;
       body.rotation.x = -0.25;
     }
     if (swingT > 0) {
-      // staff swing: raise, then sweep across (0.3 s)
+      // weapon swing (0.3 s): the right arm rises up in front, the shoulder winds back, then it
+      // chops down and forward; the arm stays out to the side so the weapon passes in front of
+      // the body, never through it
       swingT = Math.max(0, swingT - dt);
       const k = 1 - swingT / 0.3;
-      armR.rotation.x = -2.4 * Math.sin(Math.PI * Math.min(k * 1.4, 1));
-      armR.rotation.z = -0.8 + k * 1.6;
-      body.rotation.y = 0.5 - k;
+      const up = k < 0.4 ? Math.sin((k / 0.4) * Math.PI / 2) : 1 - (k - 0.4) / 0.6;
+      armR.rotation.x = 2.5 * up + 0.35 * (1 - up);
+      armR.rotation.z = ARM_OUT + 0.3 * up;
+      foreR.rotation.x = 0.2 + 0.2 * (1 - up);
+      body.rotation.y = k < 0.4 ? -0.3 * up : -0.3 + 0.65 * (k - 0.4) / 0.6;
     } else body.rotation.y = 0;
     if (rollT > 0) {
       // dodge roll: tuck and spin forward once
@@ -210,7 +221,7 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
     }
     body.position.y = 0.95 + Math.sin(t * 1.6) * 0.012;
     armL.rotation.x = Math.sin(t * 1.1) * 0.05; armR.rotation.x = -armL.rotation.x;
-    armL.rotation.z = 0.1; armR.rotation.z = -0.1;
+    armL.rotation.z = -ARM_OUT - 0.02; armR.rotation.z = ARM_OUT + 0.02;
     foreL.rotation.x = foreR.rotation.x = 0.3 + Math.sin(t * 1.3) * 0.04;
     shinL.rotation.x = shinR.rotation.x = -0.04;
   }
@@ -241,7 +252,7 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
     if (blade) { staffMesh.remove(blade); blade = null; }
     if (tier >= 4) {
       blade = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.45, 4), new THREE.MeshStandardMaterial({ color: look.tip, emissive: look.tip, emissiveIntensity: 0.6, metalness: 0.4, roughness: 0.3 }));
-      blade.position.y = 0.95;
+      blade.position.y = 1.15;
       staffMesh.add(blade);
     }
   }
@@ -265,26 +276,60 @@ export function createCharacter({ name = 'player', skin: skinC = '#c99674', shir
   function buildGear(kind) {
     for (const { parent, mesh } of gearParts) parent.remove(mesh);
     gearParts = [];
+    // a holder at the hand (or on the back) that the gear's meshes hang from
+    const grip = (parent, x, y, z, rx = 0, ry = 0, rz = 0) => {
+      const g = new THREE.Group();
+      g.position.set(x, y, z); g.rotation.set(rx, ry, rz);
+      parent.add(g); gearParts.push({ parent, mesh: g });
+      return g;
+    };
     const put = (parent, geo, m, x, y, z, rx = 0, ry = 0, rz = 0) => {
       const o = new THREE.Mesh(geo, m);
       o.position.set(x, y, z); o.rotation.set(rx, ry, rz); o.castShadow = true;
-      parent.add(o); gearParts.push({ parent, mesh: o });
+      o.userData.gear = true;
+      parent.add(o);
+      return o;
     };
+    // Every piece sits in the fist or on the outer side of the forearm, and the arms hang out
+    // from the body: nothing crosses the torso in idle, walk, run or the swing.
     if (kind === 'guerreiro') {
-      put(foreR, new THREE.BoxGeometry(0.05, 0.75, 0.09), gearMat('#c9ced6', '#3a4a5a'), 0, -0.28, -0.12);
-      put(foreR, new THREE.BoxGeometry(0.12, 0.12, 0.05), gearMat('#7a5a2a'), 0, 0.1, -0.12);
-      put(foreL, new THREE.CylinderGeometry(0.27, 0.27, 0.05, 20), gearMat('#7a4a2a'), -0.05, 0.07, -0.1, Math.PI / 2, 0, 0);
-      put(foreL, new THREE.TorusGeometry(0.22, 0.03, 6, 20), gearMat('#c9a24a', '#5a3a08'), -0.05, 0.07, -0.1, 0, Math.PI / 2, 0);
+      // sword in the right fist, pointing forward and a little out, away from the body
+      const sw = grip(foreR, 0.02, -0.29, -0.01, 0, -0.18, 0);
+      const steel = gearMat('#c9ced6', '#3a4a5a'), hilt = gearMat('#7a5a2a'), gold = gearMat('#c9a24a', '#5a3a08');
+      put(sw, new THREE.CylinderGeometry(0.022, 0.022, 0.16, 8), hilt, 0, 0, 0, Math.PI / 2);              // grip
+      put(sw, new THREE.SphereGeometry(0.032, 10, 8), gold, 0, 0, 0.09);                                    // pommel
+      put(sw, new THREE.BoxGeometry(0.2, 0.035, 0.04), gold, 0, 0, -0.09);                                  // cross-guard
+      put(sw, new THREE.BoxGeometry(0.075, 0.018, 0.68), steel, 0, 0, -0.44);                               // blade
+      put(sw, new THREE.ConeGeometry(0.053, 0.1, 4), steel, 0, 0, -0.83, -Math.PI / 2, Math.PI / 4).scale.set(1, 1, 0.34); // point
+      // round shield strapped to the outer side of the left forearm, face out and a bit forward
+      const sh = grip(foreL, -0.1, -0.15, -0.02, 0, -0.25, 0);
+      put(sh, new THREE.CylinderGeometry(0.27, 0.27, 0.05, 24), gearMat('#7a4a2a'), 0, 0, 0, 0, 0, Math.PI / 2);
+      put(sh, new THREE.TorusGeometry(0.255, 0.03, 6, 24), gold, -0.012, 0, 0, 0, Math.PI / 2, 0);        // rim
+      put(sh, new THREE.SphereGeometry(0.07, 12, 8), gold, -0.03, 0, 0).scale.set(0.6, 1, 1);               // boss
     } else if (kind === 'sabio') {
-      put(foreL, new THREE.BoxGeometry(0.22, 0.03, 0.3), gearMat('#7a4a2a'), 0.02, -0.15, -0.14);
-      put(foreL, new THREE.BoxGeometry(0.2, 0.02, 0.27), gearMat('#f0e6c8'), 0.02, -0.17, -0.14);
+      // a field book held upright in the left fist, against the outer thigh
+      const bk = grip(foreL, -0.06, -0.3, -0.02, 0, 0, 0.12);
+      put(bk, new THREE.BoxGeometry(0.05, 0.3, 0.23), gearMat('#7a4a2a'), 0, -0.04, 0);
+      put(bk, new THREE.BoxGeometry(0.04, 0.27, 0.215), gearMat('#f0e6c8'), 0, -0.04, 0.012);
     } else if (kind === 'ladino') {
-      put(foreR, new THREE.BoxGeometry(0.03, 0.03, 0.36), gearMat('#c0c4cc'), 0, -0.35, -0.08, Math.PI / 2);
-      put(foreL, new THREE.BoxGeometry(0.03, 0.03, 0.36), gearMat('#c0c4cc'), 0, -0.35, -0.08, Math.PI / 2);
+      // two daggers, blades forward out of each fist and angled out from the body
+      for (const [fore, sx] of [[foreR, 1], [foreL, -1]]) {
+        const dg = grip(fore, sx * 0.02, -0.29, -0.01, 0, -sx * 0.25, 0);
+        put(dg, new THREE.CylinderGeometry(0.018, 0.018, 0.12, 6), gearMat('#4a3018'), 0, 0, 0, Math.PI / 2);
+        put(dg, new THREE.BoxGeometry(0.11, 0.025, 0.03), gearMat('#c9a24a'), 0, 0, -0.07);
+        put(dg, new THREE.BoxGeometry(0.045, 0.012, 0.3), gearMat('#c0c4cc'), 0, 0, -0.22);
+      }
     } else if (kind === 'arqueiro') {
-      put(foreL, new THREE.TorusGeometry(0.45, 0.025, 6, 24, Math.PI), gearMat('#8a5a2a'), -0.05, -0.18, -0.05, 0, Math.PI / 2, Math.PI / 2);
-      put(body, new THREE.BoxGeometry(0.2, 0.5, 0.12), gearMat('#4a3018'), 0.05, 0.42, 0.25, 0.25);
-      for (let k = 0; k < 3; k++) put(body, new THREE.CylinderGeometry(0.01, 0.01, 0.5, 4), gearMat('#e8e2d0'), 0.05 + (k - 1) * 0.03, 0.54, 0.25, 0.25);
+      // longbow upright in the left fist, belly forward, string behind the hand, out from the hip
+      const bw = grip(foreL, -0.05, -0.29, -0.02, -0.3, 0, 0.12);
+      const bend = Math.PI * 0.8, R = 0.45, half = bend / 2;
+      const limbs = new THREE.TorusGeometry(R, 0.022, 6, 24, bend).rotateZ(-half).rotateY(Math.PI / 2);   // arc in the y-z plane, belly toward -z
+      put(bw, limbs, gearMat('#8a5a2a'), 0, 0, R);
+      put(bw, new THREE.CylinderGeometry(0.004, 0.004, 2 * R * Math.sin(half), 4), gearMat('#e8e2d0'), 0, 0, R - R * Math.cos(half));   // string
+      // quiver slung diagonally on the back, beside the pack
+      const qv = grip(body, 0.2, 0.42, 0.3, 0.2, 0, -0.35);
+      put(qv, new THREE.CylinderGeometry(0.075, 0.06, 0.5, 10), gearMat('#4a3018'), 0, 0, 0);
+      for (let k = 0; k < 3; k++) put(qv, new THREE.CylinderGeometry(0.008, 0.008, 0.3, 4), gearMat('#e8e2d0'), (k - 1) * 0.03, 0.3, 0);
     }
     gearKind = kind;
   }

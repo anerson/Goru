@@ -3,7 +3,7 @@
 // lower quality setting can draw just the first N and still cover the whole crown evenly.
 import * as THREE from 'three';
 import { mulberry32 } from '../noise.js';
-import { SEED, TAU } from './layout.js';
+import { SEED, TAU, TRUNK, ringR } from './layout.js';
 import { lumpy } from '../organic.js';
 import { addWind } from '../wind.js';
 
@@ -49,43 +49,84 @@ export function buildCanopy(group, trunk, mats) {
   const rv = (s) => new THREE.Vector3((rand() - 0.5) * s, (rand() - 0.5) * s, (rand() - 0.5) * s);
   const segs = [], spots = [];
 
-  function grow(pos, dir, len, rad, depth) {
+  // The crown is a dome: an ellipsoid over the trunk. A branch that reaches its shell stops and
+  // carries its foliage there, so the outline comes out round and even all the way around.
+  const CROWN = { y: 420, rh: 820, up: 320, down: 210 };
+  const outside = (p) => {
+    const r = Math.hypot(p.x, p.z) / CROWN.rh, h = (p.y - CROWN.y) / (p.y > CROWN.y ? CROWN.up : CROWN.down);
+    return r * r + h * h > 1;
+  };
+  const o = new THREE.Vector3(), t = new THREE.Vector3(), fan = new THREE.Vector3();
+  // Keep a direction growing away from the trunk (never back in through it) and inside the
+  // branch's own wedge of the crown, so it never crosses into a neighbouring limb's wood.
+  function steer(p, d, b) {
+    o.set(p.x, 0, p.z).normalize();
+    const h = d.x * o.x + d.z * o.z;
+    const hMin = Math.hypot(p.x, p.z) < 420 ? 0.25 : 0.05;
+    if (h < hMin) d.addScaledVector(o, hMin - h);
+    t.set(-o.z, 0, o.x);
+    const az = Math.atan2(p.z, p.x), dA = Math.atan2(Math.sin(az - b.home), Math.cos(az - b.home));
+    const tc = d.dot(t);
+    if (Math.abs(dA) > b.half * 0.8 && tc * dA > 0) d.addScaledVector(t, -tc * (Math.abs(dA) > b.half ? 2 : 1.2));
+    // lean toward the dome's own radial lines, which fan the twigs evenly over the shell
+    fan.set(p.x, p.y - b.fanY, p.z).normalize();
+    d.addScaledVector(fan, 0.08);
+    return d.normalize();
+  }
+
+  function grow(pos, dir, len, rad, depth, b) {
     const steps = 3;
     const p = pos.clone(), d = dir.clone();
-    const rEnd = rad * 0.68;
+    const rEnd = rad * 0.7;   // smooth taper: each branch ends where its children begin
     for (let i = 0; i < steps; i++) {
-      d.add(rv(0.4)).normalize();
-      d.y += depth < 5 ? 0.04 : -0.03 * (depth - 4); // young wood climbs, outer twigs droop
-      d.normalize();
+      d.addScaledVector(rv(1), 0.14);
+      d.y += depth < 6 ? 0.03 : -0.02 * (depth - 5); // young wood climbs, outer twigs droop a little
+      steer(p, d, b);
       const l = len / steps;
       segs.push({ p: p.clone(), d: d.clone(), l: l * 1.06, r: rad + (rEnd - rad) * (i / steps) });
       p.addScaledVector(d, l);
     }
-    if (depth >= MAX_DEPTH - 1) spots.push(p.clone());
-    if (depth >= MAX_DEPTH) return;
+    const atShell = outside(p);
+    if (depth >= MAX_DEPTH - 1 || (atShell && depth >= 5)) spots.push(p.clone());
+    if (depth >= MAX_DEPTH || atShell) return;
     const kids = rand() < 0.55 ? 3 : 2;
     const u = new THREE.Vector3().crossVectors(d, Math.abs(d.y) < 0.9 ? UP : new THREE.Vector3(1, 0, 0)).normalize();
     const v = new THREE.Vector3().crossVectors(d, u).normalize();
     const base = rand() * TAU;
     for (let k = 0; k < kids; k++) {
-      const a = base + (k / kids) * TAU + (rand() - 0.5) * 0.8;
-      const spread = 0.5 + rand() * 0.45;
+      const a = base + (k / kids) * TAU + (rand() - 0.5) * 0.3;   // evenly fanned children
+      const spread = 0.62 + rand() * 0.16;
       const cd = d.clone().multiplyScalar(Math.cos(spread))
         .addScaledVector(u, Math.cos(a) * Math.sin(spread))
         .addScaledVector(v, Math.sin(a) * Math.sin(spread));
-      cd.y += 0.05; cd.normalize();
-      grow(p, cd, len * (0.74 + rand() * 0.12), rEnd * (kids === 2 ? 0.8 : 0.7) * (0.9 + rand() * 0.15), depth + 1);
+      cd.y += 0.05;
+      steer(p, cd, b);
+      grow(p, cd, len * (0.76 + rand() * 0.06), rEnd * (kids === 2 ? 0.8 : 0.7), depth + 1, b);
     }
   }
 
-  trunk.limbEnds.forEach((L) => grow(L.p, L.d, 110, L.r * 1.02, 3));
-  trunk.limbMids.forEach((M) => grow(M.p, new THREE.Vector3(Math.cos(M.th), 0.9, Math.sin(M.th)).normalize(), 85, M.r * 0.5, 4));
+  // nine limbs, each owning the 40-degree wedge around its own angle. Inside every wedge the limb
+  // spreads low and wide, and two climbing branches (one from the limb's shoulder, one from its
+  // middle, on either side of it) fill the upper dome, so the crown is even all the way round.
+  const wedge = Math.PI / trunk.limbEnds.length;
+  const climb = (th, lean) => new THREE.Vector3(Math.cos(th) * lean, 1, Math.sin(th) * lean).normalize();
+  trunk.limbEnds.forEach((L, i) => {
+    const home = Math.atan2(L.p.z, L.p.x);
+    grow(L.p, L.d, 110, L.r * 1.02, 3, { home, half: wedge, fanY: 0 });
+    const M = trunk.limbMids[i];
+    if (!M) return;
+    const mh = M.th + wedge * 0.5;
+    grow(M.p.clone().setY(M.p.y + M.r * 0.55), climb(mh, 0.4), 105, M.r * 0.5, 4, { home: mh, half: wedge * 0.5, fanY: -300 });
+    const sh = M.th - wedge * 0.5, R = ringR(TRUNK.top) + 55;
+    const S = new THREE.Vector3(Math.cos(M.th) * R, TRUNK.top + 40, Math.sin(M.th) * R);
+    grow(S, climb(sh, 0.22), 115, M.r * 0.45, 4, { home: sh, half: wedge * 0.5, fanY: -700 });
+  });
 
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3();
 
-  const cylinder = new THREE.CylinderGeometry(0.86, 1, 1, 14, 1, true).translate(0, 0.5, 0);
+  const cylinder = new THREE.CylinderGeometry(0.86, 1, 1, 10, 1, true).translate(0, 0.5, 0);
   const bark = new THREE.InstancedMesh(cylinder, mats.bark, segs.length);
-  const joints = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 14, 10), mats.bark, segs.length + trunk.limbEnds.length);
+  const joints = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 6), mats.bark, segs.length + trunk.limbEnds.length);
   segs.forEach((s, i) => {
     q.setFromUnitVectors(UP, s.d);
     bark.setMatrixAt(i, m4.compose(s.p, q, sc.set(s.r, s.l, s.r)));
