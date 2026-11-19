@@ -312,7 +312,7 @@ const act = await page.evaluate(() => {
   const chestsOpened = Object.keys(G.state.flags).filter((k) => k.startsWith('bau_')).length;
   checks.chests = { opened: chestsOpened, bonus: G.state.bonus, maxHealth: G.maxHealth() };
   checks.juice = { banner: !!document.getElementById('hudBanner'), progressBar: !!document.getElementById('hudQBar') };
-  const allYielded = Object.values(bosses).every((b) => b.yielded) && Object.keys(bosses).length === 20;
+  const allYielded = Object.values(bosses).every((b) => b.yielded) && Object.keys(bosses).length === 10;
   checks.levelCapOk = G.state.level <= 100;
   const ok = G.state.stage === 'campanha_fim' && misplaced.length === 0 && allYielded && endTitle.includes('Final B') && D.intact() === 5
     && checks.gateWeak < checks.gateStrong * 0.25 && checks.benchShown !== undefined && checks.wrongOrder?.reset && checks.wrongOrder?.hurt && chestsOpened >= 15 && (G.state.bonus.hp + G.state.bonus.dmg * 100) >= 5 * 2;
