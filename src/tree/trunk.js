@@ -41,7 +41,7 @@ export function buildTube(points, radii, segs, radial, o) {
   for (let i = 0; i < segs; i++) {
     for (let j = 0; j < radial; j++) {
       const a = i * (radial + 1) + j, b = a + radial + 1;
-      idx.push(a, b, a + 1, b, b + 1, a + 1);
+      idx.push(a, a + 1, b, b, a + 1, b + 1);   // wound to face outward (ring runs N -> B = T x N)
     }
   }
   const geo = new THREE.BufferGeometry();
@@ -63,14 +63,16 @@ export function buildTrunk(group, barkMat) {
       pts.push(V(Math.cos(th) * R, y, Math.sin(th) * R));
       radii.push(strandR(y));
     }
-    // limb: arcs outward and up; `tilt` decides between a spreading or a climbing limb
-    const tilt = 0.05 + rand() * 0.55; // oak: limbs spread wide and low rather than climbing
-    let R = ringR(TRUNK.top), y = TRUNK.top, th = strandTheta(i, TRUNK.top);
+    // limb: one smooth arc straight out along the strand's own angle and gently up. Every limb
+    // gets the same rise (a hair of variation only), so the nine read as one even crown rhythm
+    // and none of them swings sideways across its neighbour.
+    const tilt = 0.42 + (rand() - 0.5) * 0.06;
+    let R = ringR(TRUNK.top), y = TRUNK.top;
+    const th = strandTheta(i, TRUNK.top);
     const r0 = strandR(TRUNK.top);
     for (let s = 1; s <= 6; s++) {
       R += 48 * (1.25 - tilt * 0.45);
       y += 20 + tilt * 20 - s * 3.2;
-      th += (rand() - 0.5) * 0.1;
       pts.push(V(Math.cos(th) * R, y, Math.sin(th) * R));
       radii.push(r0 * (1 - s * 0.115));
       if (s === 3) limbMids.push({ p: pts[pts.length - 1].clone(), th, r: radii[radii.length - 1] });
@@ -111,7 +113,7 @@ export function buildTrunk(group, barkMat) {
 // stays hidden. Left open: an arch at the foot of every gap (the ground entrances, ~28 m tall)
 // and a window where each top bridge leaves for its lookout.
 function buildWall(group, barkMat) {
-  const COLS = 324, Y0 = 30, Y1 = TRUNK.top + 14, DY = 4;
+  const COLS = 324, Y0 = 30, Y1 = TRUNK.top + 2, DY = 4;   // stops under the limbs, no rim above the strands
   const rows = Math.ceil((Y1 - Y0) / DY) + 1;            // row 0 is the arch line
   const angDist = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
   const nearestGap = (a, y) => Math.min(...gapAngles(y).map((g) => angDist(a, g)));
